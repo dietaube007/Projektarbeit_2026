@@ -8,7 +8,9 @@ Dieses Modul implementiert das Formular zum Erstellen neuer Tiermeldungen
 
 import flet as ft
 from services import references
+from services.posts import create_post, add_color_to_post, add_photo_to_post
 from datetime import datetime
+import base64
 
 # ════════════════════════════════════════════════════════════════════
 # KONSTANTEN
@@ -17,7 +19,7 @@ from datetime import datetime
 STATUS_VERMISST = "1"
 STATUS_GEFUNDEN = "2"
 VALID_IMAGE_TYPES = ["jpg", "jpeg", "png", "gif", "webp"]
-
+PLACEHOLDER_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 def build_report_form(page: ft.Page, sb, on_saved_callback=None):
 
@@ -47,8 +49,8 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     )
     
     # FOTOUPLOAD: Speichert Pfad und Namen des ausgewählten Bildes
-    photo_preview = ft.Image(width=400, height=250, fit=ft.ImageFit.COVER, visible=False)
-    selected_photo = {"path": None, "name": None}
+    photo_preview = ft.Image(width=400, height=250, fit=ft.ImageFit.COVER, visible=False, src_base64=PLACEHOLDER_IMAGE)
+    selected_photo = {"path": None, "name": None, "url": None, "base64": None}
     
     # NAME/ÜBERSCHRIFT: Label ändert sich je nach Meldungsart
     # "Name" für vermisste Tiere, "Überschrift" für gefundene
@@ -86,9 +88,7 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     # ════════════════════════════════════════════════════════════════════
     
     def update_title_label():
-
         # Aktualisiert das Label und Placeholder des Namensfelds.
- 
         is_vermisst = STATUS_VERMISST in (meldungsart.selected or [STATUS_VERMISST])
         title_label.value = "Name﹡" if is_vermisst else "Überschrift﹡"
         page.update()
@@ -100,67 +100,226 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     # ════════════════════════════════════════════════════════════════════
     
     async def pick_photo():
-        """
-        Öffnet den nativen Dateiauswahl-Dialog zur Fotoauswahl.
+        """Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch."""
         
-        Akzeptierte Dateitypen: jpg, jpeg, png, gif, webp
-        
-        """
         def on_result(ev: ft.FilePickerResultEvent):
             if ev.files:
                 f = ev.files[0]
-                selected_photo["path"] = f.path
                 selected_photo["name"] = f.name
-                photo_preview.src = f.path
-                photo_preview.visible = True
-                status_text.value = f"✓ Foto: {f.name}"
-                status_text.color = ft.Colors.GREEN
-                page.update()
+                
+                fp.upload([ft.FilePickerUploadFile(
+                    f.name,
+                    upload_url=page.get_upload_url(f.name, 60)
+                )])
         
-        fp = ft.FilePicker(on_result=on_result)
+        def on_upload(ev: ft.FilePickerUploadEvent):
+            if ev.progress == 1.0:
+                try:
+                    import os
+                    
+                    upload_path = f"image_uploads/{ev.file_name}"
+                    with open(upload_path, "rb") as image_file:
+                        file_bytes = image_file.read()
+                        image_data = base64.b64encode(file_bytes).decode()
+                    
+                    # Eindeutiger Dateiname
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    file_ext = ev.file_name.split(".")[-1].lower()
+                    storage_filename = f"{timestamp}_{ev.file_name}"
+                    
+                    # Upload zu Supabase Storage
+                    sb.storage.from_("pet-images").upload(
+                        path=storage_filename,
+                        file=file_bytes,
+                        file_options={"content-type": f"image/{file_ext}"}
+                    )
+                    
+                    # Public URL holen
+                    public_url = sb.storage.from_("pet-images").get_public_url(storage_filename)
+                    
+                    selected_photo["path"] = storage_filename
+                    selected_photo["base64"] = image_data
+                    selected_photo["url"] = public_url
+                    
+                    photo_preview.src_base64 = image_data
+                    photo_preview.visible = True
+                    status_text.value = f"✓ Hochgeladen: {ev.file_name}"
+                    status_text.color = ft.Colors.GREEN
+                    page.update()
+                    
+                    # Temporäre Datei löschen
+                    os.remove(upload_path)
+                    
+                except Exception as ex:
+                    status_text.value = f"❌ Fehler: {ex}"
+                    status_text.color = ft.Colors.RED
+                    page.update()
+        
+        fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
         page.overlay.append(fp)
         page.update()
         fp.pick_files(allow_multiple=False, allowed_extensions=VALID_IMAGE_TYPES)
     
     def remove_photo():
-
-        # Entfernt das aktuell ausgewählte Foto aus der Meldung.
-
+        """Entfernt das Foto aus der Vorschau UND aus Supabase Storage."""
+        try:
+            if selected_photo.get("path"):
+                sb.storage.from_("pet-images").remove([selected_photo["path"]])
+                print(f"Gelöscht aus Storage: {selected_photo['path']}")
+        except Exception as ex:
+            print(f"Fehler beim Löschen aus Storage: {ex}")
+        
+        # Zurücksetzen
         selected_photo["path"] = None
         selected_photo["name"] = None
+        selected_photo["url"] = None
+        selected_photo["base64"] = None
         photo_preview.visible = False
         status_text.value = ""
+        page.update()
+    
+    # ════════════════════════════════════════════════════════════════════
+    # SPEICHERN - Post in Datenbank speichern
+    # ════════════════════════════════════════════════════════════════════
+    
+    async def save_post(_=None):
+        """Speichert die Meldung in der Datenbank."""
+        
+        # 1. VALIDIERUNG
+        errors = []
+        
+        if not name_tf.value or not name_tf.value.strip():
+            errors.append("Name/Überschrift")
+        
+        if not species_dd.value:
+            errors.append("Tierart")
+        
+        if not selected_farben:
+            errors.append("Mindestens eine Farbe")
+        
+        if not info_tf.value or not info_tf.value.strip():
+            errors.append("Beschreibung")
+        
+        if not location_tf.value or not location_tf.value.strip():
+            errors.append("Ort")
+        
+        if not date_tf.value or not date_tf.value.strip():
+            errors.append("Datum")
+        
+        if not selected_photo.get("url"):
+            errors.append("Foto")
+        
+        if errors:
+            status_text.value = f"❌ Bitte ausfüllen: {', '.join(errors)}"
+            status_text.color = ft.Colors.RED
+            page.update()
+            return
+        
+        # 2. DATUM PARSEN
+        try:
+            event_date = datetime.strptime(date_tf.value.strip(), "%d.%m.%Y").date()
+        except ValueError:
+            status_text.value = "❌ Ungültiges Datum. Format: TT.MM.YYYY"
+            status_text.color = ft.Colors.RED
+            page.update()
+            return
+        
+        # 3. USER ID (Temporär für Entwicklung)
+        # TODO: Später durch echte Authentifizierung ersetzen
+        user_id = "d798bbdf-eb2d-4030-8830-24c93561ad4f"  
+        
+        # 4. POST ERSTELLEN
+        try:
+            status_text.value = "⏳ Erstelle Meldung..."
+            status_text.color = ft.Colors.BLUE
+            page.update()
+            
+            post_data = {
+                "user_id": user_id,
+                "post_status_id": int(list(meldungsart.selected)[0]),
+                "headline": name_tf.value.strip(),
+                "description": info_tf.value.strip(),
+                "species_id": int(species_dd.value),
+                "breed_id": int(breed_dd.value) if breed_dd.value else None,
+                "sex_id": 3,  # "unbekannt" als Default
+                "event_date": event_date.isoformat(),
+                "location_text": location_tf.value.strip(),
+            }
+            
+            # Post in Datenbank speichern
+            new_post = create_post(sb, post_data)
+            post_id = new_post["id"]
+            
+            # 5. FARBEN VERKNÜPFEN
+            for color_id in selected_farben:
+                add_color_to_post(sb, post_id, color_id)
+            
+            # 6. BILD VERKNÜPFEN
+            if selected_photo.get("url"):
+                print(f"DEBUG - Post ID: {post_id}")
+                print(f"DEBUG - Photo URL: {selected_photo['url']}")
+                add_photo_to_post(sb, post_id, selected_photo["url"])
+                print("DEBUG - add_photo_to_post aufgerufen")
+            
+            # 7. ERFOLG
+            status_text.value = "✓ Meldung erfolgreich erstellt!"
+            status_text.color = ft.Colors.GREEN
+            page.update()
+            
+            # 8. CALLBACK - Navigiert zur Startseite und lädt Liste neu
+            if on_saved_callback:
+                on_saved_callback(post_id)
+                
+        except Exception as ex:
+            status_text.value = f"❌ Fehler beim Speichern: {ex}"
+            status_text.color = ft.Colors.RED
+            page.update()
+    
+    async def reset_form(_=None):
+        """Setzt das Formular zurück."""
+        meldungsart.selected = ["1"]
+        name_tf.value = ""
+        species_dd.value = str(species_list[0]["id"]) if species_list else None
+        breed_dd.value = None
+        info_tf.value = ""
+        location_tf.value = ""
+        date_tf.value = ""
+        
+        # Farben zurücksetzen
+        selected_farben.clear()
+        for cb in farben_checkboxes.values():
+            cb.value = False
+        
+        # Foto zurücksetzen
+        selected_photo["path"] = None
+        selected_photo["name"] = None
+        selected_photo["url"] = None
+        selected_photo["base64"] = None
+        photo_preview.visible = False
+        
+        await update_breeds()
+        update_title_label()
         page.update()
     
     # ════════════════════════════════════════════════════════════════════
     # DATENLADEN - Lädt Referenzdaten aus Datenbank
     # ════════════════════════════════════════════════════════════════════
     
-    async def load_refs():
-
+    async def load_refs(_=None):
         # Lädt alle Referenzdaten aus der Datenbank.
-
         nonlocal post_statuses, species_list, breeds_by_species, colors_list
         
         try:
-            # Lade alle Referenzdaten aus den Services
             post_statuses = references.get_post_statuses(sb)
             species_list = references.get_species(sb)
             breeds_by_species = references.get_breeds_by_species(sb)
             colors_list = references.get_colors(sb)
             
-            # Fülle Tierart-Dropdown mit Optionen
             species_dd.options = [ft.dropdown.Option(str(s["id"]), s["name"]) for s in species_list]
             
-            # Baue Farben-Checkboxes auf
             farben_container.controls = []
             for color in colors_list:
                 def on_color_change(e, c_id=color["id"], c_name=color["name"]):
-                    """
-                    Callback wenn Farb-Checkbox geklickt wird.
-                    
-                    Addiert/Entfernt Farb-ID aus selected_farben Liste.
-                    """
                     if e.control.value:
                         if c_id not in selected_farben:
                             selected_farben.append(c_id)
@@ -174,7 +333,6 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
                     ft.Container(cb, col={"xs": 6, "sm": 6, "md": 4})
                 )
             
-            # Setze Standard-Werte
             if species_list:
                 species_dd.value = str(species_list[0]["id"])
                 await update_breeds()
@@ -183,14 +341,7 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         except Exception as ex:
             print(f"Fehler beim Laden der Referenzdaten: {ex}")
     
-    async def update_breeds():
-        """
-        Aktualisiert Rasse-Dropdown basierend auf ausgewählter Tierart.
-        
-        Wenn ein Benutzer eine Tierart wählt, werden die
-        entsprechenden Rassen im breed_dd geladen.
-
-        """
+    async def update_breeds(_=None):
         try:
             sid = int(species_dd.value) if species_dd.value else None
             if sid and sid in breeds_by_species:
@@ -204,7 +355,6 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
             print(f"Fehler beim Aktualisieren der Rassen: {ex}")
     
     species_dd.on_change = lambda _: page.run_task(update_breeds)
-        
     page.run_task(load_refs)
     
     # ════════════════════════════════════════════════════════════════════
@@ -213,20 +363,16 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     
     form_column = ft.Column(
         [
-            # HEADER: Formular-Titel
             ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
             ft.Divider(height=20),
             
-            # SEKTION 1: Meldungsart (Vermisst/Gefunden)
             ft.Text("Meldungsart", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             meldungsart,
             ft.Divider(height=20),
             
-            # SEKTION 2: Fotoupload mit Vorschau
             ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             ft.Container(
                 content=ft.Column([
-                    # Upload-Area (klickbar zum Öffnen des Datei-Dialogs)
                     ft.Container(
                         content=ft.Column([
                             ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=ft.Colors.GREY_500),
@@ -238,49 +384,41 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
                         border_radius=8,
                         on_click=lambda _: page.run_task(pick_photo),
                     ),
-                    # Vorschaubild (nur sichtbar wenn Foto gewählt)
                     photo_preview,
-                    # Entfernen-Button (nur sichtbar wenn Foto gewählt)
-                    ft.Row([
-                        ft.TextButton("Foto entfernen", icon=ft.Icons.DELETE, on_click=lambda _: remove_photo()),
-                    ]) if selected_photo["path"] else ft.Container(height=0),
+                    ft.TextButton("Foto entfernen", icon=ft.Icons.DELETE, on_click=lambda _: remove_photo()),
                 ], spacing=10),
             ),
             ft.Divider(height=20),
             
-            # SEKTION 3: Tier-Grundinfos (Name/Überschrift, Tierart, Rasse)
             title_label,
             name_tf,
             ft.Row([species_dd, breed_dd], spacing=15, wrap=True),
             
-            # SEKTION 4: Farben (Checkboxes in ResponsiveRow)
             ft.Text("Farben﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             farben_container,
             ft.Divider(height=20),
             
-            # SEKTION 5: Beschreibung & Besondere Merkmale
             ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             info_tf,
             ft.Divider(height=20),
             
-            # SEKTION 6: Standort & Zeitpunkt der Sichtung
             ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             location_tf,
             date_tf,
             ft.Divider(height=20),
             
-            # SEKTION 7: Speichern-Button und Status-Nachricht
+            # BUTTON MIT on_click VERKNÜPFT
             ft.Row([
-                ft.FilledButton("Meldung speichern", width=200),
+                ft.FilledButton(
+                    "Meldung erstellen", 
+                    width=200, 
+                    on_click=lambda e: page.run_task(save_post, e)
+                ),
             ]),
             status_text,
         ],
         spacing=10,
     )
-    
-    # ════════════════════════════════════════════════════════════════════
-    # RÜCKGABE - Scrollbarer Container mit kompletten Formular
-    # ════════════════════════════════════════════════════════════════════
     
     return ft.Column(
         [form_column],

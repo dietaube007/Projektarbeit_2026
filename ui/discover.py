@@ -67,7 +67,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
     # LOAD_REFERENCES - LÄDT FILTER-OPTIONEN AUS DATENBANK
     # ════════════════════════════════════════════════════════════════════
     
-    async def load_references():
+    async def load_references(_=None):
         
         # Lädt Kategorien, Tierarten, Farben und Geschlechter aus der Datenbank.
 
@@ -282,7 +282,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
     # DATEN LADEN UND FILTERN
     # ════════════════════════════════════════════════════════════════════
     
-    async def load():
+    async def load(_=None):
         """
         Lädt Meldungen aus der Datenbank.
 

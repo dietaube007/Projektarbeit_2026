@@ -1,3 +1,6 @@
+import os
+os.environ["FLET_SECRET_KEY"] = "MeinGeheimesPasswort2025!"
+
 import flet as ft
 from services.supabase_client import get_client
 from ui.theme import apply_theme, theme_toggle, soft_card
@@ -40,9 +43,19 @@ def main(page: ft.Page):
     # UI-BEREICHE LADEN
     # ════════════════════════════════════════════════════════════════════
     
+    def on_post_saved(post_id=None):
+        """Callback nach erfolgreicher Meldung - lädt Liste neu und navigiert zur Startseite."""
+        nonlocal current_tab
+        # Liste neu laden
+        page.run_task(search_load)
+        # Zur Startseite navigieren
+        current_tab = TAB_START
+        nav.selected_index = TAB_START
+        render_tab()
+    
     try:
         list_map_section, search_load, search_row = build_list_and_map(page, sb, on_contact_click=None, on_melden_click=go_to_report_tab)
-        report_form = build_report_form(page, sb, on_saved_callback=search_load)
+        report_form = build_report_form(page, sb, on_saved_callback=on_post_saved)
     except Exception as e:
         page.snack_bar = ft.SnackBar(ft.Text(f"Fehler beim Laden der UI: {str(e)}"))
         page.snack_bar.open = True
@@ -126,4 +139,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    ft.app(target=main, upload_dir="image_uploads", view=ft.AppView.WEB_BROWSER)
