@@ -8,10 +8,8 @@ Dieses Modul verwaltet alle Datenbankoperationen für Posts/Tier-Meldungen:
 
 """
 
-import os
 from supabase import Client
-from typing import Dict, Any, List
-from pathlib import Path
+from typing import Dict, Any
 
 
 STORAGE_BUCKET = "pet-images"  # Name des Storage Buckets in Supabase
@@ -58,58 +56,54 @@ def add_color_to_post(sb: Client, post_id: str, color_id: int) -> None:
         print(f"Fehler beim Hinzufügen der Farbe {color_id} zu Post {post_id}: {ex}")
 
 
-def upload_photo(sb: Client, post_id: str, photo_path: str) -> str:
-    """
-    Lädt ein Foto zu Supabase Storage hoch.
-    
-    Args:
-        sb: Supabase Client
-        post_id: ID der Meldung (für Dateiorganisation)
-        photo_path: Lokaler Pfad zum Foto
-    
-    Returns:
-        URL des hochgeladenen Fotos in Supabase Storage
-    
-    Raises:
-        RuntimeError: Bei Fehler beim Upload
-    """
-    try:
-        # Validiere dass Datei existiert
-        if not os.path.exists(photo_path):
-            raise RuntimeError(f"Foto nicht gefunden: {photo_path}")
-        
-        # Erstelle eindeutigen Dateinamen: post_id/filename
-        file_name = Path(photo_path).name
-        file_path = f"{post_id}/{file_name}"
-        
-        # Lese Datei
-        with open(photo_path, "rb") as f:
-            file_data = f.read()
-        
-        # Lade zu Storage hoch
-        res = sb.storage.from_(STORAGE_BUCKET).upload(
-            file=file_data,
-            path=file_path,
-            file_options={"cacheControl": "3600", "upsert": "false"},
-        )
-        
-        # Konstruiere Public URL
-        public_url = sb.storage.from_(STORAGE_BUCKET).get_public_url(file_path)
-        
-        return public_url
-        
-    except Exception as ex:
-        raise RuntimeError(f"Fehler beim Hochladen des Fotos: {str(ex)}")
-
-
 def add_photo_to_post(sb: Client, post_id: str, photo_url: str) -> None:
     """Speichert die Foto-URL in der post_image Tabelle."""
     try:
-        print(f"DEBUG - Speichere Bild: post_id={post_id}, url={photo_url}")
-        result = sb.table("post_image").insert({
+        sb.table("post_image").insert({
             "post_id": post_id,
             "url": photo_url,
         }).execute()
-        print(f"DEBUG - Result: {result}")
     except Exception as ex:
         print(f"Fehler beim Speichern der Foto-URL: {ex}")
+
+
+def delete_post(sb: Client, post_id: str) -> bool:
+    # Löscht einen Post komplett aus der Datenbank UND das zugehörige Bild aus dem Storage.
+
+    try:
+        # 1. Hole die Bild-URLs aus post_image Tabelle
+        images_res = sb.table("post_image").select("url").eq("post_id", post_id).execute()
+        image_urls = [img["url"] for img in (images_res.data or [])]
+        
+        # 2. Lösche Bilder aus Supabase Storage
+        for url in image_urls:
+            try:
+                if STORAGE_BUCKET in url:
+                    parts = url.split(f"{STORAGE_BUCKET}/")
+                    if len(parts) > 1:
+                        file_path = parts[1].split("?")[0]
+                        sb.storage.from_(STORAGE_BUCKET).remove([file_path])
+            except Exception:
+                pass  # Fehler beim Bild-Löschen ignorieren
+        
+        # 3. Lösche verknüpfte Daten
+        sb.table("post_image").delete().eq("post_id", post_id).execute()
+        sb.table("post_color").delete().eq("post_id", post_id).execute()
+        
+        # 4. Lösche den Post selbst
+        sb.table("post").delete().eq("id", post_id).execute()
+        
+        return True
+        
+    except Exception:
+        return False
+
+
+def get_post_by_id(sb: Client, post_id: str) -> Dict[str, Any] | None:
+    """Holt einen einzelnen Post anhand seiner ID."""
+    try:
+        res = sb.table("post").select("*, post_image(url)").eq("id", post_id).execute()
+        return res.data[0] if res.data else None
+    except Exception as ex:
+        print(f"Fehler beim Laden des Posts: {ex}")
+        return None

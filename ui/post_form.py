@@ -6,22 +6,33 @@ Dieses Modul implementiert das Formular zum Erstellen neuer Tiermeldungen
 
 """
 
+import os
+import base64
+from datetime import datetime
+from typing import Callable, Optional
+
 import flet as ft
 from services import references
 from services.posts import create_post, add_color_to_post, add_photo_to_post
-from datetime import datetime
-import base64
 
 # ════════════════════════════════════════════════════════════════════
 # KONSTANTEN
 # ════════════════════════════════════════════════════════════════════
 
-STATUS_VERMISST = "1"
-STATUS_GEFUNDEN = "2"
 VALID_IMAGE_TYPES = ["jpg", "jpeg", "png", "gif", "webp"]
 PLACEHOLDER_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+STORAGE_BUCKET = "pet-images"
+UPLOAD_DIR = "image_uploads"
+DATE_FORMAT = "%d.%m.%Y"
 
-def build_report_form(page: ft.Page, sb, on_saved_callback=None):
+# Meldungsarten die im Formular angezeigt werden (ohne "Wiedervereint")
+ALLOWED_POST_STATUSES = ["vermisst", "fundtier"]
+
+def build_report_form(
+    page: ft.Page, 
+    sb, 
+    on_saved_callback: Optional[Callable] = None
+) -> ft.Column:
 
     # Baut das Tiermeldungs-Formular mit allen erforderlichen Feldern.
 
@@ -29,22 +40,21 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     # REFERENZDATEN - Werden aus Datenbank geladen
     # ════════════════════════════════════════════════════════════════════
     
-    post_statuses = []
+    post_statuses = []  # Meldungsarten (Vermisst, Gefunden, etc.)
     species_list = []
     breeds_by_species = {}
     colors_list = []
+    sex_list = []  # Geschlechter (Männlich, Weiblich, Unbekannt)
     
     # ════════════════════════════════════════════════════════════════════
     # UI-ELEMENTE - Eingabefelder und Kontrollelemente
     # ════════════════════════════════════════════════════════════════════
     
-    # MELDUNGSART: Segmentierter Button für Vermisst/Gefunden Auswahl
+    # MELDUNGSART: SegmentedButton für Vermisst/Gefunden
     meldungsart = ft.SegmentedButton(
-        segments=[
-            ft.Segment(value="1", label=ft.Text("Vermisst")),
-            ft.Segment(value="2", label=ft.Text("Gefunden")),
-        ],
-        selected=["1"],
+        selected={"1"},  # Default: Vermisst (ID 1)
+        segments=[],  # Wird in load_refs() befüllt
+        allow_empty_selection=False,
         allow_multiple_selection=False,
     )
     
@@ -57,16 +67,49 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     title_label = ft.Text("Name﹡", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700)
     name_tf = ft.TextField(width=400)
     
-    # TIERDETAILS: Dropdowns für Tierart und Rasse
+    # TIERDETAILS: Dropdowns für Tierart, Rasse und Geschlecht
     # Rasse-Dropdown wird dynamisch basierend auf ausgewählter Tierart gefüllt
     species_dd = ft.Dropdown(label="Tierart﹡", text_size=14, width=250)
     breed_dd = ft.Dropdown(label="Rasse (optional)", width=250)
+    sex_dd = ft.Dropdown(label="Geschlecht (optional)", width=250)
     
     # FARBEN: Responsive Row mit Checkboxes für Mehrfach-Auswahl
     # Benutzer können eine oder mehrere Farben auswählen
     farben_checkboxes = {}
     selected_farben = []
     farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
+    
+    # Farben-Panel klappbar machen (wie in discover.py)
+    farben_panel_visible = {"value": True}  # Dict für nonlocal-Zugriff
+    farben_panel = ft.Container(
+        content=farben_container,
+        padding=12,
+        visible=True,
+    )
+    
+    farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
+    
+    def toggle_farben_panel(_):
+        farben_panel_visible["value"] = not farben_panel_visible["value"]
+        farben_panel.visible = farben_panel_visible["value"]
+        farben_toggle_icon.name = ft.Icons.KEYBOARD_ARROW_UP if farben_panel_visible["value"] else ft.Icons.KEYBOARD_ARROW_DOWN
+        page.update()
+    
+    farben_header = ft.Container(
+        content=ft.Row(
+            [
+                ft.Icon(ft.Icons.PALETTE, size=18),
+                ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600),
+                ft.Container(expand=True),
+                farben_toggle_icon,
+            ],
+            spacing=12,
+        ),
+        padding=8,
+        on_click=toggle_farben_panel,
+        border_radius=8,
+        bgcolor=ft.Colors.GREY_100,
+    )
     
     # BESCHREIBUNG: Mehrzeiliges Textfeld für Details und Merkmale
     info_tf = ft.TextField(
@@ -87,15 +130,25 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     # HILFSFUNKTIONEN - Reagieren auf Benutzerinteraktion
     # ════════════════════════════════════════════════════════════════════
     
-    def update_title_label():
-        # Aktualisiert das Label und Placeholder des Namensfelds.
-        is_vermisst = STATUS_VERMISST in (meldungsart.selected or [STATUS_VERMISST])
-        title_label.value = "Name﹡" if is_vermisst else "Überschrift﹡"
+    def update_title_label(_=None):
+        """Aktualisiert das Label basierend auf der gewählten Meldungsart."""
+        selected_id = list(meldungsart.selected)[0] if meldungsart.selected else None
+        
+        # Finde den Namen der gewählten Meldungsart
+        selected_status = None
+        for status in post_statuses:
+            if str(status["id"]) == selected_id:
+                selected_status = status["name"].lower()
+                break
+        
+        # "Vermisst" -> Name des Tieres, "Gefunden" -> Überschrift
+        if selected_status == "vermisst":
+            title_label.value = "Name﹡"
+        else:
+            title_label.value = "Überschrift﹡"
         page.update()
-    
-    meldungsart.on_change = lambda _: update_title_label()
-    
-    # ════════════════════════════════════════════════════════════════════
+
+    meldungsart.on_change = update_title_label    # ════════════════════════════════════════════════════════════════════
     # FOTOMANAGEMENT - Upload und Vorschau
     # ════════════════════════════════════════════════════════════════════
     
@@ -115,9 +168,7 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         def on_upload(ev: ft.FilePickerUploadEvent):
             if ev.progress == 1.0:
                 try:
-                    import os
-                    
-                    upload_path = f"image_uploads/{ev.file_name}"
+                    upload_path = f"{UPLOAD_DIR}/{ev.file_name}"
                     with open(upload_path, "rb") as image_file:
                         file_bytes = image_file.read()
                         image_data = base64.b64encode(file_bytes).decode()
@@ -128,14 +179,14 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
                     storage_filename = f"{timestamp}_{ev.file_name}"
                     
                     # Upload zu Supabase Storage
-                    sb.storage.from_("pet-images").upload(
+                    sb.storage.from_(STORAGE_BUCKET).upload(
                         path=storage_filename,
                         file=file_bytes,
                         file_options={"content-type": f"image/{file_ext}"}
                     )
                     
                     # Public URL holen
-                    public_url = sb.storage.from_("pet-images").get_public_url(storage_filename)
+                    public_url = sb.storage.from_(STORAGE_BUCKET).get_public_url(storage_filename)
                     
                     selected_photo["path"] = storage_filename
                     selected_photo["base64"] = image_data
@@ -164,7 +215,7 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         """Entfernt das Foto aus der Vorschau UND aus Supabase Storage."""
         try:
             if selected_photo.get("path"):
-                sb.storage.from_("pet-images").remove([selected_photo["path"]])
+                sb.storage.from_(STORAGE_BUCKET).remove([selected_photo["path"]])
                 print(f"Gelöscht aus Storage: {selected_photo['path']}")
         except Exception as ex:
             print(f"Fehler beim Löschen aus Storage: {ex}")
@@ -217,9 +268,9 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         
         # 2. DATUM PARSEN
         try:
-            event_date = datetime.strptime(date_tf.value.strip(), "%d.%m.%Y").date()
+            event_date = datetime.strptime(date_tf.value.strip(), DATE_FORMAT).date()
         except ValueError:
-            status_text.value = "❌ Ungültiges Datum. Format: TT.MM.YYYY"
+            status_text.value = f"❌ Ungültiges Datum. Format: TT.MM.YYYY"
             status_text.color = ft.Colors.RED
             page.update()
             return
@@ -240,8 +291,8 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
                 "headline": name_tf.value.strip(),
                 "description": info_tf.value.strip(),
                 "species_id": int(species_dd.value),
-                "breed_id": int(breed_dd.value) if breed_dd.value else None,
-                "sex_id": 3,  # "unbekannt" als Default
+                "breed_id": int(breed_dd.value) if breed_dd.value and breed_dd.value.isdigit() else None,
+                "sex_id": int(sex_dd.value) if sex_dd.value and sex_dd.value.isdigit() else None,
                 "event_date": event_date.isoformat(),
                 "location_text": location_tf.value.strip(),
             }
@@ -256,17 +307,17 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
             
             # 6. BILD VERKNÜPFEN
             if selected_photo.get("url"):
-                print(f"DEBUG - Post ID: {post_id}")
-                print(f"DEBUG - Photo URL: {selected_photo['url']}")
                 add_photo_to_post(sb, post_id, selected_photo["url"])
-                print("DEBUG - add_photo_to_post aufgerufen")
             
             # 7. ERFOLG
             status_text.value = "✓ Meldung erfolgreich erstellt!"
             status_text.color = ft.Colors.GREEN
             page.update()
             
-            # 8. CALLBACK - Navigiert zur Startseite und lädt Liste neu
+            # 8. FORMULAR ZURÜCKSETZEN
+            reset_form()
+            
+            # 9. CALLBACK - Navigiert zur Startseite und lädt Liste neu
             if on_saved_callback:
                 on_saved_callback(post_id)
                 
@@ -275,12 +326,15 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
             status_text.color = ft.Colors.RED
             page.update()
     
-    async def reset_form(_=None):
-        """Setzt das Formular zurück."""
-        meldungsart.selected = ["1"]
+    def reset_form():
+        """Setzt das Formular auf Standardwerte zurück."""
+        if post_statuses:
+            meldungsart.selected = {str(post_statuses[0]["id"])}
         name_tf.value = ""
-        species_dd.value = str(species_list[0]["id"]) if species_list else None
+        if species_list:
+            species_dd.value = str(species_list[0]["id"])
         breed_dd.value = None
+        breed_dd.options = []
         info_tf.value = ""
         location_tf.value = ""
         date_tf.value = ""
@@ -290,15 +344,17 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         for cb in farben_checkboxes.values():
             cb.value = False
         
-        # Foto zurücksetzen
+        # Foto zurücksetzen (ohne Storage zu löschen - Bild wurde ja gespeichert)
         selected_photo["path"] = None
         selected_photo["name"] = None
         selected_photo["url"] = None
         selected_photo["base64"] = None
         photo_preview.visible = False
         
-        await update_breeds()
-        update_title_label()
+        # Label zurücksetzen
+        title_label.value = "Name﹡"
+        status_text.value = ""
+        
         page.update()
     
     # ════════════════════════════════════════════════════════════════════
@@ -307,19 +363,33 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
     
     async def load_refs(_=None):
         # Lädt alle Referenzdaten aus der Datenbank.
-        nonlocal post_statuses, species_list, breeds_by_species, colors_list
+        nonlocal post_statuses, species_list, breeds_by_species, colors_list, sex_list
         
         try:
-            post_statuses = references.get_post_statuses(sb)
+            # Lade Meldungsarten (Vermisst, Fundtier) - ohne "Wiedervereint"
+            all_statuses = references.get_post_statuses(sb)
+            post_statuses = [s for s in all_statuses if s["name"].lower() in ALLOWED_POST_STATUSES]
+            meldungsart.segments = [
+                ft.Segment(value=str(s["id"]), label=ft.Text(s["name"])) for s in post_statuses
+            ]
+            if post_statuses:
+                meldungsart.selected = {str(post_statuses[0]["id"])}
+            
             species_list = references.get_species(sb)
             breeds_by_species = references.get_breeds_by_species(sb)
             colors_list = references.get_colors(sb)
+            sex_list = references.get_sex(sb)
             
             species_dd.options = [ft.dropdown.Option(str(s["id"]), s["name"]) for s in species_list]
             
+            # Geschlecht mit "Keine Angabe" Option
+            sex_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
+            sex_dd.options += [ft.dropdown.Option(str(s["id"]), s["name"]) for s in sex_list]
+            sex_dd.value = "none"  # Standard: Keine Angabe
+            
             farben_container.controls = []
             for color in colors_list:
-                def on_color_change(e, c_id=color["id"], c_name=color["name"]):
+                def on_color_change(e, c_id=color["id"]):
                     if e.control.value:
                         if c_id not in selected_farben:
                             selected_farben.append(c_id)
@@ -330,14 +400,19 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
                 cb = ft.Checkbox(label=color["name"], value=False, on_change=on_color_change)
                 farben_checkboxes[color["id"]] = cb
                 farben_container.controls.append(
-                    ft.Container(cb, col={"xs": 6, "sm": 6, "md": 4})
+                    ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
                 )
             
+            # Setze Tierart und lade Rassen
             if species_list:
                 species_dd.value = str(species_list[0]["id"])
-                await update_breeds()
             
             page.update()
+            
+            # Lade Rassen NACH page.update() damit species_dd.value gesetzt ist
+            if species_list:
+                await update_breeds()
+                page.update()
         except Exception as ex:
             print(f"Fehler beim Laden der Referenzdaten: {ex}")
     
@@ -345,11 +420,13 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
         try:
             sid = int(species_dd.value) if species_dd.value else None
             if sid and sid in breeds_by_species:
-                breed_dd.options = [ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds_by_species[sid]]
-                if breed_dd.options:
-                    breed_dd.value = breed_dd.options[0].key
+                # Leere Option am Anfang für "Keine Angabe"
+                breed_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
+                breed_dd.options += [ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds_by_species[sid]]
+                breed_dd.value = "none"  # Standard: Keine Angabe
             else:
-                breed_dd.options = []
+                breed_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
+                breed_dd.value = "none"
             page.update()
         except Exception as ex:
             print(f"Fehler beim Aktualisieren der Rassen: {ex}")
@@ -366,7 +443,6 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
             ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
             ft.Divider(height=20),
             
-            ft.Text("Meldungsart", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
             meldungsart,
             ft.Divider(height=20),
             
@@ -392,10 +468,10 @@ def build_report_form(page: ft.Page, sb, on_saved_callback=None):
             
             title_label,
             name_tf,
-            ft.Row([species_dd, breed_dd], spacing=15, wrap=True),
+            ft.Row([species_dd, breed_dd, sex_dd], spacing=15, wrap=True),
             
-            ft.Text("Farben﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
-            farben_container,
+            farben_header,
+            farben_panel,
             ft.Divider(height=20),
             
             ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),

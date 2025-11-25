@@ -7,12 +7,38 @@ filtern und als sortierte Liste anzeigen lassen.
 
 """
 
+from typing import Callable, Optional
 import flet as ft
 from ui.theme import soft_card, chip
 from services.references import get_species, get_colors, get_sex, get_post_statuses
 
+# ════════════════════════════════════════════════════════════════════
+# KONSTANTEN
+# ════════════════════════════════════════════════════════════════════
 
-def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None):
+# Farben für Meldungsstatus-Badges
+STATUS_COLORS = {
+    "vermisst": ft.Colors.RED_400,
+    "fundtier": ft.Colors.BLUE_400,
+    "wiedervereint": ft.Colors.GREEN_400,
+}
+
+# Farben für Tierart-Badges
+SPECIES_COLORS = {
+    "hund": ft.Colors.AMBER_600,
+    "katze": ft.Colors.PURPLE_400,
+    "kleintier": ft.Colors.CYAN_500,
+}
+
+MAX_POSTS_LIMIT = 200  # Maximale Anzahl geladener Meldungen
+
+
+def build_list_and_map(
+    page: ft.Page, 
+    sb, 
+    on_contact_click: Optional[Callable] = None, 
+    on_melden_click: Optional[Callable] = None
+):
     """
     Baut die Discover-Ansicht (Liste) mit dynamischen Suchfiltern.
     
@@ -51,7 +77,6 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
     )
     
     # Filter: Farbe/Farbmuster - Checkboxes in expandierbarem Panel
-    farben_checkboxes = {}
     selected_farben = []
     farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
     
@@ -89,7 +114,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
             # Lade Farben als Checkboxes
             farben_filter_container.controls = []
             for color in get_colors(sb):
-                def on_color_change(e, c_id=color["id"], c_name=color["name"]):
+                def on_color_change(e, c_id=color["id"]):
                     if e.control.value:
                         if c_id not in selected_farben:
                             selected_farben.append(c_id)
@@ -98,7 +123,6 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
                             selected_farben.remove(c_id)
                 
                 cb = ft.Checkbox(label=color["name"], value=False, on_change=on_color_change)
-                farben_checkboxes[color["id"]] = cb
                 farben_filter_container.controls.append(
                     ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
                 )
@@ -139,23 +163,18 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
     # ════════════════════════════════════════════════════════════════════
     
     def _badge_for_typ(typ: str) -> ft.Control:
-        """
-        Erstellt einen farbigen Badge basierend auf dem Meldungsstatus.
-        
-        Mögliche Status aus der Datenbank:
-        - "vermisst": ROT (jemand sucht ein Tier)
-        - "gefunden": BLAU (jemand hat ein Tier gefunden, sucht Besitzer)
-        - "wiedervereint": GRÜN (Tier wurde gefunden & Besitzer benachrichtigt)
-        """
+        """Erstellt einen farbigen Badge basierend auf dem Meldungsstatus."""
         typ_lower = (typ or "").lower().strip()
-        if typ_lower == "vermisst":
-            return chip("Vermisst", ft.Colors.RED_400)
-        if typ_lower == "gefunden":
-            return chip("Gefunden", ft.Colors.BLUE_400)
-        if typ_lower == "wiedervereint":
-            return chip("Wiedervereint", ft.Colors.GREEN_400)
-        # Fallback für unerwartete Status
-        return chip(typ.capitalize() if typ else "Unknown", ft.Colors.GREY_700)
+        color = STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
+        label = typ.capitalize() if typ else "Unbekannt"
+        return chip(label, color)
+
+    def _badge_for_species(species: str) -> ft.Control:
+        """Erstellt einen farbigen Badge basierend auf der Tierart."""
+        species_lower = (species or "").lower().strip()
+        color = SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
+        label = species.capitalize() if species else "Unbekannt"
+        return chip(label, color)
 
     def _meta(icon, text: str) -> ft.Control:
         """
@@ -165,8 +184,8 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
         wie Ort, Datum, Status. Icon + Text nebeneinander angeordnet.
         """
         return ft.Row(
-            [ft.Icon(icon, size=16, color=ft.Colors.GREY_700), 
-             ft.Text(text, color=ft.Colors.GREY_700)],
+            [ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT), 
+             ft.Text(text, color=ft.Colors.ON_SURFACE_VARIANT)],
             spacing=6,
         )
 
@@ -184,17 +203,30 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
         Die Karte hat Hover-Effekte (leicht Vergrößerung bei Mouse-Over).
         """
         # EXTRAHIERE MELDUNGS-DATEN
-        imgs = item.get("images") or []
-        img_src = imgs[0] if isinstance(imgs, list) and imgs else None
-        rid = str(item.get("id"))
+        # Bilder aus post_image Relation (Array von {url: "..."})
+        post_images = item.get("post_image") or []
+        img_src = post_images[0].get("url") if post_images else None
+        
         title = item.get("headline") or "Ohne Namen"
-        typ = item.get("post_status", {}).get("name", "")
-        art = item.get("species", {}).get("name", "")
-        rasse = item.get("breed", {}).get("name") or "Mischling"
-        farbe = item.get("color", {}).get("name") or ""
+        
+        # Relationen können None sein oder Objekte mit "name"
+        post_status = item.get("post_status") or {}
+        typ = post_status.get("name", "") if isinstance(post_status, dict) else ""
+        
+        species = item.get("species") or {}
+        art = species.get("name", "") if isinstance(species, dict) else ""
+        
+        breed = item.get("breed") or {}
+        rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
+        
+        # Farben aus post_color Relation (Array von {color: {name: "..."}}
+        post_colors = item.get("post_color") or []
+        farben_namen = [pc.get("color", {}).get("name", "") for pc in post_colors if pc.get("color")]
+        farbe = ", ".join(farben_namen) if farben_namen else ""
+        
         ort = item.get("location_text") or ""
         when = (item.get("event_date") or item.get("created_at") or "")[:10]
-        status = item.get("is_active") and "Aktiv" or "Inaktiv"
+        status = "Aktiv" if item.get("is_active") else "Inaktiv"
 
         # BILD-CONTAINER
         visual = ft.Container(
@@ -213,7 +245,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
 
         # BADGES (Kategorie, Tierart)
         badges = ft.Row(
-            [_badge_for_typ(typ), chip(art.capitalize(), ft.Colors.GREY_700)],
+            [_badge_for_typ(typ), _badge_for_species(art)],
             spacing=8,
             wrap=True,
         )
@@ -229,7 +261,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
         )
 
         # RASSE UND FARBE
-        line1 = ft.Text(f"{rasse} • {farbe}".strip(" • "), color=ft.Colors.GREY_700)
+        line1 = ft.Text(f"{rasse} • {farbe}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
         
         # METADATEN (Ort, Datum, Status)
         metas = ft.Row(
@@ -256,7 +288,7 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
                 ft.FilledButton(
                     "Kontakt",
                     icon=ft.Icons.EMAIL,
-                    on_click=lambda e, it=item: on_contact_click(it),
+                    on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
                 ),
                 ft.IconButton(ft.Icons.SHARE, tooltip="Teilen", on_click=share),
             ],
@@ -288,18 +320,26 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
 
         """
         try:
-            # KONSTRUIERE SUPABASE QUERY
-            query = sb.table("post").select("*")
+            # KONSTRUIERE SUPABASE QUERY MIT RELATIONEN
+            query = sb.table("post").select("""
+                *,
+                post_status(id, name),
+                species(id, name),
+                breed(id, name),
+                post_image(url),
+                post_color(color(id, name))
+            """)
             
             # FÜHRE QUERY AUS
-            result = query.limit(200).execute()
+            result = query.limit(MAX_POSTS_LIMIT).execute()
             items = result.data
             
             # GENERIERE UI
-            # Zeige immer die Empty State Card oben, dann die Meldungen
             if items:
-                list_view.controls = [empty_state_card] + [big_card(it) for it in items]
+                # Meldungen vorhanden - zeige nur die Karten
+                list_view.controls = [big_card(it) for it in items]
             else:
+                # Keine Meldungen - zeige Empty State
                 list_view.controls = [empty_state_card]
             
             page.update()
@@ -368,10 +408,21 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
         content=ft.Column([list_view], spacing=12),
     )
     
-    # KARTEN-CONTAINER: Zeigt gleiche Liste (Kartenfunktionen entfernt)
+    # KARTEN-CONTAINER: Platzhalter für zukünftige Kartenansicht
+    map_placeholder = ft.Column(
+        [
+            ft.Container(height=50),
+            ft.Icon(ft.Icons.MAP_OUTLINED, size=64, color=ft.Colors.GREY_400),
+            ft.Text("Kartenansicht", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_600),
+            ft.Text("Kommt bald!", color=ft.Colors.GREY_500),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
     map_container = ft.Container(
         padding=4,
-        content=ft.Column([list_view], spacing=12),
+        content=map_placeholder,
+        expand=True,
     )
     
     # TABS: Wähle zwischen Liste und Karte
@@ -400,6 +451,9 @@ def build_list_and_map(page: ft.Page, sb, on_contact_click, on_melden_click=None
     
     # Starte asynchrones Laden der Filter-Optionen
     page.run_task(load_references)
+    
+    # Lade Meldungen beim App-Start
+    page.run_task(load)
 
     # ════════════════════════════════════════════════════════════════════
     # RÜCKGABE AN MAIN.PY
