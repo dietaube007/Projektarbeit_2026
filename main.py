@@ -6,6 +6,7 @@ from services.supabase_client import get_client
 from ui.theme import ThemeManager, soft_card
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
+from ui.auth import AuthView
 from dotenv import load_dotenv
 
 # Lade Umgebungsvariablen aus .env
@@ -29,6 +30,7 @@ class PetBuddyApp:
         self.current_tab = self.TAB_START
         self.sb = None
         self.theme_manager = None
+        self.is_logged_in = False
         
         # UI-Komponenten
         self.body = ft.Container(padding=16, expand=True)
@@ -37,6 +39,7 @@ class PetBuddyApp:
         self.post_form = None
         self.discover_view = None
         self.profile_card = None
+        self.auth_view = None
         
     def initialize(self) -> bool:
         # Initialisiert die Seite und Supabase-Client. Gibt False bei Fehler zurück.
@@ -188,11 +191,9 @@ class PetBuddyApp:
     # APP STARTEN
     # ════════════════════════════════════════════════════════════════════
     
-    def run(self):
-        # Startet die Anwendung.
-        # Initialisierung
-        if not self.initialize():
-            return
+    def _show_main_app(self):
+        # Zeigt die Hauptanwendung nach erfolgreichem Login.
+        self.is_logged_in = True
         
         # UI aufbauen
         if not self.build_ui():
@@ -203,7 +204,8 @@ class PetBuddyApp:
         self.start_section = self._build_start_section()
         self.nav = self._build_navigation()
         
-        # Hauptseite aufbauen
+        # Seite leeren und neu aufbauen
+        self.page.controls.clear()
         self.page.appbar = self._build_appbar()
         self.page.navigation_bar = self.nav
         self.page.add(self.body)
@@ -212,6 +214,37 @@ class PetBuddyApp:
         self.render_tab()
         self.page.run_task(self.discover_view.load_posts)
         self.page.update()
+    
+    def _show_login(self):
+        """Zeigt die Login-Maske."""
+        self.auth_view = AuthView(
+            page=self.page,
+            sb=self.sb,
+            on_auth_success=self._show_main_app
+        )
+        
+        # Seite für Login vorbereiten
+        self.page.appbar = None
+        self.page.navigation_bar = None
+        self.page.controls.clear()
+        self.page.add(self.auth_view.build())
+        self.page.update()
+    
+    def run(self):
+        # Startet die Anwendung.
+        # Initialisierung
+        if not self.initialize():
+            return
+        
+        # Prüfen ob bereits eingeloggt
+        try:
+            user = self.sb.auth.get_user()
+            if user and user.user:
+                self._show_main_app()
+            else:
+                self._show_login()
+        except:
+            self._show_login()
 
 
 def main(page: ft.Page):
@@ -221,4 +254,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main, upload_dir="image_uploads", view=ft.AppView.WEB_BROWSER)
+    ft.app(target=main, upload_dir="image_uploads", view=ft.AppView.WEB_BROWSER, port=8550)

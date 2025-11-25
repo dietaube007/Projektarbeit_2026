@@ -5,7 +5,6 @@ Dieses Modul implementiert die Haupt-Entdeckungsseite der PetBuddy-Anwendung.
 Benutzer können verschiedene verlorene oder gefundene Haustier-Meldungen durchsuchen,
 filtern und als sortierte Liste anzeigen lassen.
 
-Objektorientierte Implementierung mit der DiscoverView-Klasse.
 """
 
 from typing import Callable, Optional
@@ -15,25 +14,25 @@ from services.references import get_species, get_colors, get_sex, get_post_statu
 
 
 class DiscoverView:
-    """Klasse für die Entdeckungs-/Suchansicht."""
+    # Klasse für die Startseite
     
     # ════════════════════════════════════════════════════════════════════
     # KONSTANTEN
     # ════════════════════════════════════════════════════════════════════
     
     STATUS_COLORS = {
-        "vermisst": ft.Colors.RED_400,
-        "fundtier": ft.Colors.BLUE_400,
-        "wiedervereint": ft.Colors.GREEN_400,
+        "vermisst": ft.Colors.RED_200,
+        "fundtier": ft.Colors.INDIGO_300,
+        "wiedervereint": ft.Colors.LIGHT_GREEN_200,
     }
     
     SPECIES_COLORS = {
-        "hund": ft.Colors.AMBER_600,
-        "katze": ft.Colors.PURPLE_400,
-        "kleintier": ft.Colors.CYAN_500,
+        "hund": ft.Colors.PURPLE_200,
+        "katze": ft.Colors.PINK_200,
+        "kleintier": ft.Colors.TEAL_200,
     }
     
-    MAX_POSTS_LIMIT = 200
+    MAX_POSTS_LIMIT = 30
     
     def __init__(
         self,
@@ -263,18 +262,26 @@ class DiscoverView:
         status = "Aktiv" if item.get("is_active") else "Inaktiv"
         
         # Bild-Container
+        if img_src:
+            visual_content = ft.Image(
+                src=img_src,
+                height=220,
+                fit=ft.ImageFit.COVER,
+                gapless_playback=True,
+            )
+        else:
+            visual_content = ft.Container(
+                height=220,
+                bgcolor=ft.Colors.GREY_100,
+                alignment=ft.alignment.center,
+                content=ft.Icon(ft.Icons.PETS, size=64, color=ft.Colors.GREY_500),
+            )
+        
         visual = ft.Container(
-            content=(
-                ft.Image(src=img_src, height=220, fit=ft.ImageFit.COVER)
-                if img_src
-                else ft.Container(
-                    height=220,
-                    alignment=ft.alignment.center,
-                    content=ft.Icon(ft.Icons.PETS, size=64, color=ft.Colors.GREY_500),
-                )
-            ),
+            content=visual_content,
             border_radius=16,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            bgcolor=ft.Colors.GREY_200,  # Hintergrundfarbe während Laden
         )
         
         # Badges
@@ -348,15 +355,31 @@ class DiscoverView:
     
     async def load_posts(self, _=None):
         """Lädt Meldungen aus der Datenbank."""
+        # Loading-Indikator anzeigen
+        loading_indicator = ft.Container(
+            content=ft.Column(
+                [
+                    ft.ProgressRing(width=40, height=40),
+                    ft.Text("Meldungen werden geladen...", size=14, color=ft.Colors.GREY_600),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ),
+            padding=40,
+            alignment=ft.alignment.center,
+        )
+        self.list_view.controls = [loading_indicator]
+        self.page.update()
+        
         try:
             query = self.sb.table("post").select("""
-                *,
+                id, headline, location_text, event_date, created_at, is_active,
                 post_status(id, name),
                 species(id, name),
                 breed(id, name),
                 post_image(url),
                 post_color(color(id, name))
-            """)
+            """).order("created_at", desc=True)
             
             result = query.limit(self.MAX_POSTS_LIMIT).execute()
             items = result.data
@@ -370,6 +393,7 @@ class DiscoverView:
             
         except Exception as ex:
             print(f"Fehler beim Laden der Daten: {ex}")
+            self.list_view.controls = [self.empty_state_card]
             self.page.update()
     
     # ════════════════════════════════════════════════════════════════════

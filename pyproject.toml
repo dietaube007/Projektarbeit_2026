@@ -5,6 +5,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "flet==0.28.3",
+    "pillow>=10.0.0",
     "python-dotenv==1.2.1",
     "supabase==2.24.0"
 ]

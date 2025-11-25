@@ -8,7 +8,6 @@ Es definiert:
 - Wiederverwendbare UI-Komponenten (Chips, Soft Cards)
 - Theme-Toggle-Funktionalität
 
-Objektorientierte Implementierung mit der ThemeManager-Klasse.
 """
 
 import flet as ft
@@ -25,10 +24,12 @@ CHIP_BORDER_RADIUS = 999 # Vollständig rund (Pille-Form)
 
 
 class ThemeManager:
-    """Klasse zur Verwaltung des App-Themes."""
+
+    # Klasse zur Verwaltung des App-Themes.
     
     def __init__(self, page: ft.Page):
-        """Initialisiert den ThemeManager."""
+        
+        # Initialisiert den ThemeManager.
         self.page = page
         self._toggle_button = None
     
@@ -38,7 +39,9 @@ class ThemeManager:
     
     @staticmethod
     def build_theme_light() -> ft.Theme:
-        """Erstellt ein helles Material-3-Theme für die Anwendung."""
+        
+        # Erstellt ein helles Material-3-Theme für die Anwendung.
+
         t = ft.Theme()
         t.use_material3 = True
         t.color_scheme_seed = PRIMARY_SEED
@@ -65,7 +68,9 @@ class ThemeManager:
 
     @staticmethod
     def build_theme_dark() -> ft.Theme:
-        """Erstellt ein dunkles Material-3-Theme für die Anwendung."""
+
+        # Erstellt ein dunkles Material-3-Theme für die Anwendung.
+
         return ThemeManager.build_theme_light()
     
     # ════════════════════════════════════════════════════════════════════
@@ -73,7 +78,7 @@ class ThemeManager:
     # ════════════════════════════════════════════════════════════════════
     
     def apply_theme(self, mode: str = "light"):
-        """Wendet ein Theme auf die Seite an und setzt den Modus."""
+        # Wendet ein Theme auf die Seite an und setzt den Modus.
         if mode not in ("light", "dark"):
             print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende 'light'.")
             mode = "light"
@@ -85,12 +90,12 @@ class ThemeManager:
         )
         self.page.update()
     
-    def _get_current_icon(self) -> str:
-        """Gibt das passende Icon basierend auf aktuellem Theme zurück."""
+    def _get_current_icon(self) -> str: 
+        # Gibt das passende Icon basierend auf aktuellem Theme zurück.
         return ft.Icons.LIGHT_MODE if self.page.theme_mode == ft.ThemeMode.DARK else ft.Icons.DARK_MODE
     
     def _toggle_theme(self, _):
-        """Toggled zwischen Light und Dark Theme."""
+        # Toggled zwischen Light und Dark Theme.
         self.page.theme_mode = (
             ft.ThemeMode.LIGHT
             if self.page.theme_mode == ft.ThemeMode.DARK
@@ -101,7 +106,7 @@ class ThemeManager:
         self.page.update()
     
     def create_toggle_button(self) -> ft.IconButton:
-        """Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus."""
+        # Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),
             tooltip="Theme wechseln",
@@ -157,22 +162,22 @@ def soft_card(content: ft.Control, pad: int = 16, elev: float = 2) -> ft.Control
 # ════════════════════════════════════════════════════════════════════
 
 def build_theme_light() -> ft.Theme:
-    """Legacy-Funktion für Abwärtskompatibilität."""
+    # Legacy-Funktion für Abwärtskompatibilität.
     return ThemeManager.build_theme_light()
 
 
 def build_theme_dark() -> ft.Theme:
-    """Legacy-Funktion für Abwärtskompatibilität."""
+    # Legacy-Funktion für Abwärtskompatibilität.
     return ThemeManager.build_theme_dark()
 
 
 def apply_theme(page: ft.Page, mode: str = "light"):
-    """Legacy-Funktion für Abwärtskompatibilität."""
+    # Legacy-Funktion für Abwärtskompatibilität.
     manager = ThemeManager(page)
     manager.apply_theme(mode)
 
 
 def theme_toggle(page: ft.Page) -> ft.IconButton:
-    """Legacy-Funktion für Abwärtskompatibilität."""
+    # Legacy-Funktion für Abwärtskompatibilität.
     manager = ThemeManager(page)
     return manager.create_toggle_button()

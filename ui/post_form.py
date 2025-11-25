@@ -7,11 +7,13 @@ Dieses Modul implementiert das Formular zum Erstellen neuer Tiermeldungen
 """
 
 import os
+import io
 import base64
 from datetime import datetime
 from typing import Callable, Optional
 
 import flet as ft
+from PIL import Image
 from services import references
 from services.posts import create_post, add_color_to_post, add_photo_to_post
 
@@ -29,6 +31,8 @@ class PostForm:
     UPLOAD_DIR = "image_uploads"
     DATE_FORMAT = "%d.%m.%Y"
     ALLOWED_POST_STATUSES = ["vermisst", "fundtier"]
+    MAX_IMAGE_SIZE = (800, 800)  # Maximale Bildgröße für schnelleres Laden
+    IMAGE_QUALITY = 85  # JPEG Qualität (1-100)
     
     def __init__(
         self,
@@ -36,7 +40,7 @@ class PostForm:
         sb,
         on_saved_callback: Optional[Callable] = None
     ):
-        """Initialisiert das Formular."""
+        # Initialisiert das Formular.
         self.page = page
         self.sb = sb
         self.on_saved_callback = on_saved_callback
@@ -174,6 +178,22 @@ class PostForm:
     # FOTO-MANAGEMENT
     # ════════════════════════════════════════════════════════════════════
     
+    def _compress_image(self, file_path: str) -> tuple[bytes, str]:
+        """Komprimiert ein Bild für schnelleres Laden."""
+        with Image.open(file_path) as img:
+            # EXIF-Orientierung beibehalten
+            img = img.convert("RGB")
+            
+            # Größe anpassen wenn nötig
+            img.thumbnail(self.MAX_IMAGE_SIZE, Image.Resampling.LANCZOS)
+            
+            # Als JPEG komprimieren
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=self.IMAGE_QUALITY, optimize=True)
+            buffer.seek(0)
+            
+            return buffer.read(), "jpeg"
+    
     async def _pick_photo(self):
         # Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch.
         
@@ -191,18 +211,20 @@ class PostForm:
             if ev.progress == 1.0:
                 try:
                     upload_path = f"{self.UPLOAD_DIR}/{ev.file_name}"
-                    with open(upload_path, "rb") as image_file:
-                        file_bytes = image_file.read()
-                        image_data = base64.b64encode(file_bytes).decode()
+                    
+                    # Bild komprimieren für schnelleres Laden
+                    compressed_bytes, file_ext = self._compress_image(upload_path)
+                    image_data = base64.b64encode(compressed_bytes).decode()
                     
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    file_ext = ev.file_name.split(".")[-1].lower()
-                    storage_filename = f"{timestamp}_{ev.file_name}"
+                    # Immer .jpg als Extension da wir zu JPEG konvertieren
+                    original_name = ev.file_name.rsplit(".", 1)[0]
+                    storage_filename = f"{timestamp}_{original_name}.jpg"
                     
                     self.sb.storage.from_(self.STORAGE_BUCKET).upload(
                         path=storage_filename,
-                        file=file_bytes,
-                        file_options={"content-type": f"image/{file_ext}"}
+                        file=compressed_bytes,
+                        file_options={"content-type": "image/jpeg"}
                     )
                     
                     public_url = self.sb.storage.from_(self.STORAGE_BUCKET).get_public_url(storage_filename)
@@ -281,8 +303,20 @@ class PostForm:
             self.page.update()
             return
         
-        # User ID (Temporär)
-        user_id = "d798bbdf-eb2d-4030-8830-24c93561ad4f"
+        # Eingeloggten Benutzer holen
+        try:
+            user_response = self.sb.auth.get_user()
+            if not user_response or not user_response.user:
+                self.status_text.value = "❌ Nicht eingeloggt. Bitte neu anmelden."
+                self.status_text.color = ft.Colors.RED
+                self.page.update()
+                return
+            user_id = user_response.user.id
+        except Exception as e:
+            self.status_text.value = f"❌ Fehler beim Abrufen des Benutzers: {e}"
+            self.status_text.color = ft.Colors.RED
+            self.page.update()
+            return
         
         try:
             self.status_text.value = "⏳ Erstelle Meldung..."
@@ -333,8 +367,14 @@ class PostForm:
         self.name_tf.value = ""
         if self.species_list:
             self.species_dd.value = str(self.species_list[0]["id"])
-        self.breed_dd.value = None
-        self.breed_dd.options = []
+            # Rassen für die ausgewählte Tierart laden
+            species_id = self.species_list[0]["id"]
+            breeds = self.breeds_by_species.get(species_id, [])
+            self.breed_dd.options = [ft.dropdown.Option("none", "- Keine Angabe -")] + [
+                ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds
+            ]
+        self.breed_dd.value = "none"
+        self.sex_dd.value = "none"
         self.info_tf.value = ""
         self.location_tf.value = ""
         self.date_tf.value = ""
