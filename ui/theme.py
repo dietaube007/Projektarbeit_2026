@@ -8,9 +8,11 @@ Es definiert:
 - Wiederverwendbare UI-Komponenten (Chips, Soft Cards)
 - Theme-Toggle-Funktionalität
 
+Objektorientierte Implementierung mit der ThemeManager-Klasse.
 """
 
 import flet as ft
+
 
 # ════════════════════════════════════════════════════════════════════
 # DESIGN-KONSTANTEN
@@ -21,106 +23,91 @@ RADIUS = 16              # Standard Border-Radius für alle Elemente
 CHIP_PADDING = 6         # Innerer Abstand in Badges/Chips
 CHIP_BORDER_RADIUS = 999 # Vollständig rund (Pille-Form)
 
-# ════════════════════════════════════════════════════════════════════
-# THEME-BUILDER - Erstellt Material-3 Design Themes
-# ════════════════════════════════════════════════════════════════════
 
-def build_theme_light() -> ft.Theme:
-
-    # Erstellt ein helles Material-3-Theme für die Anwendung.
- 
-    t = ft.Theme()
-    t.use_material3 = True
-    t.color_scheme_seed = PRIMARY_SEED
-    t.visual_density = ft.VisualDensity.COMFORTABLE
-
-    # Karten-Styling: Runde Ecken mit RADIUS
-    t.card_theme = ft.CardTheme(
-        shape=ft.RoundedRectangleBorder(radius=RADIUS)
-    )
+class ThemeManager:
+    """Klasse zur Verwaltung des App-Themes."""
     
-    # Button-Styling: Alle Button-Typen mit runden Ecken
-
-    rounded = ft.RoundedRectangleBorder(radius=RADIUS)
-    t.filled_button_theme = ft.ButtonStyle(shape=rounded)
-    t.elevated_button_theme = ft.ButtonStyle(shape=rounded)
-    t.outlined_button_theme = ft.ButtonStyle(shape=rounded)
-
-    # Input-Decorator: TextFields mit runden Ecken
-    # Mit Try-Catch für Kompatibilität mit älteren Flet-Versionen
-    try:
-        t.input_decorator_theme = ft.InputDecoratorTheme(border_radius=RADIUS)
-    except AttributeError:
-        # Ältere Flet-Versionen unterstützen dies möglicherweise nicht
-        pass
-
-    return t
-
-
-def build_theme_dark() -> ft.Theme:
+    def __init__(self, page: ft.Page):
+        """Initialisiert den ThemeManager."""
+        self.page = page
+        self._toggle_button = None
     
-    # Erstellt ein dunkles Material-3-Theme für die Anwendung.
-
+    # ════════════════════════════════════════════════════════════════════
+    # THEME-BUILDER
+    # ════════════════════════════════════════════════════════════════════
     
-    # Verwendet die gleiche Basis wie das Light-Theme
-    # Material Design 3 passt automatisch die Farben an
-    return build_theme_light()
+    @staticmethod
+    def build_theme_light() -> ft.Theme:
+        """Erstellt ein helles Material-3-Theme für die Anwendung."""
+        t = ft.Theme()
+        t.use_material3 = True
+        t.color_scheme_seed = PRIMARY_SEED
+        t.visual_density = ft.VisualDensity.COMFORTABLE
 
-
-# ════════════════════════════════════════════════════════════════════
-# THEME-VERWALTUNG - Anwendung von Themes auf die Seite
-# ════════════════════════════════════════════════════════════════════
-
-def apply_theme(page: ft.Page, mode: str = "light"):
-    
-    # Wendet ein Theme auf die Seite an und setzt den Modus.
-
-    if mode not in ("light", "dark"):
-        print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende 'light'.")
-        mode = "light"
-    
-    page.theme = build_theme_light()
-    page.dark_theme = build_theme_dark()
-    page.theme_mode = (
-        ft.ThemeMode.LIGHT if mode == "light" else ft.ThemeMode.DARK
-    )
-    page.update()
-
-
-def theme_toggle(page: ft.Page) -> ft.IconButton:
-    """
-    Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
-    
-    Der Button zeigt:
-    - 🌙 Mond-Icon: Wenn aktuell Hell-Modus (zum Wechsel zu Dunkel)
-    - ☀️  Sonne-Icon: Wenn aktuell Dunkel-Modus (zum Wechsel zu Hell)
-
-    """
-    
-    def get_current_icon() -> str:
-
-        # Gibt das passende Icon basierend auf aktuellem Theme zurück.
-
-        return ft.Icons.LIGHT_MODE if page.theme_mode == ft.ThemeMode.DARK else ft.Icons.DARK_MODE
-
-    def toggle_theme(_):
+        # Karten-Styling
+        t.card_theme = ft.CardTheme(
+            shape=ft.RoundedRectangleBorder(radius=RADIUS)
+        )
         
-        # Toggled zwischen Light und Dark Theme.
+        # Button-Styling
+        rounded = ft.RoundedRectangleBorder(radius=RADIUS)
+        t.filled_button_theme = ft.ButtonStyle(shape=rounded)
+        t.elevated_button_theme = ft.ButtonStyle(shape=rounded)
+        t.outlined_button_theme = ft.ButtonStyle(shape=rounded)
+
+        # Input-Decorator
+        try:
+            t.input_decorator_theme = ft.InputDecoratorTheme(border_radius=RADIUS)
+        except AttributeError:
+            pass
+
+        return t
+
+    @staticmethod
+    def build_theme_dark() -> ft.Theme:
+        """Erstellt ein dunkles Material-3-Theme für die Anwendung."""
+        return ThemeManager.build_theme_light()
+    
+    # ════════════════════════════════════════════════════════════════════
+    # THEME-VERWALTUNG
+    # ════════════════════════════════════════════════════════════════════
+    
+    def apply_theme(self, mode: str = "light"):
+        """Wendet ein Theme auf die Seite an und setzt den Modus."""
+        if mode not in ("light", "dark"):
+            print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende 'light'.")
+            mode = "light"
         
-        page.theme_mode = (
+        self.page.theme = self.build_theme_light()
+        self.page.dark_theme = self.build_theme_dark()
+        self.page.theme_mode = (
+            ft.ThemeMode.LIGHT if mode == "light" else ft.ThemeMode.DARK
+        )
+        self.page.update()
+    
+    def _get_current_icon(self) -> str:
+        """Gibt das passende Icon basierend auf aktuellem Theme zurück."""
+        return ft.Icons.LIGHT_MODE if self.page.theme_mode == ft.ThemeMode.DARK else ft.Icons.DARK_MODE
+    
+    def _toggle_theme(self, _):
+        """Toggled zwischen Light und Dark Theme."""
+        self.page.theme_mode = (
             ft.ThemeMode.LIGHT
-            if page.theme_mode == ft.ThemeMode.DARK
+            if self.page.theme_mode == ft.ThemeMode.DARK
             else ft.ThemeMode.DARK
         )
-        btn.icon = get_current_icon()
-        page.update()
-
-    btn = ft.IconButton(
-        icon=get_current_icon(),
-        tooltip="Theme wechseln",
-        on_click=toggle_theme
-    )
-    return btn
+        if self._toggle_button:
+            self._toggle_button.icon = self._get_current_icon()
+        self.page.update()
+    
+    def create_toggle_button(self) -> ft.IconButton:
+        """Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus."""
+        self._toggle_button = ft.IconButton(
+            icon=self._get_current_icon(),
+            tooltip="Theme wechseln",
+            on_click=self._toggle_theme
+        )
+        return self._toggle_button
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -136,7 +123,6 @@ def chip(label: str, color: str | None = None) -> ft.Control:
     - Weißer Text auf farbigem Hintergrund
     - Kleiner Font (11px)
     - Standard-Padding (CHIP_PADDING)
-
     """
     return ft.Container(
         content=ft.Text(label, size=11, color=ft.Colors.WHITE),
@@ -155,7 +141,6 @@ def soft_card(content: ft.Control, pad: int = 16, elev: float = 2) -> ft.Control
     - Runde Ecken (RADIUS = 16)
     - Flexibles Padding
     - Material-3 Card-Styling
-
     """
     return ft.Card(
         elevation=elev,
@@ -165,3 +150,29 @@ def soft_card(content: ft.Control, pad: int = 16, elev: float = 2) -> ft.Control
             border_radius=RADIUS
         ),
     )
+
+
+# ════════════════════════════════════════════════════════════════════
+# LEGACY-FUNKTIONEN (Für Abwärtskompatibilität)
+# ════════════════════════════════════════════════════════════════════
+
+def build_theme_light() -> ft.Theme:
+    """Legacy-Funktion für Abwärtskompatibilität."""
+    return ThemeManager.build_theme_light()
+
+
+def build_theme_dark() -> ft.Theme:
+    """Legacy-Funktion für Abwärtskompatibilität."""
+    return ThemeManager.build_theme_dark()
+
+
+def apply_theme(page: ft.Page, mode: str = "light"):
+    """Legacy-Funktion für Abwärtskompatibilität."""
+    manager = ThemeManager(page)
+    manager.apply_theme(mode)
+
+
+def theme_toggle(page: ft.Page) -> ft.IconButton:
+    """Legacy-Funktion für Abwärtskompatibilität."""
+    manager = ThemeManager(page)
+    return manager.create_toggle_button()

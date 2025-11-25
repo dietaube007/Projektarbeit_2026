@@ -1,9 +1,11 @@
+# PetBuddy - Hauptanwendung.
+
 import os
 import flet as ft
 from services.supabase_client import get_client
-from ui.theme import apply_theme, theme_toggle, soft_card
-from ui.post_form import build_report_form
-from ui.discover import build_list_and_map
+from ui.theme import ThemeManager, soft_card
+from ui.post_form import PostForm
+from ui.discover import DiscoverView
 from dotenv import load_dotenv
 
 # Lade Umgebungsvariablen aus .env
@@ -12,128 +14,210 @@ load_dotenv()
 # Secret Key für Flet Uploads aus .env laden
 os.environ["FLET_SECRET_KEY"] = os.getenv("FLET_SECRET_KEY", "")
 
-# Konstanten für Tab-Indices
-TAB_START, TAB_MELDEN, TAB_PROFIL = range(3)
 
-def main(page: ft.Page):
-    try:
-        page.title = "PetBuddy"
-        page.padding = 0
-        page.scroll = ft.ScrollMode.ADAPTIVE
-        page.window_min_width = 420
-        page.window_width = 1100
-        page.window_height = 820
+class PetBuddyApp:
+    # Hauptklasse der PetBuddy-Anwendung.
+    
+    # Tab-Indices als Klassenkonstanten
+    TAB_START = 0
+    TAB_MELDEN = 1
+    TAB_PROFIL = 2
+    
+    def __init__(self, page: ft.Page):
+        # Initialisiert die Anwendung.
+        self.page = page
+        self.current_tab = self.TAB_START
+        self.sb = None
+        self.theme_manager = None
         
-        apply_theme(page, "light")
-        sb = get_client()
-    except Exception as e:
-        page.snack_bar = ft.SnackBar(ft.Text(f"Fehler beim Laden: {str(e)}"))
-        page.snack_bar.open = True
-        page.update()
-        return
+        # UI-Komponenten
+        self.body = ft.Container(padding=16, expand=True)
+        self.nav = None
+        self.start_section = None
+        self.post_form = None
+        self.discover_view = None
+        self.profile_card = None
+        
+    def initialize(self) -> bool:
+        # Initialisiert die Seite und Supabase-Client. Gibt False bei Fehler zurück.
+        try:
+            self.page.title = "PetBuddy"
+            self.page.padding = 0
+            self.page.scroll = ft.ScrollMode.ADAPTIVE
+            self.page.window_min_width = 420
+            self.page.window_width = 1100
+            self.page.window_height = 820
+            
+            # Theme anwenden
+            self.theme_manager = ThemeManager(self.page)
+            self.theme_manager.apply_theme("light")
+            
+            # Supabase-Client initialisieren
+            self.sb = get_client()
+            return True
+            
+        except Exception as e:
+            self._show_error(f"Fehler beim Laden: {str(e)}")
+            return False
+    
+    def _show_error(self, message: str):
+        """Zeigt eine Fehlermeldung in der Snackbar."""
+        self.page.snack_bar = ft.SnackBar(ft.Text(message))
+        self.page.snack_bar.open = True
+        self.page.update()
     
     # ════════════════════════════════════════════════════════════════════
-    # NAVIGATION HILFSFUNKTIONEN
+    # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
     
-    current_tab = TAB_START
-    body = ft.Container(padding=16, expand=True)
+    def render_tab(self):
+        # Rendert den aktuellen Tab.
+        self.body.content = {
+            self.TAB_START: self.start_section,
+            self.TAB_MELDEN: self.post_form.build() if self.post_form else None,
+            self.TAB_PROFIL: ft.Container(padding=16, content=self.profile_card),
+        }.get(self.current_tab, self.start_section)
+        self.page.update()
     
-    # Platzhalter für UI-Elemente (werden später befüllt)
-    start_section = None
-    report_form = None
-    profile_card = None
+    def go_to_melden_tab(self, _=None):
+        # Navigiert zum Melden-Tab.
+        self.current_tab = self.TAB_MELDEN
+        if self.nav:
+            self.nav.selected_index = self.TAB_MELDEN
+        self.render_tab()
     
-    def render_tab():
-        body.content = {
-            TAB_START: start_section,
-            TAB_MELDEN: report_form,
-            TAB_PROFIL: ft.Container(padding=16, content=profile_card),
-        }.get(current_tab, start_section)
-        page.update()
+    def on_post_saved(self, post_id=None):
+        # Callback nach erfolgreicher Meldung - lädt Liste neu und navigiert zur Startseite.
+        if self.discover_view:
+            self.page.run_task(self.discover_view.load_posts)
+        self.current_tab = self.TAB_START
+        if self.nav:
+            self.nav.selected_index = self.TAB_START
+        self.render_tab()
     
-    def go_to_melden_tab(_=None):
-        """Navigiert zum Melden-Tab."""
-        nonlocal current_tab
-        current_tab = TAB_MELDEN
-        if nav:
-            nav.selected_index = TAB_MELDEN
-        render_tab()
-    
-    def on_post_saved(post_id=None):
-        #Callback nach erfolgreicher Meldung - lädt Liste neu und navigiert zur Startseite.
-        nonlocal current_tab
-        page.run_task(search_load)
-        current_tab = TAB_START
-        if nav:
-            nav.selected_index = TAB_START
-        render_tab()
+    def _on_nav_change(self, e):
+        # Event-Handler für Navigationsänderung.
+        self.current_tab = e.control.selected_index
+        self.render_tab()
     
     # ════════════════════════════════════════════════════════════════════
     # UI-BEREICHE LADEN
     # ════════════════════════════════════════════════════════════════════
     
-    try:
-        list_map_section, search_load, search_row = build_list_and_map(page, sb, on_contact_click=None, on_melden_click=go_to_melden_tab)
-        report_form = build_report_form(page, sb, on_saved_callback=on_post_saved)
-    except Exception as e:
-        page.snack_bar = ft.SnackBar(ft.Text(f"Fehler beim Laden der UI: {str(e)}"))
-        page.snack_bar.open = True
-        page.update()
-        return
+    def build_ui(self) -> bool:
+        # Baut die UI-Bereiche auf. Gibt False bei Fehler zurück.
+        try:
+            # DiscoverView erstellen
+            self.discover_view = DiscoverView(
+                page=self.page,
+                sb=self.sb,
+                on_contact_click=None,
+                on_melden_click=self.go_to_melden_tab
+            )
+            
+            # PostForm erstellen
+            self.post_form = PostForm(
+                page=self.page,
+                sb=self.sb,
+                on_saved_callback=self.on_post_saved
+            )
+            
+            return True
+            
+        except Exception as e:
+            self._show_error(f"Fehler beim Laden der UI: {str(e)}")
+            return False
     
-    # Profil-Karte
-    profile_card = soft_card(
-        ft.Column([], tight=True),
-        elev=3,
-    )
+    def _build_profile_card(self) -> ft.Control:
+       # Erstellt die Profil-Karte.
+        return soft_card(
+            ft.Column([], tight=True),
+            elev=3,
+        )
     
-    # Start-Tab mit Suchleiste und Liste/Karte
-    start_section = ft.Column(
-        [
-            soft_card(ft.Column([search_row], spacing=8), pad=12, elev=2),
-            list_map_section,
-        ],
-        spacing=14,
-        expand=True,
-    )
+    def _build_start_section(self) -> ft.Control:
+        # Erstellt den Start-Tab mit Suchleiste und Liste/Karte.
+        return ft.Column(
+            [
+                soft_card(
+                    ft.Column([self.discover_view.search_row], spacing=8),
+                    pad=12,
+                    elev=2
+                ),
+                self.discover_view.build(),
+            ],
+            spacing=14,
+            expand=True,
+        )
+    
+    def _build_navigation(self) -> ft.NavigationBar:
+        # Erstellt die Navigationsleiste.
+        return ft.NavigationBar(
+            selected_index=self.current_tab,
+            destinations=[
+                ft.NavigationBarDestination(
+                    icon=ft.Icons.HOME_OUTLINED,
+                    selected_icon=ft.Icons.HOME,
+                    label="Start"
+                ),
+                ft.NavigationBarDestination(
+                    icon=ft.Icons.ADD_CIRCLE_OUTLINE,
+                    selected_icon=ft.Icons.ADD_CIRCLE,
+                    label="Melden"
+                ),
+                ft.NavigationBarDestination(
+                    icon=ft.Icons.PERSON,
+                    label="Profil"
+                ),
+            ],
+            on_change=self._on_nav_change,
+        )
+    
+    def _build_appbar(self) -> ft.AppBar:
+        # Erstellt die App-Bar.
+        return ft.AppBar(
+            title=ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600),
+            center_title=True,
+            actions=[
+                ft.IconButton(ft.Icons.NOTIFICATIONS_NONE),
+                self.theme_manager.create_toggle_button(),
+            ],
+        )
     
     # ════════════════════════════════════════════════════════════════════
-    # NAVIGATION SETUP
+    # APP STARTEN
     # ════════════════════════════════════════════════════════════════════
     
-    def on_nav_change(e):
-        nonlocal current_tab
-        current_tab = e.control.selected_index
-        render_tab()
-    
-    nav = ft.NavigationBar(
-        selected_index=current_tab,
-        destinations=[
-            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Start"),
-            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Melden"),
-            ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="Profil"),
-        ],
-        on_change=on_nav_change,
-    )
-    
-    # ════════════════════════════════════════════════════════════════════
-    # HAUPTAPP BAUEN
-    # ════════════════════════════════════════════════════════════════════
-    page.appbar = ft.AppBar(
-        title=ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600),
-        center_title=True,
-        actions=[
-            ft.IconButton(ft.Icons.NOTIFICATIONS_NONE),
-            theme_toggle(page),
-        ],
-    )
-    
-    page.navigation_bar = nav
-    page.add(body)
-    render_tab()
-    page.run_task(search_load)
-    page.update()
+    def run(self):
+        # Startet die Anwendung.
+        # Initialisierung
+        if not self.initialize():
+            return
+        
+        # UI aufbauen
+        if not self.build_ui():
+            return
+        
+        # Komponenten erstellen
+        self.profile_card = self._build_profile_card()
+        self.start_section = self._build_start_section()
+        self.nav = self._build_navigation()
+        
+        # Hauptseite aufbauen
+        self.page.appbar = self._build_appbar()
+        self.page.navigation_bar = self.nav
+        self.page.add(self.body)
+        
+        # Tab rendern und Daten laden
+        self.render_tab()
+        self.page.run_task(self.discover_view.load_posts)
+        self.page.update()
+
+
+def main(page: ft.Page):
+    # Einstiegspunkt der Anwendung.
+    app = PetBuddyApp(page)
+    app.run()
 
 
 if __name__ == "__main__":
