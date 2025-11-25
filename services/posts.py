@@ -6,7 +6,6 @@ Dieses Modul verwaltet alle Datenbankoperationen für Posts/Tier-Meldungen:
 - Verknüpfung von Posts mit Farben
 - Foto-Upload zum Storage
 
-Objektorientierte Implementierung mit der PostService-Klasse.
 """
 
 from supabase import Client
@@ -14,16 +13,16 @@ from typing import Dict, Any, List, Optional
 
 
 class PostService:
-    """Service-Klasse für Post-Operationen."""
-    
+    # Service-Klasse für Post-Operationen.
+    #     
     STORAGE_BUCKET = "pet-images"
     
     def __init__(self, sb: Client):
-        """Initialisiert den Service mit dem Supabase-Client."""
+        # Initialisiert den Service mit dem Supabase-Client.
         self.sb = sb
     
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Erstellt einen neuen Post."""
+        # Erstellt einen neuen Post.
         try:
             self.sb.table("post").insert(payload).execute()
             
@@ -38,7 +37,7 @@ class PostService:
             raise RuntimeError(f"Fehler beim Erstellen der Meldung: {str(ex)}")
     
     def update(self, post_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Aktualisiert einen bestehenden Post."""
+        # Aktualisiert einen bestehenden Post.
         try:
             res = self.sb.table("post").update(payload).eq("id", post_id).select("*").execute()
             if not res.data:
@@ -48,7 +47,7 @@ class PostService:
             raise RuntimeError(f"Fehler beim Aktualisieren der Meldung: {str(ex)}")
     
     def delete(self, post_id: str) -> bool:
-        """Löscht einen Post komplett inkl. Bilder und verknüpfter Daten."""
+        # Löscht einen Post komplett inkl. Bilder und verknüpfter Daten.
         try:
             # 1. Hole die Bild-URLs
             images_res = self.sb.table("post_image").select("url").eq("post_id", post_id).execute()
@@ -77,7 +76,7 @@ class PostService:
             return False
     
     def get_by_id(self, post_id: str) -> Optional[Dict[str, Any]]:
-        """Holt einen Post anhand seiner ID."""
+        # Holt einen Post anhand seiner ID.
         try:
             res = self.sb.table("post").select("*, post_image(url)").eq("id", post_id).execute()
             return res.data[0] if res.data else None
@@ -86,7 +85,7 @@ class PostService:
             return None
     
     def get_all(self, limit: int = 200) -> List[Dict[str, Any]]:
-        """Holt alle Posts mit Relationen."""
+        # Holt alle Posts mit Relationen.
         try:
             res = self.sb.table("post").select("""
                 *,
@@ -102,7 +101,7 @@ class PostService:
             return []
     
     def add_color(self, post_id: str, color_id: int) -> None:
-        """Fügt eine Farbe zu einem Post hinzu."""
+        # Fügt eine Farbe zu einem Post hinzu.
         try:
             self.sb.table("post_color").insert({
                 "post_id": post_id,
@@ -112,7 +111,7 @@ class PostService:
             print(f"Fehler beim Hinzufügen der Farbe {color_id} zu Post {post_id}: {ex}")
     
     def add_photo(self, post_id: str, photo_url: str) -> None:
-        """Speichert eine Foto-URL für einen Post."""
+        # Speichert eine Foto-URL für einen Post.
         try:
             self.sb.table("post_image").insert({
                 "post_id": post_id,
@@ -121,45 +120,3 @@ class PostService:
         except Exception as ex:
             print(f"Fehler beim Speichern der Foto-URL: {ex}")
 
-
-# ════════════════════════════════════════════════════════════════════
-# LEGACY-FUNKTIONEN (Für Abwärtskompatibilität)
-# ════════════════════════════════════════════════════════════════════
-
-STORAGE_BUCKET = "pet-images"
-
-
-def create_post(sb: Client, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    return service.create(payload)
-
-
-def update_post(sb: Client, post_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    return service.update(post_id, payload)
-
-
-def add_color_to_post(sb: Client, post_id: str, color_id: int) -> None:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    service.add_color(post_id, color_id)
-
-
-def add_photo_to_post(sb: Client, post_id: str, photo_url: str) -> None:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    service.add_photo(post_id, photo_url)
-
-
-def delete_post(sb: Client, post_id: str) -> bool:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    return service.delete(post_id)
-
-
-def get_post_by_id(sb: Client, post_id: str) -> Dict[str, Any] | None:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = PostService(sb)
-    return service.get_by_id(post_id)

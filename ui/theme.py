@@ -155,29 +155,3 @@ def soft_card(content: ft.Control, pad: int = 16, elev: float = 2) -> ft.Control
             border_radius=RADIUS
         ),
     )
-
-
-# ════════════════════════════════════════════════════════════════════
-# LEGACY-FUNKTIONEN (Für Abwärtskompatibilität)
-# ════════════════════════════════════════════════════════════════════
-
-def build_theme_light() -> ft.Theme:
-    # Legacy-Funktion für Abwärtskompatibilität.
-    return ThemeManager.build_theme_light()
-
-
-def build_theme_dark() -> ft.Theme:
-    # Legacy-Funktion für Abwärtskompatibilität.
-    return ThemeManager.build_theme_dark()
-
-
-def apply_theme(page: ft.Page, mode: str = "light"):
-    # Legacy-Funktion für Abwärtskompatibilität.
-    manager = ThemeManager(page)
-    manager.apply_theme(mode)
-
-
-def theme_toggle(page: ft.Page) -> ft.IconButton:
-    # Legacy-Funktion für Abwärtskompatibilität.
-    manager = ThemeManager(page)
-    return manager.create_toggle_button()

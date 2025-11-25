@@ -1,6 +1,4 @@
-# ui/auth.py
-# Login-/Registrier-Bereich als OOP-Klasse.
-# Nutzt Supabase-Auth für Authentifizierung.
+# Login-/Registrier-Bereich
 
 import flet as ft
 import asyncio
@@ -32,13 +30,14 @@ class AuthView:
 
     # Authentifizierungs-View mit Login, Registrierung und Theme-Toggle.
 
-    def __init__(self, page: ft.Page, sb, on_auth_success: Optional[Callable] = None):
+    def __init__(self, page: ft.Page, sb, on_auth_success: Optional[Callable] = None, on_continue_without_account: Optional[Callable] = None):
         
         # Initialisiert die AuthView.
 
         self.page = page
         self.sb = sb
         self.on_auth_success = on_auth_success
+        self.on_continue_without_account = on_continue_without_account
         
         # UI-Komponenten (werden in build() initialisiert)
         self._login_email: Optional[ft.TextField] = None
@@ -60,12 +59,12 @@ class AuthView:
     
     @staticmethod
     def _is_valid_email(email: str) -> bool:
-        """Prüft ob die E-Mail-Adresse gültig ist."""
+        # Prüft ob die E-Mail-Adresse gültig ist.
         return bool(re.match(EMAIL_REGEX, email))
     
     @staticmethod
     def _validate_password(password: str) -> Optional[str]:
-        """Validiert das Passwort. Gibt Fehlermeldung oder None zurück."""
+        # Validiert das Passwort. Gibt Fehlermeldung oder None zurück.
         if len(password) < MIN_PASSWORD_LENGTH:
             return f"❌ Passwort mind. {MIN_PASSWORD_LENGTH} Zeichen."
         if not any(c.isdigit() for c in password):
@@ -420,6 +419,13 @@ class AuthView:
             style=ft.ButtonStyle(color=ft.Colors.RED_400),
         )
         
+        # Ohne Account fortsetzen (zentriert)
+        continue_btn = ft.TextButton(
+            "Ohne Account fortsetzen",
+            on_click=lambda e: (self.on_continue_without_account() if self.on_continue_without_account else None),
+            style=ft.ButtonStyle(color=PRIMARY_COLOR),
+        )
+        
         # Login-Card
         card_content = [
             self._login_email,
@@ -435,6 +441,8 @@ class AuthView:
                 spacing=0,
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
+            ft.Container(height=12),
+            ft.Row([continue_btn], alignment=ft.MainAxisAlignment.CENTER),
         ]
         
         # Logout-Button nur anzeigen wenn eingeloggt
@@ -512,15 +520,3 @@ class AuthView:
         
         return self._background
 
-
-# ─────────────────────────────────────────────────────────────────
-# Legacy-Funktion für Abwärtskompatibilität
-# ─────────────────────────────────────────────────────────────────
-
-def build_auth_section(page: ft.Page, sb, on_auth_success: Optional[Callable] = None) -> ft.Control:
-    """
-    Legacy-Funktion für Abwärtskompatibilität.
-    Erstellt eine AuthView und gibt die UI zurück.
-    """
-    auth_view = AuthView(page, sb, on_auth_success)
-    return auth_view.build()

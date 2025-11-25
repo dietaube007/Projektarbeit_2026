@@ -10,7 +10,7 @@ filtern und als sortierte Liste anzeigen lassen.
 from typing import Callable, Optional
 import flet as ft
 from ui.theme import soft_card, chip
-from services.references import get_species, get_colors, get_sex, get_post_statuses
+from services.references import ReferenceService
 
 
 class DiscoverView:
@@ -41,11 +41,14 @@ class DiscoverView:
         on_contact_click: Optional[Callable] = None,
         on_melden_click: Optional[Callable] = None
     ):
-        """Initialisiert die Discover-Ansicht."""
+        # Initialisiert die Discover-Ansicht.
         self.page = page
         self.sb = sb
         self.on_contact_click = on_contact_click
         self.on_melden_click = on_melden_click
+        
+        # Services
+        self.ref_service = ReferenceService(self.sb)
         
         # Filter-Status
         self.selected_farben = []
@@ -58,7 +61,7 @@ class DiscoverView:
         self.page.run_task(self._load_references)
     
     def _init_ui_elements(self):
-        """Initialisiert alle UI-Elemente."""
+        # Initialisiert alle UI-Elemente.
         # Suchfeld
         self.search_q = ft.TextField(
             label="Suche",
@@ -160,7 +163,7 @@ class DiscoverView:
         )
     
     def _toggle_farben_panel(self, _):
-        """Toggle für das Farben-Filter-Panel."""
+        # Toggle für das Farben-Filter-Panel.
         self.farben_panel_visible = not self.farben_panel_visible
         self.farben_panel.visible = self.farben_panel_visible
         self.farben_toggle_icon.name = (
@@ -174,7 +177,7 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     async def _load_references(self, _=None):
-        """Lädt Kategorien, Tierarten, Farben und Geschlechter."""
+        # Lädt Kategorien, Tierarten, Farben und Geschlechter.
         try:
             def populate_dropdown(dropdown, items, id_key="id", name_key="name"):
                 dropdown.options = [ft.dropdown.Option("alle", "Alle")]
@@ -183,13 +186,13 @@ class DiscoverView:
                         ft.dropdown.Option(str(item.get(id_key)), item.get(name_key, ""))
                     )
             
-            populate_dropdown(self.filter_typ, get_post_statuses(self.sb))
-            populate_dropdown(self.filter_art, get_species(self.sb))
-            populate_dropdown(self.filter_geschlecht, get_sex(self.sb))
+            populate_dropdown(self.filter_typ, self.ref_service.get_post_statuses())
+            populate_dropdown(self.filter_art, self.ref_service.get_species())
+            populate_dropdown(self.filter_geschlecht, self.ref_service.get_sex())
             
             # Farben-Checkboxes
             self.farben_filter_container.controls = []
-            for color in get_colors(self.sb):
+            for color in self.ref_service.get_colors():
                 def on_color_change(e, c_id=color["id"]):
                     if e.control.value:
                         if c_id not in self.selected_farben:
@@ -213,21 +216,21 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     def _badge_for_typ(self, typ: str) -> ft.Control:
-        """Erstellt einen farbigen Badge basierend auf dem Meldungsstatus."""
+        # Erstellt einen farbigen Badge basierend auf dem Meldungsstatus.
         typ_lower = (typ or "").lower().strip()
         color = self.STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
         label = typ.capitalize() if typ else "Unbekannt"
         return chip(label, color)
     
     def _badge_for_species(self, species: str) -> ft.Control:
-        """Erstellt einen farbigen Badge basierend auf der Tierart."""
+        # Erstellt einen farbigen Badge basierend auf der Tierart.
         species_lower = (species or "").lower().strip()
         color = self.SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
         label = species.capitalize() if species else "Unbekannt"
         return chip(label, color)
     
     def _meta(self, icon, text: str) -> ft.Control:
-        """Erstellt eine Metainformation mit Icon und Text."""
+        # Erstellt eine Metainformation mit Icon und Text.
         return ft.Row(
             [
                 ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -237,7 +240,7 @@ class DiscoverView:
         )
     
     def _big_card(self, item: dict) -> ft.Control:
-        """Erstellt eine große Meldungs-Karte für die Listen-Ansicht."""
+        # Erstellt eine große Meldungs-Karte für die Listen-Ansicht.
         # Daten extrahieren
         post_images = item.get("post_image") or []
         img_src = post_images[0].get("url") if post_images else None
@@ -354,7 +357,7 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     async def load_posts(self, _=None):
-        """Lädt Meldungen aus der Datenbank."""
+        # Lädt Meldungen aus der Datenbank.
         # Loading-Indikator anzeigen
         loading_indicator = ft.Container(
             content=ft.Column(
@@ -401,7 +404,7 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     def build(self) -> ft.Column:
-        """Baut und gibt das Layout zurück."""
+        # Baut und gibt das Layout zurück.
         # Listen-Container
         list_container = ft.Container(
             padding=4,

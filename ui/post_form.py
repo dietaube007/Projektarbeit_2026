@@ -14,8 +14,8 @@ from typing import Callable, Optional
 
 import flet as ft
 from PIL import Image
-from services import references
-from services.posts import create_post, add_color_to_post, add_photo_to_post
+from services.references import ReferenceService
+from services.posts import PostService
 
 
 class PostForm:
@@ -45,6 +45,10 @@ class PostForm:
         self.sb = sb
         self.on_saved_callback = on_saved_callback
         
+        # Services
+        self.ref_service = ReferenceService(self.sb)
+        self.post_service = PostService(self.sb)
+        
         # Referenzdaten
         self.post_statuses = []
         self.species_list = []
@@ -66,10 +70,10 @@ class PostForm:
     
     def _init_ui_elements(self):
         # Initialisiert alle UI-Elemente.
-        # Meldungsart SegmentedButton
+        # Meldungsart SegmentedButton 
         self.meldungsart = ft.SegmentedButton(
             selected={"1"},
-            segments=[],
+            segments=[ft.Segment(value="1", label=ft.Text("Vermisst"))],
             allow_empty_selection=False,
             allow_multiple_selection=False,
             on_change=self._update_title_label,
@@ -179,7 +183,7 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     
     def _compress_image(self, file_path: str) -> tuple[bytes, str]:
-        """Komprimiert ein Bild für schnelleres Laden."""
+        # Komprimiert ein Bild für schnelleres Laden.
         with Image.open(file_path) as img:
             # EXIF-Orientierung beibehalten
             img = img.convert("RGB")
@@ -335,16 +339,16 @@ class PostForm:
                 "location_text": self.location_tf.value.strip(),
             }
             
-            new_post = create_post(self.sb, post_data)
+            new_post = self.post_service.create(post_data)
             post_id = new_post["id"]
             
             # Farben verknüpfen
             for color_id in self.selected_farben:
-                add_color_to_post(self.sb, post_id, color_id)
+                self.post_service.add_color(post_id, color_id)
             
             # Bild verknüpfen
             if self.selected_photo.get("url"):
-                add_photo_to_post(self.sb, post_id, self.selected_photo["url"])
+                self.post_service.add_photo(post_id, self.selected_photo["url"])
             
             self.status_text.value = "✓ Meldung erfolgreich erstellt!"
             self.status_text.color = ft.Colors.GREEN
@@ -398,7 +402,7 @@ class PostForm:
         # Lädt alle Referenzdaten aus der Datenbank.
         try:
             # Meldungsarten laden
-            all_statuses = references.get_post_statuses(self.sb)
+            all_statuses = self.ref_service.get_post_statuses()
             self.post_statuses = [
                 s for s in all_statuses
                 if s["name"].lower() in self.ALLOWED_POST_STATUSES
@@ -411,10 +415,10 @@ class PostForm:
                 self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
             
             # Andere Referenzdaten laden
-            self.species_list = references.get_species(self.sb)
-            self.breeds_by_species = references.get_breeds_by_species(self.sb)
-            self.colors_list = references.get_colors(self.sb)
-            self.sex_list = references.get_sex(self.sb)
+            self.species_list = self.ref_service.get_species()
+            self.breeds_by_species = self.ref_service.get_breeds_by_species()
+            self.colors_list = self.ref_service.get_colors()
+            self.sex_list = self.ref_service.get_sex()
             
             # Species Dropdown füllen
             self.species_dd.options = [

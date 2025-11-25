@@ -1,15 +1,8 @@
 """Referenzdaten-Management.
 
 Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank, die
-für Dropdowns, Filter und die Formularvalidierung benötigt werden:
+für Dropdowns, Filter und die Formularvalidierung benötigt werden
 
-- Meldung-Statuses: Kategorien wie "Vermisst" oder "Gefunden"
-- Tierarten
-- Rassen: Gruppiert nach Tierart (z.B. Labrador unter Hund)
-- Farben
-- Geschlechter
-
-Objektorientierte Implementierung mit der ReferenceService-Klasse.
 """
 
 from supabase import Client
@@ -17,10 +10,10 @@ from typing import List, Dict, Any
 
 
 class ReferenceService:
-    """Service-Klasse für das Laden von Referenzdaten aus der Datenbank."""
+    # Service-Klasse für das Laden von Referenzdaten aus der Datenbank.
     
     def __init__(self, sb: Client):
-        """Initialisiert den Service mit dem Supabase-Client."""
+        # Initialisiert den Service mit dem Supabase-Client.
         self.sb = sb
         
         # Cache für Referenzdaten
@@ -31,7 +24,7 @@ class ReferenceService:
         self._sex = None
     
     def get_post_statuses(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        """Lädt alle verfügbaren Post-Statuses/Kategorien."""
+        # Lädt alle verfügbaren Post-Statuses/Kategorien.
         if use_cache and self._post_statuses is not None:
             return self._post_statuses
         
@@ -44,7 +37,7 @@ class ReferenceService:
             return []
     
     def get_species(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        """Lädt alle verfügbaren Tierarten."""
+        # Lädt alle verfügbaren Tierarten.
         if use_cache and self._species is not None:
             return self._species
         
@@ -57,7 +50,7 @@ class ReferenceService:
             return []
     
     def get_breeds_by_species(self, use_cache: bool = True) -> Dict[int, List[Dict[str, Any]]]:
-        """Lädt alle Rassen und gruppiert sie nach Tierart."""
+        # Lädt alle Rassen und gruppiert sie nach Tierart.
         if use_cache and self._breeds_by_species is not None:
             return self._breeds_by_species
         
@@ -77,7 +70,7 @@ class ReferenceService:
             return {}
     
     def get_colors(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        """Lädt alle verfügbaren Farb-Beschreibungen."""
+        # Lädt alle verfügbaren Farb-Beschreibungen.
         if use_cache and self._colors is not None:
             return self._colors
         
@@ -90,7 +83,7 @@ class ReferenceService:
             return []
     
     def get_sex(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        """Lädt alle verfügbaren Geschlechts-Optionen."""
+        # Lädt alle verfügbaren Geschlechts-Optionen.
         if use_cache and self._sex is not None:
             return self._sex
         
@@ -103,43 +96,9 @@ class ReferenceService:
             return []
     
     def clear_cache(self):
-        """Löscht alle gecachten Daten."""
+        # Löscht alle gecachten Daten.
         self._post_statuses = None
         self._species = None
         self._breeds_by_species = None
         self._colors = None
         self._sex = None
-
-
-# ════════════════════════════════════════════════════════════════════
-# LEGACY-FUNKTIONEN (Für Abwärtskompatibilität)
-# ════════════════════════════════════════════════════════════════════
-
-def get_post_statuses(sb: Client) -> List[Dict[str, Any]]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = ReferenceService(sb)
-    return service.get_post_statuses(use_cache=False)
-
-
-def get_species(sb: Client) -> List[Dict[str, Any]]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = ReferenceService(sb)
-    return service.get_species(use_cache=False)
-
-
-def get_breeds_by_species(sb: Client) -> Dict[int, List[Dict[str, Any]]]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = ReferenceService(sb)
-    return service.get_breeds_by_species(use_cache=False)
-
-
-def get_colors(sb: Client) -> List[Dict[str, Any]]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = ReferenceService(sb)
-    return service.get_colors(use_cache=False)
-
-
-def get_sex(sb: Client) -> List[Dict[str, Any]]:
-    """Legacy-Funktion für Abwärtskompatibilität."""
-    service = ReferenceService(sb)
-    return service.get_sex(use_cache=False)
