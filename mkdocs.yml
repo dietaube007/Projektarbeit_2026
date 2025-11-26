@@ -1,0 +1,57 @@
+site_name: PetBuddy Dokumentation
+site_url: https://dietaube007.github.io/Projektarbeit_2026/
+repo_url: https://github.com/dietaube007/Projektarbeit_2026
+repo_name: dietaube007/Projektarbeit_2026
+
+theme:
+  name: material
+  language: de
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dunkelmodus
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Hellmodus
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Nutzerdokumentation:
+    - Erste Schritte: nutzer/erste-schritte.md
+    - Konto & Anmeldung: nutzer/konto.md
+    - Meldung erstellen: nutzer/meldung-erstellen.md
+    - Suchen & Filtern: nutzer/suchen.md
+  - Entwicklerdokumentation:
+    - Installation: entwickler/installation.md
+    - Architektur: entwickler/architektur.md
+    - Datenbank: entwickler/datenbank.md
+    - API-Referenz: entwickler/api.md

@@ -7,5 +7,6 @@ dependencies = [
     "flet==0.28.3",
     "pillow>=10.0.0",
     "python-dotenv==1.2.1",
-    "supabase==2.24.0"
+    "supabase==2.24.0",
+    "mkdocs==1.6.1"
 ]
