@@ -183,12 +183,8 @@ class AuthView:
                 if res.user.confirmed_at is None:
                     # E-Mail-Bestätigung aktiviert in Supabase
                     self._show_reg_message("✅ Bestätigungs-E-Mail gesendet! Bitte prüfe dein Postfach.", ft.Colors.GREEN)
-                else:
-                    # Keine E-Mail-Bestätigung erforderlich
-                    self._show_reg_message("✅ Erfolgreich! Du kannst dich jetzt anmelden.", ft.Colors.GREEN)
-                
-                await asyncio.sleep(3)
-                self._close_modal()
+                    await asyncio.sleep(3)
+                    self._close_modal()
             else:
                 self._show_reg_message("❌ Fehler!", ft.Colors.RED)
                 

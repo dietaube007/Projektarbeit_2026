@@ -254,12 +254,6 @@ class PetBuddyApp:
                 tooltip="Abmelden",
                 on_click=lambda _: self._logout()
             ))
-        else:
-            actions.insert(0, ft.IconButton(
-                ft.Icons.PERSON_ADD_ALT_1,
-                tooltip="Anmelden / Registrieren",
-                on_click=lambda _: self._show_login()
-            ))
         
         return ft.AppBar(
             title=ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600),

@@ -53,6 +53,8 @@ class DiscoverView:
         # Filter-Status
         self.selected_farben = []
         self.farben_panel_visible = False
+        self.view_mode = "list"  # "list" oder "grid"
+        self.current_items = []  # Speichert die aktuellen Meldungen
         
         # UI-Elemente initialisieren
         self._init_ui_elements()
@@ -62,26 +64,26 @@ class DiscoverView:
     
     def _init_ui_elements(self):
         # Initialisiert alle UI-Elemente.
-        # Suchfeld
+        # Suchfeld (kleiner für mehr Platz)
         self.search_q = ft.TextField(
             label="Suche",
             prefix_icon=ft.Icons.SEARCH,
-            width=420,
+            expand=True,
         )
         
-        # Filter-Dropdowns
+        # Filter-Dropdowns (expand für flexible Breite)
         self.filter_typ = ft.Dropdown(
             label="Kategorie",
             options=[ft.dropdown.Option("alle", "Alle")],
             value="alle",
-            width=180,
+            expand=True,
         )
         
         self.filter_art = ft.Dropdown(
             label="Tierart",
             options=[ft.dropdown.Option("alle", "Alle")],
             value="alle",
-            width=180,
+            expand=True,
             on_change=lambda e: self._on_tierart_change(e),
         )
         
@@ -92,14 +94,14 @@ class DiscoverView:
                 ft.dropdown.Option("keine_angabe", "Keine Angabe"),
             ],
             value="alle",
-            width=180,
+            expand=True,
         )
         
         self.filter_rasse = ft.Dropdown(
             label="Rasse",
             options=[ft.dropdown.Option("alle", "Alle")],
             value="alle",
-            width=180,
+            expand=True,
             on_change=None,
         )
         
@@ -149,19 +151,41 @@ class DiscoverView:
             pad=14,
         )
         
-        # Liste der Meldungen
+        # Liste und Grid der Meldungen
         self.list_view = ft.Column(spacing=14, expand=False)
         self.list_view.controls = [self.empty_state_card]
+        
+        self.grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12)
+        self.grid_view.controls = []
+        
+        # View-Mode Toggle Buttons
+        self.view_toggle = ft.SegmentedButton(
+            selected={"list"},
+            segments=[
+                ft.Segment(
+                    value="list",
+                    label=ft.Text("Liste"),
+                    icon=ft.Icon(ft.Icons.VIEW_LIST),
+                ),
+                ft.Segment(
+                    value="grid",
+                    label=ft.Text("Grid"),
+                    icon=ft.Icon(ft.Icons.GRID_VIEW),
+                ),
+            ],
+            on_change=self._on_view_mode_change,
+        )
         
         # Suchleiste zusammenbauen
         self.search_row = ft.ResponsiveRow(
             [
-                ft.Container(self.search_q, col={"xs": 12, "sm": 12, "md": 6}),
-                ft.Container(self.filter_typ, col={"xs": 6, "sm": 4, "md": 2}),
-                ft.Container(self.filter_art, col={"xs": 6, "sm": 4, "md": 2}),
-                ft.Container(self.filter_geschlecht, col={"xs": 6, "sm": 4, "md": 2}),
-                ft.Container(self.filter_rasse, col={"xs": 6, "sm": 4, "md": 2}),
-                ft.Container(self.farben_header, col={"xs": 12, "sm": 12, "md": 12}),
+                # Suchfeld und Dropdowns auf einer Zeile (Desktop)
+                ft.Container(self.search_q, col={"xs": 12, "sm": 6, "md": 4}),
+                ft.Container(self.filter_typ, col={"xs": 6, "sm": 3, "md": 2}),
+                ft.Container(self.filter_art, col={"xs": 6, "sm": 3, "md": 2}),
+                ft.Container(self.filter_geschlecht, col={"xs": 6, "sm": 3, "md": 2}),
+                ft.Container(self.filter_rasse, col={"xs": 6, "sm": 3, "md": 2}),
+                ft.Container(self.farben_header, col={"xs": 12, "sm": 8, "md": 6}),
                 ft.Container(self.farben_panel, col={"xs": 12, "sm": 12, "md": 12}),
                 ft.Container(
                     ft.Row(
@@ -178,12 +202,36 @@ class DiscoverView:
                             ),
                         ],
                         spacing=10,
+                        alignment=ft.MainAxisAlignment.START,
                     ),
                     col={"xs": 12, "sm": 12, "md": 12},
                 ),
             ],
             run_spacing=10,
         )
+    
+    def _on_view_mode_change(self, e):
+        # Wechselt zwischen Listen- und Grid-Ansicht.
+        selected = e.control.selected
+        if selected:
+            self.view_mode = list(selected)[0]
+            self._update_view()
+    
+    def _update_view(self):
+        # Aktualisiert die Ansicht basierend auf dem aktuellen View-Mode.
+        if not self.current_items:
+            return
+        
+        if self.view_mode == "grid":
+            self.grid_view.controls = [self._grid_card(it) for it in self.current_items]
+            self.list_view.visible = False
+            self.grid_view.visible = True
+        else:
+            self.list_view.controls = [self._big_card(it) for it in self.current_items]
+            self.list_view.visible = True
+            self.grid_view.visible = False
+        
+        self.page.update()
     
     def _toggle_farben_panel(self, _):
         # Toggle für das Farben-Filter-Panel.
@@ -305,9 +353,8 @@ class DiscoverView:
             spacing=6,
         )
     
-    def _big_card(self, item: dict) -> ft.Control:
-        # Erstellt eine große Meldungs-Karte für die Listen-Ansicht.
-        # Daten extrahieren
+    def _extract_item_data(self, item: dict) -> dict:
+        # Extrahiert und formatiert Daten aus einem Meldungs-Item.
         post_images = item.get("post_image") or []
         img_src = post_images[0].get("url") if post_images else None
         
@@ -329,11 +376,286 @@ class DiscoverView:
         ort = item.get("location_text") or ""
         when = (item.get("event_date") or item.get("created_at") or "")[:10]
         status = "Aktiv" if item.get("is_active") else "Inaktiv"
+        beschreibung = item.get("description") or ""
+        
+        # Geschlecht
+        sex_data = item.get("sex") or {}
+        geschlecht = sex_data.get("name", "Keine Angabe") if isinstance(sex_data, dict) else "Keine Angabe"
+        
+        return {
+            "img_src": img_src,
+            "title": title,
+            "typ": typ,
+            "art": art,
+            "rasse": rasse,
+            "farbe": farbe,
+            "ort": ort,
+            "when": when,
+            "status": status,
+            "beschreibung": beschreibung,
+            "geschlecht": geschlecht,
+        }
+    
+    def _show_detail_dialog(self, item: dict):
+        # Zeigt einen Detail-Dialog für eine Grid-Karte.
+        data = self._extract_item_data(item)
+        
+        # Bild
+        if data["img_src"]:
+            image = ft.Image(
+                src=data["img_src"],
+                height=280,
+                fit=ft.ImageFit.COVER,
+                border_radius=ft.border_radius.only(top_left=12, top_right=12),
+            )
+        else:
+            image = ft.Container(
+                height=280,
+                bgcolor=ft.Colors.GREY_200,
+                alignment=ft.alignment.center,
+                content=ft.Icon(ft.Icons.PETS, size=80, color=ft.Colors.GREY_400),
+                border_radius=ft.border_radius.only(top_left=12, top_right=12),
+            )
+        
+        # Teilen-Funktion
+        def share(_):
+            text = f"PetBuddy: {data['title']}\n{data['typ']} · {data['art']}\n{data['ort']}\n"
+            self.page.set_clipboard(text)
+            self.page.snack_bar = ft.SnackBar(ft.Text("Text kopiert 📋"), open=True)
+            self.page.update()
+        
+        def close_dialog(_):
+            dialog.open = False
+            self.page.update()
+        
+        dialog_content = ft.Column(
+            [
+                # Bild
+                ft.Container(
+                    content=image,
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                    border_radius=ft.border_radius.only(top_left=12, top_right=12),
+                ),
+                # Inhalt
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            # Titel und Badges
+                            ft.Text(data["title"], size=20, weight=ft.FontWeight.W_600),
+                            ft.Row(
+                                [
+                                    self._badge_for_typ(data["typ"]),
+                                    self._badge_for_species(data["art"]),
+                                ],
+                                spacing=8,
+                                wrap=True,
+                            ),
+                            ft.Divider(height=16),
+                            # Details
+                            ft.Row([
+                                ft.Icon(ft.Icons.SCHEDULE, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(f"Datum: {data['when'] if data['when'] else '—'}", color=ft.Colors.ON_SURFACE_VARIANT),
+                            ], spacing=8),
+                            ft.Row([
+                                ft.Icon(ft.Icons.CATEGORY, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(f"Rasse: {data['rasse']}", color=ft.Colors.ON_SURFACE_VARIANT),
+                            ], spacing=8),
+                            ft.Row([
+                                ft.Icon(ft.Icons.MALE, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(f"Geschlecht: {data['geschlecht']}", color=ft.Colors.ON_SURFACE_VARIANT),
+                            ], spacing=8),
+                            ft.Row([
+                                ft.Icon(ft.Icons.PALETTE, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(f"Farbe: {data['farbe'] if data['farbe'] else '—'}", color=ft.Colors.ON_SURFACE_VARIANT),
+                            ], spacing=8),
+                            ft.Row([
+                                ft.Icon(ft.Icons.LOCATION_ON, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(
+                                    f"Ort: {data['ort'] if data['ort'] else '—'}",
+                                    color=ft.Colors.ON_SURFACE_VARIANT,
+                                    expand=True,
+                                ),
+                            ], spacing=8),
+                            ft.Row([
+                                ft.Icon(ft.Icons.LABEL, size=16, color=ft.Colors.GREY_600),
+                                ft.Text(f"Status: {data['status']}", color=ft.Colors.ON_SURFACE_VARIANT),
+                            ], spacing=8),
+                            # Beschreibung
+                            ft.Container(
+                                content=ft.Column([
+                                    ft.Text("Beschreibung", size=14, weight=ft.FontWeight.W_600),
+                                    ft.Text(
+                                        data["beschreibung"] if data["beschreibung"] else "Keine Beschreibung vorhanden.",
+                                        color=ft.Colors.ON_SURFACE_VARIANT,
+                                        size=13,
+                                    ),
+                                ], spacing=4),
+                                bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE),
+                                padding=12,
+                                border_radius=8,
+                                margin=ft.margin.only(top=8),
+                            ) if True else None,
+                            ft.Divider(height=16),
+                            # Aktionen
+                            ft.Row(
+                                [
+                                    ft.FilledButton(
+                                        "Kontakt",
+                                        icon=ft.Icons.EMAIL,
+                                        on_click=lambda e, it=item: self.on_contact_click(it) if self.on_contact_click else None,
+                                        height=42,
+                                    ),
+                                    ft.OutlinedButton(
+                                        "Teilen",
+                                        icon=ft.Icons.SHARE,
+                                        on_click=share,
+                                        height=42,
+                                        style=ft.ButtonStyle(
+                                            padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                                        ),
+                                    ),
+                                ],
+                                spacing=10,
+                            ),
+                        ],
+                        spacing=8,
+                    ),
+                    padding=20,
+                ),
+            ],
+            spacing=0,
+            scroll=ft.ScrollMode.AUTO,
+        )
+        
+        dialog = ft.AlertDialog(
+            modal=False,
+            content=ft.Container(
+                content=dialog_content,
+                width=400,
+            ),
+            actions=[
+                ft.TextButton("Schließen", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+    
+    def _grid_card(self, item: dict) -> ft.Control:
+        # Erstellt eine Grid-Karte mit Bild oben und Infos unten.
+        data = self._extract_item_data(item)
+        
+        # Bild-Container oben (stretch um weiße Ränder zu vermeiden)
+        if data["img_src"]:
+            image_content = ft.Image(
+                src=data["img_src"],
+                height=160,
+                width=float("inf"),
+                fit=ft.ImageFit.COVER,
+                gapless_playback=True,
+            )
+        else:
+            image_content = ft.Container(
+                height=160,
+                bgcolor=ft.Colors.GREY_200,
+                alignment=ft.alignment.center,
+                content=ft.Icon(ft.Icons.PETS, size=50, color=ft.Colors.GREY_400),
+                expand=True,
+            )
+        
+        image_section = ft.Container(
+            content=image_content,
+            border_radius=ft.border_radius.only(top_left=12, top_right=12),
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            bgcolor=ft.Colors.GREY_200,
+        )
+        
+        # Info-Bereich unten
+        info_section = ft.Container(
+            content=ft.Column(
+                [
+                    # Titel
+                    ft.Text(
+                        data["title"],
+                        size=14,
+                        weight=ft.FontWeight.W_600,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                    # Badges: Meldungstyp + Tierart
+                    ft.Row(
+                        [
+                            self._badge_for_typ(data["typ"]),
+                            self._badge_for_species(data["art"]),
+                        ],
+                        spacing=6,
+                        wrap=True,
+                    ),
+                    # Ort
+                    ft.Row(
+                        [
+                            ft.Icon(ft.Icons.LOCATION_ON, size=14, color=ft.Colors.GREY_600),
+                            ft.Text(
+                                data["ort"] if data["ort"] else "—",
+                                size=12,
+                                color=ft.Colors.GREY_600,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                                expand=True,
+                            ),
+                        ],
+                        spacing=4,
+                    ),
+                ],
+                spacing=6,
+            ),
+            padding=12,
+            bgcolor=ft.Colors.SURFACE,
+        )
+        
+        # Karte zusammensetzen
+        card_content = ft.Column(
+            [image_section, info_section],
+            spacing=0,
+        )
+        
+        card = ft.Container(
+            content=card_content,
+            border_radius=12,
+            bgcolor=ft.Colors.SURFACE,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=8,
+                color=ft.Colors.with_opacity(0.12, ft.Colors.BLACK),
+                offset=ft.Offset(0, 2),
+            ),
+            animate_scale=200,
+            scale=ft.Scale(1.0),
+            on_click=lambda _: self._show_detail_dialog(item),
+        )
+        
+        def on_hover(e: ft.HoverEvent):
+            card.scale = ft.Scale(1.02) if e.data == "true" else ft.Scale(1.0)
+            self.page.update()
+        
+        card.on_hover = on_hover
+        
+        return ft.Container(
+            content=card,
+            col={"xs": 6, "sm": 4, "md": 3, "lg": 2.4},
+        )
+    
+    def _big_card(self, item: dict) -> ft.Control:
+        # Erstellt eine große Meldungs-Karte für die Listen-Ansicht.
+        data = self._extract_item_data(item)
         
         # Bild-Container
-        if img_src:
+        if data["img_src"]:
             visual_content = ft.Image(
-                src=img_src,
+                src=data["img_src"],
                 height=220,
                 fit=ft.ImageFit.COVER,
                 gapless_playback=True,
@@ -350,12 +672,12 @@ class DiscoverView:
             content=visual_content,
             border_radius=16,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-            bgcolor=ft.Colors.GREY_200,  # Hintergrundfarbe während Laden
+            bgcolor=ft.Colors.GREY_200,
         )
         
         # Badges
         badges = ft.Row(
-            [self._badge_for_typ(typ), self._badge_for_species(art)],
+            [self._badge_for_typ(data["typ"]), self._badge_for_species(data["art"])],
             spacing=8,
             wrap=True,
         )
@@ -363,7 +685,7 @@ class DiscoverView:
         # Header
         header = ft.Row(
             [
-                ft.Text(title, size=18, weight=ft.FontWeight.W_600),
+                ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
                 badges,
             ],
@@ -371,14 +693,14 @@ class DiscoverView:
         )
         
         # Rasse und Farbe
-        line1 = ft.Text(f"{rasse} • {farbe}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
+        line1 = ft.Text(f"{data['rasse']} • {data['farbe']}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
         
         # Metadaten
         metas = ft.Row(
             [
-                self._meta(ft.Icons.LOCATION_ON, ort if ort else "—"),
-                self._meta(ft.Icons.SCHEDULE, when if when else "—"),
-                self._meta(ft.Icons.LABEL, status),
+                self._meta(ft.Icons.LOCATION_ON, data["ort"] if data["ort"] else "—"),
+                self._meta(ft.Icons.SCHEDULE, data["when"] if data["when"] else "—"),
+                self._meta(ft.Icons.LABEL, data["status"]),
             ],
             spacing=16,
             wrap=True,
@@ -386,7 +708,7 @@ class DiscoverView:
         
         # Teilen-Funktion
         def share(_):
-            text = f"PetBuddy: {title}\n{typ} · {art}\n{ort}\n"
+            text = f"PetBuddy: {data['title']}\n{data['typ']} · {data['art']}\n{data['ort']}\n"
             self.page.set_clipboard(text)
             self.page.snack_bar = ft.SnackBar(ft.Text("Text kopiert 📋"), open=True)
             self.page.update()
@@ -408,8 +730,13 @@ class DiscoverView:
         card_inner = ft.Column([visual, header, line1, metas, actions], spacing=10)
         card = soft_card(card_inner, pad=12, elev=3)
         
-        # Hover-Animation
-        wrapper = ft.Container(content=card, animate_scale=300, scale=ft.Scale(1.0))
+        # Hover-Animation und Klick-Handler
+        wrapper = ft.Container(
+            content=card,
+            animate_scale=300,
+            scale=ft.Scale(1.0),
+            on_click=lambda _: self._show_detail_dialog(item),
+        )
         
         def on_hover(e: ft.HoverEvent):
             wrapper.scale = ft.Scale(1.01) if e.data == "true" else ft.Scale(1.0)
@@ -442,10 +769,11 @@ class DiscoverView:
         
         try:
             query = self.sb.table("post").select("""
-                id, headline, location_text, event_date, created_at, is_active,
+                id, headline, description, location_text, event_date, created_at, is_active,
                 post_status(id, name),
                 species(id, name),
                 breed(id, name),
+                sex(id, name),
                 post_image(url),
                 post_color(color(id, name))
             """).order("created_at", desc=True)
@@ -495,8 +823,19 @@ class DiscoverView:
                 items = [item for item in items if has_matching_color(item)]
             
             if items:
-                self.list_view.controls = [self._big_card(it) for it in items]
+                self.current_items = items
+                if self.view_mode == "grid":
+                    self.grid_view.controls = [self._grid_card(it) for it in items]
+                    self.list_view.controls = []
+                    self.list_view.visible = False
+                    self.grid_view.visible = True
+                else:
+                    self.list_view.controls = [self._big_card(it) for it in items]
+                    self.grid_view.controls = []
+                    self.list_view.visible = True
+                    self.grid_view.visible = False
             else:
+                self.current_items = []
                 # Keine Ergebnisse gefunden
                 no_results = soft_card(
                     ft.Column(
@@ -513,12 +852,17 @@ class DiscoverView:
                     pad=24,
                 )
                 self.list_view.controls = [no_results]
+                self.grid_view.controls = []
+                self.list_view.visible = True
+                self.grid_view.visible = False
             
             self.page.update()
             
         except Exception as ex:
             print(f"Fehler beim Laden der Daten: {ex}")
+            self.current_items = []
             self.list_view.controls = [self.empty_state_card]
+            self.grid_view.controls = []
             self.page.update()
     
     def _reset_filters(self, _=None):
@@ -544,10 +888,22 @@ class DiscoverView:
     
     def build(self) -> ft.Column:
         # Baut und gibt das Layout zurück.
-        # Listen-Container
-        list_container = ft.Container(
+        
+        # View-Toggle Zeile (links über den Meldungen)
+        view_toggle_row = ft.Container(
+            content=ft.Row(
+                [
+                    self.view_toggle,
+                ],
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            padding=ft.padding.only(left=4, top=12, bottom=8),
+        )
+        
+        # Listen- und Grid-Container
+        content_container = ft.Container(
             padding=4,
-            content=ft.Column([self.list_view], spacing=12),
+            content=ft.Column([view_toggle_row, self.list_view, self.grid_view], spacing=8),
         )
         
         # Karten-Platzhalter
@@ -572,7 +928,7 @@ class DiscoverView:
         tabs = ft.Tabs(
             selected_index=0,
             tabs=[
-                ft.Tab(text="Liste", icon=ft.Icons.VIEW_LIST, content=list_container),
+                ft.Tab(text="Meldungen", icon=ft.Icons.PETS, content=content_container),
                 ft.Tab(text="Karte", icon=ft.Icons.MAP, content=map_container),
             ],
             expand=True,
