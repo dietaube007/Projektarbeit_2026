@@ -171,17 +171,52 @@ class PetBuddyApp:
             self._show_error(f"Fehler beim Laden der UI: {str(e)}")
             return False
     
+    def _build_login_banner(self) -> ft.Control:
+        # Erstellt ein Banner für nicht eingeloggte Benutzer.
+        return ft.Container(
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700, size=20),
+                    ft.Text(
+                        "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
+                        color=ft.Colors.BLUE_900,
+                        size=14,
+                        expand=True,
+                    ),
+                    ft.TextButton(
+                        "Anmelden",
+                        icon=ft.Icons.LOGIN,
+                        on_click=lambda _: self._show_login(),
+                    ),
+                ],
+                spacing=12,
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            padding=ft.padding.symmetric(horizontal=16, vertical=10),
+            bgcolor=ft.Colors.BLUE_50,
+            border_radius=10,
+            border=ft.border.all(1, ft.Colors.BLUE_200),
+        )
+    
     def _build_start_section(self) -> ft.Control:
         # Erstellt den Start-Tab mit Suchleiste und Liste/Karte.
+        controls = []
+        
+        # Login-Banner für nicht eingeloggte Benutzer
+        if not self.is_logged_in:
+            controls.append(self._build_login_banner())
+        
+        controls.extend([
+            soft_card(
+                ft.Column([self.discover_view.search_row], spacing=8),
+                pad=12,
+                elev=2
+            ),
+            self.discover_view.build(),
+        ])
+        
         return ft.Column(
-            [
-                soft_card(
-                    ft.Column([self.discover_view.search_row], spacing=8),
-                    pad=12,
-                    elev=2
-                ),
-                self.discover_view.build(),
-            ],
+            controls,
             spacing=14,
             expand=True,
         )
@@ -221,8 +256,8 @@ class PetBuddyApp:
             ))
         else:
             actions.insert(0, ft.IconButton(
-                ft.Icons.LOGIN,
-                tooltip="Anmelden",
+                ft.Icons.PERSON_ADD_ALT_1,
+                tooltip="Anmelden / Registrieren",
                 on_click=lambda _: self._show_login()
             ))
         
