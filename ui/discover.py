@@ -82,13 +82,25 @@ class DiscoverView:
             options=[ft.dropdown.Option("alle", "Alle")],
             value="alle",
             width=180,
+            on_change=lambda e: self._on_tierart_change(e),
         )
         
         self.filter_geschlecht = ft.Dropdown(
             label="Geschlecht",
+            options=[
+                ft.dropdown.Option("alle", "Alle"),
+                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
+            ],
+            value="alle",
+            width=180,
+        )
+        
+        self.filter_rasse = ft.Dropdown(
+            label="Rasse",
             options=[ft.dropdown.Option("alle", "Alle")],
             value="alle",
             width=180,
+            on_change=None,
         )
         
         # Farben-Filter
@@ -114,7 +126,7 @@ class DiscoverView:
             padding=8,
             on_click=self._toggle_farben_panel,
             border_radius=8,
-            bgcolor=ft.Colors.GREY_100,
+            bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE),
         )
         
         # Empty State Card
@@ -145,16 +157,27 @@ class DiscoverView:
         self.search_row = ft.ResponsiveRow(
             [
                 ft.Container(self.search_q, col={"xs": 12, "sm": 12, "md": 6}),
-                ft.Container(self.filter_typ, col={"xs": 6, "sm": 6, "md": 2}),
-                ft.Container(self.filter_art, col={"xs": 6, "sm": 6, "md": 2}),
-                ft.Container(self.filter_geschlecht, col={"xs": 6, "sm": 6, "md": 2}),
+                ft.Container(self.filter_typ, col={"xs": 6, "sm": 4, "md": 2}),
+                ft.Container(self.filter_art, col={"xs": 6, "sm": 4, "md": 2}),
+                ft.Container(self.filter_geschlecht, col={"xs": 6, "sm": 4, "md": 2}),
+                ft.Container(self.filter_rasse, col={"xs": 6, "sm": 4, "md": 2}),
                 ft.Container(self.farben_header, col={"xs": 12, "sm": 12, "md": 12}),
                 ft.Container(self.farben_panel, col={"xs": 12, "sm": 12, "md": 12}),
                 ft.Container(
-                    ft.FilledButton(
-                        "Suchen",
-                        icon=ft.Icons.SEARCH,
-                        on_click=lambda e: self.page.run_task(self.load_posts)
+                    ft.Row(
+                        [
+                            ft.FilledButton(
+                                "Suchen",
+                                icon=ft.Icons.SEARCH,
+                                on_click=lambda e: self.page.run_task(self.load_posts)
+                            ),
+                            ft.OutlinedButton(
+                                "Zurücksetzen",
+                                icon=ft.Icons.REFRESH,
+                                on_click=lambda e: self._reset_filters(e)
+                            ),
+                        ],
+                        spacing=10,
                     ),
                     col={"xs": 12, "sm": 12, "md": 12},
                 ),
@@ -172,6 +195,35 @@ class DiscoverView:
         )
         self.page.update()
     
+    def _update_rassen_dropdown(self, species_id=None):
+        # Aktualisiert das Rassen-Dropdown basierend auf der ausgewählten Tierart.
+        self.filter_rasse.options = [ft.dropdown.Option("alle", "Alle")]
+        self.filter_rasse.value = "alle"
+        
+        if hasattr(self, '_all_breeds') and self._all_breeds:
+            breeds_to_show = []
+            
+            if species_id and species_id != "alle":
+                # Nur Rassen der ausgewählten Tierart
+                breeds_to_show = self._all_breeds.get(int(species_id), [])
+            else:
+                # Alle Rassen aus allen Tierarten
+                for sid, breeds in self._all_breeds.items():
+                    breeds_to_show.extend(breeds)
+            
+            # Nach Name sortieren
+            breeds_to_show.sort(key=lambda b: b.get("name", "").lower())
+            
+            for breed in breeds_to_show:
+                self.filter_rasse.options.append(
+                    ft.dropdown.Option(str(breed.get("id")), breed.get("name", ""))
+                )
+    
+    def _on_tierart_change(self, e):
+        # Wird aufgerufen wenn sich die Tierart ändert.
+        self._update_rassen_dropdown(self.filter_art.value)
+        self.page.update()
+    
     # ════════════════════════════════════════════════════════════════════
     # REFERENZDATEN LADEN
     # ════════════════════════════════════════════════════════════════════
@@ -186,9 +238,23 @@ class DiscoverView:
                         ft.dropdown.Option(str(item.get(id_key)), item.get(name_key, ""))
                     )
             
+            
             populate_dropdown(self.filter_typ, self.ref_service.get_post_statuses())
             populate_dropdown(self.filter_art, self.ref_service.get_species())
-            populate_dropdown(self.filter_geschlecht, self.ref_service.get_sex())
+            
+            sex_options = self.ref_service.get_sex()
+            self.filter_geschlecht.options = [
+                ft.dropdown.Option("alle", "Alle"),
+                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
+            ]
+            for item in sex_options:
+                self.filter_geschlecht.options.append(
+                    ft.dropdown.Option(str(item.get("id")), item.get("name", ""))
+                )
+            
+            # Rassen laden (alle Rassen für den Filter)
+            self._all_breeds = self.ref_service.get_breeds_by_species()
+            self._update_rassen_dropdown()
             
             # Farben-Checkboxes
             self.farben_filter_container.controls = []
@@ -357,7 +423,7 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     async def load_posts(self, _=None):
-        # Lädt Meldungen aus der Datenbank.
+        # Lädt Meldungen aus der Datenbank mit Filteroptionen.
         # Loading-Indikator anzeigen
         loading_indicator = ft.Container(
             content=ft.Column(
@@ -384,13 +450,69 @@ class DiscoverView:
                 post_color(color(id, name))
             """).order("created_at", desc=True)
             
+            # Filter: Kategorie (post_status)
+            if self.filter_typ.value and self.filter_typ.value != "alle":
+                query = query.eq("post_status_id", int(self.filter_typ.value))
+            
+            # Filter: Tierart (species)
+            if self.filter_art.value and self.filter_art.value != "alle":
+                query = query.eq("species_id", int(self.filter_art.value))
+            
+            # Filter: Geschlecht
+            if self.filter_geschlecht.value and self.filter_geschlecht.value != "alle":
+                if self.filter_geschlecht.value == "keine_angabe":
+                    query = query.is_("sex_id", "null")
+                else:
+                    query = query.eq("sex_id", int(self.filter_geschlecht.value))
+            
+            # Filter: Rasse
+            if self.filter_rasse.value and self.filter_rasse.value != "alle":
+                query = query.eq("breed_id", int(self.filter_rasse.value))
+            
             result = query.limit(self.MAX_POSTS_LIMIT).execute()
             items = result.data
+            
+            # Filter: Suchtext (client-seitig für headline, location_text)
+            search_text = (self.search_q.value or "").strip().lower()
+            if search_text:
+                items = [
+                    item for item in items
+                    if search_text in (item.get("headline") or "").lower()
+                    or search_text in (item.get("location_text") or "").lower()
+                ]
+            
+            # Filter: Farben (client-seitig)
+            if self.selected_farben:
+                def has_matching_color(item):
+                    post_colors = item.get("post_color") or []
+                    item_color_ids = [
+                        pc.get("color", {}).get("id") 
+                        for pc in post_colors 
+                        if pc.get("color")
+                    ]
+                    return any(c_id in item_color_ids for c_id in self.selected_farben)
+                
+                items = [item for item in items if has_matching_color(item)]
             
             if items:
                 self.list_view.controls = [self._big_card(it) for it in items]
             else:
-                self.list_view.controls = [self.empty_state_card]
+                # Keine Ergebnisse gefunden
+                no_results = soft_card(
+                    ft.Column(
+                        [
+                            ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
+                            ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
+                            ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
+                            ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=8,
+                    ),
+                    elev=1,
+                    pad=24,
+                )
+                self.list_view.controls = [no_results]
             
             self.page.update()
             
@@ -398,6 +520,23 @@ class DiscoverView:
             print(f"Fehler beim Laden der Daten: {ex}")
             self.list_view.controls = [self.empty_state_card]
             self.page.update()
+    
+    def _reset_filters(self, _=None):
+        # Setzt alle Filter zurück.
+        self.search_q.value = ""
+        self.filter_typ.value = "alle"
+        self.filter_art.value = "alle"
+        self.filter_geschlecht.value = "alle"
+        self.filter_rasse.value = "alle"
+        self.selected_farben.clear()
+        
+        # Farben-Checkboxen zurücksetzen
+        for container in self.farben_filter_container.controls:
+            if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
+                container.content.value = False
+        
+        self.page.update()
+        self.page.run_task(self.load_posts)
     
     # ════════════════════════════════════════════════════════════════════
     # BUILD

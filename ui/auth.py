@@ -52,6 +52,9 @@ class AuthView:
         self._reg_modal_bg: Optional[ft.Container] = None
         self._background: Optional[ft.Container] = None
         self._theme_icon: Optional[ft.IconButton] = None
+        self._welcome_text: Optional[ft.Text] = None
+        self._title_text: Optional[ft.Text] = None
+        self._subtitle_text: Optional[ft.Text] = None
     
     # ─────────────────────────────────────────────────────────────
     # Validierungs-Methoden
@@ -238,6 +241,11 @@ class AuthView:
         self._form_card.bgcolor = ft.Colors.GREY_800 if is_dark else CARD_COLOR
         self._reg_modal_card.bgcolor = ft.Colors.GREY_800 if is_dark else CARD_COLOR
         
+        # Überschriften-Farben aktualisieren
+        self._welcome_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
+        self._title_text.color = ft.Colors.WHITE if is_dark else TEXT_PRIMARY
+        self._subtitle_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
+        
         self.page.update()
     
     def _open_modal(self, e=None):
@@ -301,7 +309,7 @@ class AuthView:
         
         self._login_pwd = ft.TextField(
             label="Passwort",
-            hint_text="••••••••",
+            hint_text="Dein Passwort",
             password=True,
             can_reveal_password=True,
             border_radius=8,
@@ -475,6 +483,25 @@ class AuthView:
             border_radius=50,
         )
         
+        # Überschriften-Texte
+        self._welcome_text = ft.Text(
+            "Willkommen bei",
+            size=16,
+            color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
+        )
+        self._title_text = ft.Text(
+            "PetBuddy",
+            size=32,
+            weight=ft.FontWeight.BOLD,
+            color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
+        )
+        self._subtitle_text = ft.Text(
+            "Melde dich an, um deine Haustierhilfe zu\nstarten 🐾",
+            size=14,
+            color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
+            text_align=ft.TextAlign.CENTER,
+        )
+        
         # Haupt-Layout - vertikal zentriert, minimalistisch
         self._background = ft.Container(
             content=ft.Stack([
@@ -484,24 +511,10 @@ class AuthView:
                     ft.Column([
                         paw_icon,
                         ft.Container(height=24),
-                        ft.Text(
-                            "Willkommen bei",
-                            size=16,
-                            color=TEXT_SECONDARY,
-                        ),
-                        ft.Text(
-                            "PetBuddy",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=TEXT_PRIMARY if not is_dark else ft.Colors.WHITE,
-                        ),
+                        self._welcome_text,
+                        self._title_text,
                         ft.Container(height=8),
-                        ft.Text(
-                            "Melde dich an, um deine Haustierhilfe zu\nstarten 🐾",
-                            size=14,
-                            color=TEXT_SECONDARY,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
+                        self._subtitle_text,
                         ft.Container(height=32),
                         self._form_card,
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
