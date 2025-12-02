@@ -800,13 +800,14 @@ class DiscoverView:
             result = query.limit(self.MAX_POSTS_LIMIT).execute()
             items = result.data
             
-            # Filter: Suchtext (client-seitig für headline, location_text)
+            # Filter: Suchtext (client-seitig für headline, location_text, description)
             search_text = (self.search_q.value or "").strip().lower()
             if search_text:
                 items = [
                     item for item in items
                     if search_text in (item.get("headline") or "").lower()
                     or search_text in (item.get("location_text") or "").lower()
+                    or search_text in (item.get("description") or "").lower()
                 ]
             
             # Filter: Farben (client-seitig)
