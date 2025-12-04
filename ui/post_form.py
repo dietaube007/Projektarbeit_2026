@@ -19,20 +19,27 @@ from services.posts import PostService
 
 
 class PostForm:
-    # Klasse für das Tiermeldungs-Formular.
+    """Formular zum Erstellen von Tier-Meldungen (vermisst/gefunden)."""
     
     # ════════════════════════════════════════════════════════════════════
     # KONSTANTEN
     # ════════════════════════════════════════════════════════════════════
     
-    VALID_IMAGE_TYPES = ["jpg", "jpeg", "png", "gif", "webp"]
-    PLACEHOLDER_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-    STORAGE_BUCKET = "pet-images"
-    UPLOAD_DIR = "image_uploads"
-    DATE_FORMAT = "%d.%m.%Y"
-    ALLOWED_POST_STATUSES = ["vermisst", "fundtier"]
-    MAX_IMAGE_SIZE = (800, 800)  # Maximale Bildgröße für schnelleres Laden
-    IMAGE_QUALITY = 85  # JPEG Qualität (1-100)
+    VALID_IMAGE_TYPES: list[str] = ["jpg", "jpeg", "png", "gif", "webp"]
+    PLACEHOLDER_IMAGE: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+    STORAGE_BUCKET: str = "pet-images"
+    UPLOAD_DIR: str = "image_uploads"
+    DATE_FORMAT: str = "%d.%m.%Y"
+    ALLOWED_POST_STATUSES: list[str] = ["vermisst", "fundtier"]
+    MAX_IMAGE_SIZE: tuple[int, int] = (800, 800)
+    IMAGE_QUALITY: int = 85
+    
+    # UI-Konstanten
+    FIELD_WIDTH_SMALL: int = 250
+    FIELD_WIDTH_MEDIUM: int = 400
+    FIELD_WIDTH_LARGE: int = 500
+    NO_SELECTION_VALUE: str = "none"
+    NO_SELECTION_LABEL: str = "— Keine Angabe —"
     
     def __init__(
         self,
@@ -40,7 +47,13 @@ class PostForm:
         sb,
         on_saved_callback: Optional[Callable] = None
     ):
-        # Initialisiert das Formular.
+        """Initialisiert das Meldungsformular.
+        
+        Args:
+            page: Flet Page-Instanz
+            sb: Supabase Client
+            on_saved_callback: Callback nach erfolgreichem Speichern
+        """
         self.page = page
         self.sb = sb
         self.on_saved_callback = on_saved_callback
@@ -81,7 +94,7 @@ class PostForm:
         
         # Foto-Vorschau
         self.photo_preview = ft.Image(
-            width=400, height=250,
+            width=self.FIELD_WIDTH_MEDIUM, height=250,
             fit=ft.ImageFit.COVER,
             visible=False,
             src_base64=self.PLACEHOLDER_IMAGE
@@ -93,12 +106,12 @@ class PostForm:
             weight=ft.FontWeight.W_600,
             color=ft.Colors.GREY_700
         )
-        self.name_tf = ft.TextField(width=400)
+        self.name_tf = ft.TextField(width=self.FIELD_WIDTH_MEDIUM)
         
         # Dropdowns
-        self.species_dd = ft.Dropdown(label="Tierart﹡", text_size=14, width=250)
-        self.breed_dd = ft.Dropdown(label="Rasse (optional)", width=250)
-        self.sex_dd = ft.Dropdown(label="Geschlecht (optional)", width=250)
+        self.species_dd = ft.Dropdown(label="Tierart﹡", text_size=14, width=self.FIELD_WIDTH_SMALL)
+        self.breed_dd = ft.Dropdown(label="Rasse (optional)", width=self.FIELD_WIDTH_SMALL)
+        self.sex_dd = ft.Dropdown(label="Geschlecht (optional)", width=self.FIELD_WIDTH_SMALL)
         
         # Species-Dropdown Event
         self.species_dd.on_change = lambda _: self.page.run_task(self._update_breeds)
@@ -133,15 +146,15 @@ class PostForm:
         self.info_tf = ft.TextField(
             multiline=True,
             max_lines=4,
-            width=500,
+            width=self.FIELD_WIDTH_LARGE,
             min_lines=2,
         )
         
         # Standort & Datum
-        self.location_tf = ft.TextField(label="Ort﹡", width=500)
+        self.location_tf = ft.TextField(label="Ort﹡", width=self.FIELD_WIDTH_LARGE)
         self.date_tf = ft.TextField(
             label="Datum﹡ (TT.MM.YYYY)",
-            width=250,
+            width=self.FIELD_WIDTH_SMALL,
             hint_text="z.B. 15.11.2025"
         )
         
@@ -151,6 +164,23 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     # EVENT HANDLER
     # ════════════════════════════════════════════════════════════════════
+    
+    def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
+        """Zeigt eine Statusnachricht an.
+        
+        Args:
+            message: Die anzuzeigende Nachricht
+            is_error: True für Fehlermeldung (rot)
+            is_loading: True für Ladevorgang (blau)w
+        """
+        if is_error:
+            self.status_text.color = ft.Colors.RED
+        elif is_loading:
+            self.status_text.color = ft.Colors.BLUE
+        else:
+            self.status_text.color = ft.Colors.GREEN
+        self.status_text.value = message
+        self.page.update()
     
     def _toggle_farben_panel(self, _):
         # Toggle für das Farben-Panel.
@@ -239,16 +269,12 @@ class PostForm:
                     
                     self.photo_preview.src_base64 = image_data
                     self.photo_preview.visible = True
-                    self.status_text.value = f"✓ Hochgeladen: {ev.file_name}"
-                    self.status_text.color = ft.Colors.GREEN
-                    self.page.update()
+                    self._show_status(f"✓ Hochgeladen: {ev.file_name}")
                     
                     os.remove(upload_path)
                     
                 except Exception as ex:
-                    self.status_text.value = f"❌ Fehler: {ex}"
-                    self.status_text.color = ft.Colors.RED
-                    self.page.update()
+                    self._show_status(f"❌ Fehler: {ex}", is_error=True)
         
         fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
         self.page.overlay.append(fp)
@@ -293,39 +319,29 @@ class PostForm:
             errors.append("Foto")
         
         if errors:
-            self.status_text.value = f"❌ Bitte ausfüllen: {', '.join(errors)}"
-            self.status_text.color = ft.Colors.RED
-            self.page.update()
+            self._show_status(f"❌ Bitte ausfüllen: {', '.join(errors)}", is_error=True)
             return
         
         # Datum parsen
         try:
             event_date = datetime.strptime(self.date_tf.value.strip(), self.DATE_FORMAT).date()
         except ValueError:
-            self.status_text.value = "❌ Ungültiges Datum. Format: TT.MM.YYYY"
-            self.status_text.color = ft.Colors.RED
-            self.page.update()
+            self._show_status("❌ Ungültiges Datum. Format: TT.MM.YYYY", is_error=True)
             return
         
         # Eingeloggten Benutzer holen
         try:
             user_response = self.sb.auth.get_user()
             if not user_response or not user_response.user:
-                self.status_text.value = "❌ Nicht eingeloggt. Bitte neu anmelden."
-                self.status_text.color = ft.Colors.RED
-                self.page.update()
+                self._show_status("❌ Nicht eingeloggt. Bitte neu anmelden.", is_error=True)
                 return
             user_id = user_response.user.id
         except Exception as e:
-            self.status_text.value = f"❌ Fehler beim Abrufen des Benutzers: {e}"
-            self.status_text.color = ft.Colors.RED
-            self.page.update()
+            self._show_status(f"❌ Fehler beim Abrufen des Benutzers: {e}", is_error=True)
             return
         
         try:
-            self.status_text.value = "⏳ Erstelle Meldung..."
-            self.status_text.color = ft.Colors.BLUE
-            self.page.update()
+            self._show_status("⏳ Erstelle Meldung...", is_loading=True)
             
             post_data = {
                 "user_id": user_id,
@@ -333,8 +349,8 @@ class PostForm:
                 "headline": self.name_tf.value.strip(),
                 "description": self.info_tf.value.strip(),
                 "species_id": int(self.species_dd.value),
-                "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value.isdigit() else None,
-                "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value.isdigit() else None,
+                "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != self.NO_SELECTION_VALUE else None,
+                "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != self.NO_SELECTION_VALUE else None,
                 "event_date": event_date.isoformat(),
                 "location_text": self.location_tf.value.strip(),
             }
@@ -350,9 +366,7 @@ class PostForm:
             if self.selected_photo.get("url"):
                 self.post_service.add_photo(post_id, self.selected_photo["url"])
             
-            self.status_text.value = "✓ Meldung erfolgreich erstellt!"
-            self.status_text.color = ft.Colors.GREEN
-            self.page.update()
+            self._show_status("✓ Meldung erfolgreich erstellt!")
             
             self._reset_form()
             
@@ -360,12 +374,10 @@ class PostForm:
                 self.on_saved_callback(post_id)
                 
         except Exception as ex:
-            self.status_text.value = f"❌ Fehler beim Speichern: {ex}"
-            self.status_text.color = ft.Colors.RED
-            self.page.update()
+            self._show_status(f"❌ Fehler beim Speichern: {ex}", is_error=True)
     
     def _reset_form(self):
-        # Setzt das Formular auf Standardwerte zurück.
+        """Setzt das Formular auf Standardwerte zurück."""
         if self.post_statuses:
             self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
         self.name_tf.value = ""
@@ -374,11 +386,11 @@ class PostForm:
             # Rassen für die ausgewählte Tierart laden
             species_id = self.species_list[0]["id"]
             breeds = self.breeds_by_species.get(species_id, [])
-            self.breed_dd.options = [ft.dropdown.Option("none", "- Keine Angabe -")] + [
+            self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, "- Keine Angabe -")] + [
                 ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds
             ]
-        self.breed_dd.value = "none"
-        self.sex_dd.value = "none"
+        self.breed_dd.value = self.NO_SELECTION_VALUE
+        self.sex_dd.value = self.NO_SELECTION_VALUE
         self.info_tf.value = ""
         self.location_tf.value = ""
         self.date_tf.value = ""
@@ -427,12 +439,12 @@ class PostForm:
             ]
             
             # Geschlecht Dropdown mit "Keine Angabe"
-            self.sex_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
+            self.sex_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
             self.sex_dd.options += [
                 ft.dropdown.Option(str(s["id"]), s["name"])
                 for s in self.sex_list
             ]
-            self.sex_dd.value = "none"
+            self.sex_dd.value = self.NO_SELECTION_VALUE
             
             # Farben-Checkboxes erstellen
             self.farben_container.controls = []
@@ -464,19 +476,19 @@ class PostForm:
             print(f"Fehler beim Laden der Referenzdaten: {ex}")
     
     async def _update_breeds(self, _=None):
-        # Aktualisiert das Rassen-Dropdown basierend auf der Tierart.
+        """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
         try:
             sid = int(self.species_dd.value) if self.species_dd.value else None
             if sid and sid in self.breeds_by_species:
-                self.breed_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
+                self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
                 self.breed_dd.options += [
                     ft.dropdown.Option(str(b["id"]), b["name"])
                     for b in self.breeds_by_species[sid]
                 ]
-                self.breed_dd.value = "none"
+                self.breed_dd.value = self.NO_SELECTION_VALUE
             else:
-                self.breed_dd.options = [ft.dropdown.Option("none", "— Keine Angabe —")]
-                self.breed_dd.value = "none"
+                self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
+                self.breed_dd.value = self.NO_SELECTION_VALUE
             self.page.update()
         except Exception as ex:
             print(f"Fehler beim Aktualisieren der Rassen: {ex}")

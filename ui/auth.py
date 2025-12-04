@@ -23,7 +23,6 @@ CARD_COLOR = ft.Colors.WHITE     # Weiße Card
 TEXT_PRIMARY = "#1F2937"         # Dunkler Text
 TEXT_SECONDARY = "#6B7280"       # Grauer Text
 BORDER_COLOR = "#E5E7EB"         # Hellgrauer Rahmen
-BUTTON_SUCCESS = "#5B6EE1"       # Grün für Registrieren
 
 
 class AuthView:
@@ -200,7 +199,7 @@ class AuthView:
         try:
             self.sb.auth.sign_out()
             self._show_login_message("✅ Abgemeldet.", ft.Colors.GREEN)
-        except:
+        except Exception:
             pass
     
     # ─────────────────────────────────────────────────────────────
@@ -277,14 +276,14 @@ class AuthView:
         try:
             user = self.sb.auth.get_user()
             return user is not None and user.user is not None
-        except:
+        except Exception:
             return False
     
     def get_current_user(self):
         # Gibt den aktuell angemeldeten Benutzer zurück.
         try:
             return self.sb.auth.get_user()
-        except:
+        except Exception:
             return None
     
     def build(self) -> ft.Control:
@@ -370,7 +369,7 @@ class AuthView:
                     ft.ElevatedButton(
                         "Registrieren",
                         on_click=lambda e: self.page.run_task(self._register),
-                        bgcolor=BUTTON_SUCCESS,
+                        bgcolor=PRIMARY_COLOR,
                         color=ft.Colors.WHITE,
                     ),
                 ], alignment=ft.MainAxisAlignment.END),

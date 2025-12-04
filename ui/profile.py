@@ -12,13 +12,21 @@ from ui.theme import soft_card
 
 
 class ProfileView:
-    # Klasse für den Profilbereich.
+    """Benutzer-Profilbereich mit Einstellungen und Profilverwaltung."""
     
     # ════════════════════════════════════════════════════════════════════
     # KONSTANTEN
     # ════════════════════════════════════════════════════════════════════
     
-    PRIMARY_COLOR = "#5B6EE1"
+    PRIMARY_COLOR: str = "#5B6EE1"
+    AVATAR_RADIUS: int = 50
+    SECTION_PADDING: int = 20
+    CARD_ELEVATION: int = 2
+    
+    # View-Namen als Konstanten
+    VIEW_MAIN: str = "main"
+    VIEW_EDIT_PROFILE: str = "edit_profile"
+    VIEW_SETTINGS: str = "settings"
     
     def __init__(
         self,
@@ -26,7 +34,13 @@ class ProfileView:
         sb,
         on_logout: Optional[Callable] = None
     ):
-        # Initialisiert die Profil-Ansicht.
+        """Initialisiert die Profil-Ansicht.
+        
+        Args:
+            page: Flet Page-Instanz
+            sb: Supabase Client
+            on_logout: Callback nach Logout
+        """
         self.page = page
         self.sb = sb
         self.on_logout = on_logout
@@ -36,7 +50,7 @@ class ProfileView:
         self.user_profile = None
         
         # Aktueller Bereich (Hauptmenü oder Untermenü)
-        self.current_view = "main"
+        self.current_view = self.VIEW_MAIN
         self.main_container = ft.Column(spacing=16, scroll=ft.ScrollMode.AUTO, expand=True)
         
         # UI-Elemente initialisieren
@@ -46,12 +60,12 @@ class ProfileView:
         self.page.run_task(self._load_user_data)
     
     def _init_ui_elements(self):
-        # Initialisiert alle UI-Elemente.
+        """Initialisiert alle UI-Elemente."""
         # Profilbild
         self.avatar = ft.CircleAvatar(
-            radius=50,
+            radius=self.AVATAR_RADIUS,
             bgcolor=self.PRIMARY_COLOR,
-            content=ft.Icon(ft.Icons.PERSON, size=50, color=ft.Colors.WHITE),
+            content=ft.Icon(ft.Icons.PERSON, size=self.AVATAR_RADIUS, color=ft.Colors.WHITE),
         )
         
         # Benutzerinfo
@@ -105,31 +119,32 @@ class ProfileView:
     # ════════════════════════════════════════════════════════════════════
     
     def _show_main_menu(self):
-        # Zeigt das Hauptmenü.
-        self.current_view = "main"
+        """Zeigt das Hauptmenü."""
+        self.current_view = self.VIEW_MAIN
         self._rebuild()
     
     def _show_edit_profile(self):
-        # Zeigt das Profil-Bearbeiten-Menü.
-        self.current_view = "edit_profile"
+        """Zeigt das Profil-Bearbeiten-Menü."""
+        self.current_view = self.VIEW_EDIT_PROFILE
         self._rebuild()
     
     def _show_settings(self):
-        # Zeigt die Einstellungen.
-        self.current_view = "settings"
+        """Zeigt die Einstellungen."""
+        self.current_view = self.VIEW_SETTINGS
         self._rebuild()
     
     def _rebuild(self):
-        # Baut die Ansicht neu.
+        """Baut die Ansicht basierend auf current_view neu."""
         self.main_container.controls.clear()
         
-        if self.current_view == "main":
-            self.main_container.controls = self._build_main_menu()
-        elif self.current_view == "edit_profile":
-            self.main_container.controls = self._build_edit_profile()
-        elif self.current_view == "settings":
-            self.main_container.controls = self._build_settings()
+        view_builders = {
+            self.VIEW_MAIN: self._build_main_menu,
+            self.VIEW_EDIT_PROFILE: self._build_edit_profile,
+            self.VIEW_SETTINGS: self._build_settings,
+        }
         
+        builder = view_builders.get(self.current_view, self._build_main_menu)
+        self.main_container.controls = builder()
         self.page.update()
     
     # ════════════════════════════════════════════════════════════════════
@@ -149,8 +164,40 @@ class ProfileView:
     # UI KOMPONENTEN
     # ════════════════════════════════════════════════════════════════════
     
+    def _build_back_button(self) -> ft.Container:
+        """Erstellt einen Zurück-Button."""
+        return ft.Container(
+            content=ft.TextButton(
+                "← Zurück",
+                on_click=lambda _: self._show_main_menu(),
+            ),
+            padding=ft.padding.only(bottom=8),
+        )
+    
+    def _build_section_title(self, title: str) -> ft.Text:
+        """Erstellt einen Abschnitts-Titel."""
+        return ft.Text(title, size=18, weight=ft.FontWeight.W_600)
+    
+    def _build_setting_row(self, icon, title: str, subtitle: str, control: ft.Control) -> ft.Row:
+        """Erstellt eine Einstellungs-Zeile mit Icon, Text und Control."""
+        return ft.Row(
+            [
+                ft.Icon(icon, color=self.PRIMARY_COLOR),
+                ft.Column(
+                    [
+                        ft.Text(title, size=14),
+                        ft.Text(subtitle, size=12, color=ft.Colors.GREY_600),
+                    ],
+                    spacing=2,
+                    expand=True,
+                ),
+                control,
+            ],
+            spacing=12,
+        )
+    
     def _build_menu_item(self, icon: str, title: str, subtitle: str = "", on_click=None) -> ft.Container:
-        # Erstellt einen Menüpunkt.
+        """Erstellt einen Menüpunkt mit Icon, Titel und optionalem Untertitel."""
         return ft.Container(
             content=ft.Row(
                 [
@@ -183,7 +230,7 @@ class ProfileView:
     # ════════════════════════════════════════════════════════════════════
     
     def _build_main_menu(self) -> list:
-        # Baut das Hauptmenü.
+        """Baut das Hauptmenü mit Profil-Header und Menüliste."""
         # Profil-Header
         profile_header = soft_card(
             ft.Column(
@@ -206,8 +253,8 @@ class ProfileView:
                 ],
                 spacing=16,
             ),
-            pad=20,
-            elev=2,
+            pad=self.SECTION_PADDING,
+            elev=self.CARD_ELEVATION,
         )
         
         # Menü-Liste
@@ -279,21 +326,12 @@ class ProfileView:
     # ════════════════════════════════════════════════════════════════════
     
     def _build_edit_profile(self) -> list:
-        # Baut die Profil-Bearbeiten-Ansicht.
-        # Zurück-Button
-        back_button = ft.Container(
-            content=ft.TextButton(
-                "← Zurück",
-                on_click=lambda _: self._show_main_menu(),
-            ),
-            padding=ft.padding.only(bottom=8),
-        )
-        
+        """Baut die Profil-Bearbeiten-Ansicht."""
         # Bild ändern
         change_image_section = soft_card(
             ft.Column(
                 [
-                    ft.Text("Profilbild", size=18, weight=ft.FontWeight.W_600),
+                    self._build_section_title("Profilbild"),
                     ft.Container(height=8),
                     ft.Row(
                         [
@@ -318,7 +356,7 @@ class ProfileView:
         change_name_section = soft_card(
             ft.Column(
                 [
-                    ft.Text("Anzeigename", size=18, weight=ft.FontWeight.W_600),
+                    self._build_section_title("Anzeigename"),
                     ft.Container(height=8),
                     ft.TextField(
                         value=self.display_name.value,
@@ -342,7 +380,7 @@ class ProfileView:
         password_section = soft_card(
             ft.Column(
                 [
-                    ft.Text("Passwort", size=18, weight=ft.FontWeight.W_600),
+                    self._build_section_title("Passwort"),
                     ft.Container(height=8),
                     ft.Text(
                         "Setze dein Passwort zurück",
@@ -359,82 +397,55 @@ class ProfileView:
                 spacing=8,
             ),
             pad=20,
-            elev=2,
+            elev=self.CARD_ELEVATION,
         )
         
-        return [back_button, change_image_section, change_name_section, password_section]
+        return [self._build_back_button(), change_image_section, change_name_section, password_section]
     
     # ════════════════════════════════════════════════════════════════════
     # BUILD - EINSTELLUNGEN
     # ════════════════════════════════════════════════════════════════════
     
     def _build_settings(self) -> list:
-        # Baut die Einstellungen-Ansicht.
-        # Zurück-Button
-        back_button = ft.Container(
-            content=ft.TextButton(
-                "← Zurück",
-                on_click=lambda _: self._show_main_menu(),
-            ),
-            padding=ft.padding.only(bottom=8),
-        )
-        
+        """Baut die Einstellungen-Ansicht."""
         # Benachrichtigungen
         notifications_section = soft_card(
             ft.Column(
                 [
-                    ft.Text("Benachrichtigungen", size=18, weight=ft.FontWeight.W_600),
+                    self._build_section_title("Benachrichtigungen"),
                     ft.Container(height=12),
-                    ft.Row(
-                        [
-                            ft.Icon(ft.Icons.NOTIFICATIONS_OUTLINED, color=self.PRIMARY_COLOR),
-                            ft.Column(
-                                [
-                                    ft.Text("Push-Benachrichtigungen", size=14),
-                                    ft.Text("Erhalte Updates zu deinen Meldungen", size=12, color=ft.Colors.GREY_600),
-                                ],
-                                spacing=2,
-                                expand=True,
-                            ),
-                            ft.Switch(value=True, on_change=lambda _: print("Benachrichtigung geändert")),
-                        ],
-                        spacing=12,
+                    self._build_setting_row(
+                        ft.Icons.NOTIFICATIONS_OUTLINED,
+                        "Push-Benachrichtigungen",
+                        "Erhalte Updates zu deinen Meldungen",
+                        ft.Switch(value=True, on_change=lambda _: print("Benachrichtigung geändert")),
                     ),
                     ft.Divider(height=20),
-                    ft.Row(
-                        [
-                            ft.Icon(ft.Icons.EMAIL_OUTLINED, color=self.PRIMARY_COLOR),
-                            ft.Column(
-                                [
-                                    ft.Text("E-Mail-Benachrichtigungen", size=14),
-                                    ft.Text("Erhalte wichtige Updates per E-Mail", size=12, color=ft.Colors.GREY_600),
-                                ],
-                                spacing=2,
-                                expand=True,
-                            ),
-                            ft.Switch(value=False, on_change=lambda _: print("E-Mail geändert")),
-                        ],
-                        spacing=12,
+                    self._build_setting_row(
+                        ft.Icons.EMAIL_OUTLINED,
+                        "E-Mail-Benachrichtigungen",
+                        "Erhalte wichtige Updates per E-Mail",
+                        ft.Switch(value=False, on_change=lambda _: print("E-Mail geändert")),
                     ),
                 ],
                 spacing=8,
             ),
-            pad=20,
-            elev=2,
+            pad=self.SECTION_PADDING,
+            elev=self.CARD_ELEVATION,
         )
         
-        return [back_button, notifications_section]
+        return [self._build_back_button(), notifications_section]
     
     # ════════════════════════════════════════════════════════════════════
     # BUILD
     # ════════════════════════════════════════════════════════════════════
     
     def build(self) -> ft.Column:
-        # Baut und gibt das Layout zurück.
+        """Baut und gibt das Profil-Layout zurück."""
         self.main_container.controls = self._build_main_menu()
         return self.main_container
     
     async def refresh(self):
-        # Aktualisiert die Profildaten.
+        """Aktualisiert die Profildaten und zeigt das Hauptmenü."""
         await self._load_user_data()
         self._show_main_menu()

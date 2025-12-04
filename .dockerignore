@@ -1,0 +1,56 @@
+# flyctl launch added from .gitignore
+# Virtual Environment
+**/.venv
+**/venv
+**/ENV
+**/env
+
+# Environment variables
+**/.env
+**/.env.local
+**/.env.*.local
+
+# IDE & Editor
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/*~
+**/.DS_Store
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/.Python
+**/build
+**/develop-eggs
+**/dist
+**/downloads
+**/eggs
+**/.eggs
+**/lib
+**/lib64
+**/parts
+**/sdist
+**/var
+**/wheels
+**/*.egg-info
+**/.installed.cfg
+**/*.egg
+
+# pytest & Testing
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# Dependencies
+**/*.lock
+
+# Supabase 
+**/.supabase
+
+# flyctl launch added from .venv/.gitignore
+.venv/**/*
+fly.toml

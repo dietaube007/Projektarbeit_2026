@@ -335,7 +335,7 @@ class PetBuddyApp:
             user = self.sb.auth.get_user()
             if user and user.user:
                 self.is_logged_in = True
-        except:
+        except Exception:
             self.is_logged_in = False
         
         # Immer Hauptapp zeigen (Startseite verfügbar ohne Login)
@@ -349,4 +349,11 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main, upload_dir="image_uploads", view=ft.AppView.WEB_BROWSER, port=8550)
+    port = int(os.getenv("PORT", 8550))
+    ft.app(
+        target=main,
+        upload_dir="image_uploads",
+        view=ft.AppView.WEB_BROWSER,
+        port=port,
+        host="0.0.0.0"
+    )

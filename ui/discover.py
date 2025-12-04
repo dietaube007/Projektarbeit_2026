@@ -14,25 +14,30 @@ from services.references import ReferenceService
 
 
 class DiscoverView:
-    # Klasse für die Startseite
+    """Klasse für die Startseite mit Meldungsübersicht."""
     
     # ════════════════════════════════════════════════════════════════════
     # KONSTANTEN
     # ════════════════════════════════════════════════════════════════════
     
-    STATUS_COLORS = {
+    STATUS_COLORS: dict[str, str] = {
         "vermisst": ft.Colors.RED_200,
         "fundtier": ft.Colors.INDIGO_300,
         "wiedervereint": ft.Colors.LIGHT_GREEN_200,
     }
     
-    SPECIES_COLORS = {
+    SPECIES_COLORS: dict[str, str] = {
         "hund": ft.Colors.PURPLE_200,
         "katze": ft.Colors.PINK_200,
         "kleintier": ft.Colors.TEAL_200,
     }
     
+    # UI-Konstanten
     MAX_POSTS_LIMIT = 30
+    CARD_IMAGE_HEIGHT = 160
+    LIST_IMAGE_HEIGHT = 220
+    DIALOG_IMAGE_HEIGHT = 280
+    DEFAULT_PLACEHOLDER = "—"
     
     def __init__(
         self,
@@ -344,7 +349,7 @@ class DiscoverView:
         return chip(label, color)
     
     def _meta(self, icon, text: str) -> ft.Control:
-        # Erstellt eine Metainformation mit Icon und Text.
+        """Erstellt eine Metainformation mit Icon und Text."""
         return ft.Row(
             [
                 ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -353,8 +358,39 @@ class DiscoverView:
             spacing=6,
         )
     
+    def _build_image_placeholder(self, height: int, icon_size: int = 50) -> ft.Container:
+        """Erstellt einen Platzhalter für fehlende Bilder."""
+        return ft.Container(
+            height=height,
+            bgcolor=ft.Colors.GREY_200,
+            alignment=ft.alignment.center,
+            content=ft.Icon(ft.Icons.PETS, size=icon_size, color=ft.Colors.GREY_400),
+            expand=True,
+        )
+    
+    def _build_detail_row(self, icon, label: str, value: str) -> ft.Row:
+        """Erstellt eine Detail-Zeile mit Icon und Text."""
+        return ft.Row([
+            ft.Icon(icon, size=16, color=ft.Colors.GREY_600),
+            ft.Text(f"{label}: {value or self.DEFAULT_PLACEHOLDER}", color=ft.Colors.ON_SURFACE_VARIANT),
+        ], spacing=8)
+    
+    def _copy_to_clipboard(self, data: dict):
+        """Kopiert Meldungsdaten in die Zwischenablage."""
+        text = f"PetBuddy: {data['title']}\n{data['typ']} · {data['art']}\n{data['ort']}\n"
+        self.page.set_clipboard(text)
+        self.page.snack_bar = ft.SnackBar(ft.Text("Text kopiert 📋"), open=True)
+        self.page.update()
+    
     def _extract_item_data(self, item: dict) -> dict:
-        # Extrahiert und formatiert Daten aus einem Meldungs-Item.
+        """Extrahiert und formatiert Daten aus einem Meldungs-Item.
+        
+        Args:
+            item: Rohdaten aus der Datenbank
+            
+        Returns:
+            Formatiertes Dictionary mit allen Anzeigedaten
+        """
         post_images = item.get("post_image") or []
         img_src = post_images[0].get("url") if post_images else None
         
@@ -397,32 +433,20 @@ class DiscoverView:
         }
     
     def _show_detail_dialog(self, item: dict):
-        # Zeigt einen Detail-Dialog für eine Grid-Karte.
+        """Zeigt einen Detail-Dialog für eine Meldung."""
         data = self._extract_item_data(item)
         
         # Bild
         if data["img_src"]:
             image = ft.Image(
                 src=data["img_src"],
-                height=280,
+                height=self.DIALOG_IMAGE_HEIGHT,
                 fit=ft.ImageFit.COVER,
                 border_radius=ft.border_radius.only(top_left=12, top_right=12),
             )
         else:
-            image = ft.Container(
-                height=280,
-                bgcolor=ft.Colors.GREY_200,
-                alignment=ft.alignment.center,
-                content=ft.Icon(ft.Icons.PETS, size=80, color=ft.Colors.GREY_400),
-                border_radius=ft.border_radius.only(top_left=12, top_right=12),
-            )
-        
-        # Teilen-Funktion
-        def share(_):
-            text = f"PetBuddy: {data['title']}\n{data['typ']} · {data['art']}\n{data['ort']}\n"
-            self.page.set_clipboard(text)
-            self.page.snack_bar = ft.SnackBar(ft.Text("Text kopiert 📋"), open=True)
-            self.page.update()
+            image = self._build_image_placeholder(self.DIALOG_IMAGE_HEIGHT, icon_size=80)
+            image.border_radius = ft.border_radius.only(top_left=12, top_right=12)
         
         def close_dialog(_):
             dialog.open = False
@@ -451,35 +475,13 @@ class DiscoverView:
                                 wrap=True,
                             ),
                             ft.Divider(height=16),
-                            # Details
-                            ft.Row([
-                                ft.Icon(ft.Icons.SCHEDULE, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(f"Datum: {data['when'] if data['when'] else '—'}", color=ft.Colors.ON_SURFACE_VARIANT),
-                            ], spacing=8),
-                            ft.Row([
-                                ft.Icon(ft.Icons.CATEGORY, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(f"Rasse: {data['rasse']}", color=ft.Colors.ON_SURFACE_VARIANT),
-                            ], spacing=8),
-                            ft.Row([
-                                ft.Icon(ft.Icons.MALE, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(f"Geschlecht: {data['geschlecht']}", color=ft.Colors.ON_SURFACE_VARIANT),
-                            ], spacing=8),
-                            ft.Row([
-                                ft.Icon(ft.Icons.PALETTE, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(f"Farbe: {data['farbe'] if data['farbe'] else '—'}", color=ft.Colors.ON_SURFACE_VARIANT),
-                            ], spacing=8),
-                            ft.Row([
-                                ft.Icon(ft.Icons.LOCATION_ON, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(
-                                    f"Ort: {data['ort'] if data['ort'] else '—'}",
-                                    color=ft.Colors.ON_SURFACE_VARIANT,
-                                    expand=True,
-                                ),
-                            ], spacing=8),
-                            ft.Row([
-                                ft.Icon(ft.Icons.LABEL, size=16, color=ft.Colors.GREY_600),
-                                ft.Text(f"Status: {data['status']}", color=ft.Colors.ON_SURFACE_VARIANT),
-                            ], spacing=8),
+                            # Details - verwende Hilfsmethode
+                            self._build_detail_row(ft.Icons.SCHEDULE, "Datum", data["when"]),
+                            self._build_detail_row(ft.Icons.CATEGORY, "Rasse", data["rasse"]),
+                            self._build_detail_row(ft.Icons.MALE, "Geschlecht", data["geschlecht"]),
+                            self._build_detail_row(ft.Icons.PALETTE, "Farbe", data["farbe"]),
+                            self._build_detail_row(ft.Icons.LOCATION_ON, "Ort", data["ort"]),
+                            self._build_detail_row(ft.Icons.LABEL, "Status", data["status"]),
                             # Beschreibung
                             ft.Container(
                                 content=ft.Column([
@@ -508,7 +510,7 @@ class DiscoverView:
                                     ft.OutlinedButton(
                                         "Teilen",
                                         icon=ft.Icons.SHARE,
-                                        on_click=share,
+                                        on_click=lambda _: self._copy_to_clipboard(data),
                                         height=42,
                                         style=ft.ButtonStyle(
                                             padding=ft.padding.symmetric(horizontal=20, vertical=10),
@@ -544,26 +546,20 @@ class DiscoverView:
         self.page.update()
     
     def _grid_card(self, item: dict) -> ft.Control:
-        # Erstellt eine Grid-Karte mit Bild oben und Infos unten.
+        """Erstellt eine Grid-Karte mit Bild oben und Infos unten."""
         data = self._extract_item_data(item)
         
-        # Bild-Container oben (stretch um weiße Ränder zu vermeiden)
+        # Bild-Container oben
         if data["img_src"]:
             image_content = ft.Image(
                 src=data["img_src"],
-                height=160,
+                height=self.CARD_IMAGE_HEIGHT,
                 width=float("inf"),
                 fit=ft.ImageFit.COVER,
                 gapless_playback=True,
             )
         else:
-            image_content = ft.Container(
-                height=160,
-                bgcolor=ft.Colors.GREY_200,
-                alignment=ft.alignment.center,
-                content=ft.Icon(ft.Icons.PETS, size=50, color=ft.Colors.GREY_400),
-                expand=True,
-            )
+            image_content = self._build_image_placeholder(self.CARD_IMAGE_HEIGHT)
         
         image_section = ft.Container(
             content=image_content,
@@ -649,24 +645,19 @@ class DiscoverView:
         )
     
     def _big_card(self, item: dict) -> ft.Control:
-        # Erstellt eine große Meldungs-Karte für die Listen-Ansicht.
+        """Erstellt eine große Meldungs-Karte für die Listen-Ansicht."""
         data = self._extract_item_data(item)
         
         # Bild-Container
         if data["img_src"]:
             visual_content = ft.Image(
                 src=data["img_src"],
-                height=220,
+                height=self.LIST_IMAGE_HEIGHT,
                 fit=ft.ImageFit.COVER,
                 gapless_playback=True,
             )
         else:
-            visual_content = ft.Container(
-                height=220,
-                bgcolor=ft.Colors.GREY_100,
-                alignment=ft.alignment.center,
-                content=ft.Icon(ft.Icons.PETS, size=64, color=ft.Colors.GREY_500),
-            )
+            visual_content = self._build_image_placeholder(self.LIST_IMAGE_HEIGHT, icon_size=64)
         
         visual = ft.Container(
             content=visual_content,
@@ -698,20 +689,13 @@ class DiscoverView:
         # Metadaten
         metas = ft.Row(
             [
-                self._meta(ft.Icons.LOCATION_ON, data["ort"] if data["ort"] else "—"),
-                self._meta(ft.Icons.SCHEDULE, data["when"] if data["when"] else "—"),
+                self._meta(ft.Icons.LOCATION_ON, data["ort"] or self.DEFAULT_PLACEHOLDER),
+                self._meta(ft.Icons.SCHEDULE, data["when"] or self.DEFAULT_PLACEHOLDER),
                 self._meta(ft.Icons.LABEL, data["status"]),
             ],
             spacing=16,
             wrap=True,
         )
-        
-        # Teilen-Funktion
-        def share(_):
-            text = f"PetBuddy: {data['title']}\n{data['typ']} · {data['art']}\n{data['ort']}\n"
-            self.page.set_clipboard(text)
-            self.page.snack_bar = ft.SnackBar(ft.Text("Text kopiert 📋"), open=True)
-            self.page.update()
         
         # Buttons
         actions = ft.Row(
@@ -721,7 +705,7 @@ class DiscoverView:
                     icon=ft.Icons.EMAIL,
                     on_click=lambda e, it=item: self.on_contact_click(it) if self.on_contact_click else None,
                 ),
-                ft.IconButton(ft.Icons.SHARE, tooltip="Teilen", on_click=share),
+                ft.IconButton(ft.Icons.SHARE, tooltip="Teilen", on_click=lambda _: self._copy_to_clipboard(data)),
             ],
             spacing=10,
         )
@@ -750,7 +734,7 @@ class DiscoverView:
     # ════════════════════════════════════════════════════════════════════
     
     async def load_posts(self, _=None):
-        # Lädt Meldungen aus der Datenbank mit Filteroptionen.
+        """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen."""
         # Loading-Indikator anzeigen
         loading_indicator = ft.Container(
             content=ft.Column(

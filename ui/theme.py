@@ -17,21 +17,36 @@ import flet as ft
 # DESIGN-KONSTANTEN
 # ════════════════════════════════════════════════════════════════════
 
-PRIMARY_SEED = "#4C6FFF"  # Primäre Farbe - Blau für Material 3 Design
-RADIUS = 16              # Standard Border-Radius für alle Elemente
-CHIP_PADDING = 6         # Innerer Abstand in Badges/Chips
-CHIP_BORDER_RADIUS = 999 # Vollständig rund (Pille-Form)
+# Farben
+PRIMARY_SEED: str = "#4C6FFF"  # Primäre Farbe - Blau für Material 3 Design
+
+# Layout-Dimensionen
+RADIUS: int = 16               # Standard Border-Radius für alle Elemente
+CHIP_PADDING: int = 6          # Innerer Abstand in Badges/Chips
+CHIP_BORDER_RADIUS: int = 999  # Vollständig rund (Pille-Form)
+CHIP_FONT_SIZE: int = 11       # Schriftgröße in Chips
+
+# Theme-Modi
+THEME_LIGHT: str = "light"
+THEME_DARK: str = "dark"
+DEFAULT_CARD_PADDING: int = 16
+DEFAULT_CARD_ELEVATION: float = 2.0
 
 
 class ThemeManager:
-
-    # Klasse zur Verwaltung des App-Themes.
+    """
+    Klasse zur Verwaltung des App-Themes.
     
-    def __init__(self, page: ft.Page):
-        
-        # Initialisiert den ThemeManager.
+    Verantwortlich für:
+    - Erstellen und Anwenden von Light/Dark Themes
+    - Theme-Toggle-Funktionalität
+    - Material 3 Design-Konfiguration
+    """
+    
+    def __init__(self, page: ft.Page) -> None:
+        """Initialisiert den ThemeManager mit einer Flet-Page."""
         self.page = page
-        self._toggle_button = None
+        self._toggle_button: ft.IconButton | None = None
     
     # ════════════════════════════════════════════════════════════════════
     # THEME-BUILDER
@@ -39,9 +54,12 @@ class ThemeManager:
     
     @staticmethod
     def build_theme_light() -> ft.Theme:
+        """
+        Erstellt ein helles Material-3-Theme für die Anwendung.
         
-        # Erstellt ein helles Material-3-Theme für die Anwendung.
-
+        Returns:
+            ft.Theme: Konfiguriertes Theme mit Material 3 Design.
+        """
         t = ft.Theme()
         t.use_material3 = True
         t.color_scheme_seed = PRIMARY_SEED
@@ -58,55 +76,71 @@ class ThemeManager:
         t.elevated_button_theme = ft.ButtonStyle(shape=rounded)
         t.outlined_button_theme = ft.ButtonStyle(shape=rounded)
 
-        # Input-Decorator
+        # Input-Decorator (optional, abhängig von Flet-Version)
         try:
             t.input_decorator_theme = ft.InputDecoratorTheme(border_radius=RADIUS)
         except AttributeError:
+            # InputDecoratorTheme nicht verfügbar in älterer Flet-Version
             pass
 
         return t
 
     @staticmethod
     def build_theme_dark() -> ft.Theme:
-
-        # Erstellt ein dunkles Material-3-Theme für die Anwendung.
-
+        """
+        Erstellt ein dunkles Material-3-Theme für die Anwendung.
+        
+        Hinweis: Verwendet aktuell das gleiche Theme wie Light-Modus.
+        Flet passt Farben automatisch an den Dark-Modus an.
+        
+        Returns:
+            ft.Theme: Konfiguriertes Theme mit Material 3 Design.
+        """
         return ThemeManager.build_theme_light()
     
     # ════════════════════════════════════════════════════════════════════
     # THEME-VERWALTUNG
     # ════════════════════════════════════════════════════════════════════
     
-    def apply_theme(self, mode: str = "light"):
-        # Wendet ein Theme auf die Seite an und setzt den Modus.
-        if mode not in ("light", "dark"):
-            print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende 'light'.")
-            mode = "light"
+    def apply_theme(self, mode: str = THEME_LIGHT) -> None:
+        """
+        Wendet ein Theme auf die Seite an und setzt den Modus.
+        
+        Args:
+            mode: Theme-Modus ('light' oder 'dark'). Standard: 'light'
+        """
+        if mode not in (THEME_LIGHT, THEME_DARK):
+            print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende '{THEME_LIGHT}'.")
+            mode = THEME_LIGHT
         
         self.page.theme = self.build_theme_light()
         self.page.dark_theme = self.build_theme_dark()
         self.page.theme_mode = (
-            ft.ThemeMode.LIGHT if mode == "light" else ft.ThemeMode.DARK
+            ft.ThemeMode.LIGHT if mode == THEME_LIGHT else ft.ThemeMode.DARK
         )
         self.page.update()
     
-    def _get_current_icon(self) -> str: 
-        # Gibt das passende Icon basierend auf aktuellem Theme zurück.
-        return ft.Icons.LIGHT_MODE if self.page.theme_mode == ft.ThemeMode.DARK else ft.Icons.DARK_MODE
+    def _get_current_icon(self) -> str:
+        """Gibt das passende Icon basierend auf aktuellem Theme zurück."""
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        return ft.Icons.LIGHT_MODE if is_dark else ft.Icons.DARK_MODE
     
-    def _toggle_theme(self, _):
-        # Toggled zwischen Light und Dark Theme.
-        self.page.theme_mode = (
-            ft.ThemeMode.LIGHT
-            if self.page.theme_mode == ft.ThemeMode.DARK
-            else ft.ThemeMode.DARK
-        )
+    def _toggle_theme(self, _) -> None:
+        """Toggled zwischen Light und Dark Theme."""
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        self.page.theme_mode = ft.ThemeMode.LIGHT if is_dark else ft.ThemeMode.DARK
+        
         if self._toggle_button:
             self._toggle_button.icon = self._get_current_icon()
         self.page.update()
     
     def create_toggle_button(self) -> ft.IconButton:
-        # Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
+        """
+        Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
+        
+        Returns:
+            ft.IconButton: Button mit Theme-Toggle-Funktionalität.
+        """
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),
             tooltip="Theme wechseln",
@@ -123,29 +157,46 @@ def chip(label: str, color: str | None = None) -> ft.Control:
     """
     Erstellt einen kleinen, runden Badge-Chip mit Text.
     
-    Verwendet:
-    - Pille-Form (vollständig gerundete Ecken)
-    - Weißer Text auf farbigem Hintergrund
-    - Kleiner Font (11px)
-    - Standard-Padding (CHIP_PADDING)
+    Args:
+        label: Text-Inhalt des Chips.
+        color: Hintergrundfarbe (Standard: Grau).
+    
+    Returns:
+        ft.Control: Container mit Chip-Styling.
+    
+    Design:
+        - Pille-Form (vollständig gerundete Ecken)
+        - Weißer Text auf farbigem Hintergrund
+        - Kleiner Font (CHIP_FONT_SIZE)
     """
     return ft.Container(
-        content=ft.Text(label, size=11, color=ft.Colors.WHITE),
+        content=ft.Text(label, size=CHIP_FONT_SIZE, color=ft.Colors.WHITE),
         bgcolor=color or ft.Colors.GREY_700,
         padding=ft.padding.symmetric(CHIP_PADDING, CHIP_PADDING),
         border_radius=CHIP_BORDER_RADIUS,
     )
 
 
-def soft_card(content: ft.Control, pad: int = 16, elev: float = 2) -> ft.Control:
+def soft_card(
+    content: ft.Control,
+    pad: int = DEFAULT_CARD_PADDING,
+    elev: float = DEFAULT_CARD_ELEVATION
+) -> ft.Control:
     """
     Erstellt eine Card mit sanfter Elevation und runden Ecken.
     
-    Diese Komponente wird häufig zum Umhüllen von Inhalten verwendet:
-    - Soft Design mit subtlem Schatten
-    - Runde Ecken (RADIUS = 16)
-    - Flexibles Padding
-    - Material-3 Card-Styling
+    Args:
+        content: Der Inhalt der Karte.
+        pad: Innerer Abstand (Standard: DEFAULT_CARD_PADDING).
+        elev: Schattenstärke (Standard: DEFAULT_CARD_ELEVATION).
+    
+    Returns:
+        ft.Control: Material-3 Card mit dem gegebenen Inhalt.
+    
+    Design:
+        - Soft Design mit subtlem Schatten
+        - Runde Ecken (RADIUS)
+        - Material-3 Card-Styling
     """
     return ft.Card(
         elevation=elev,
