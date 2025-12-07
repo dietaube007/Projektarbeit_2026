@@ -162,7 +162,8 @@ class PetBuddyApp:
             self.profile_view = ProfileView(
                 page=self.page,
                 sb=self.sb,
-                on_logout=self._logout
+                on_logout=self._logout,
+                on_favorites_changed=lambda: self.page.run_task(self.discover_view.load_posts),
             )
             
             return True

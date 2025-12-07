@@ -54,6 +54,15 @@ class DiscoverView:
         
         # Services
         self.ref_service = ReferenceService(self.sb)
+
+        # Aktueller User (für Favoriten)
+        self.current_user_id = None
+        try:
+            user_resp = self.sb.auth.get_user()
+            if user_resp and getattr(user_resp, "user", None):
+                self.current_user_id = user_resp.user.id
+        except Exception as ex:
+            print(f"Konnte aktuellen Benutzer nicht laden: {ex}")
         
         # Filter-Status
         self.selected_farben = []
@@ -329,6 +338,59 @@ class DiscoverView:
             
         except Exception as ex:
             print(f"Fehler beim Laden der Referenzen: {ex}")
+    
+    # ════════════════════════════════════════════════════════════════════
+    # FAVORITEN
+    # ════════════════════════════════════════════════════════════════════
+
+    def _toggle_favorite(self, item: dict, icon_button: ft.IconButton):
+        """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""
+        if not self.current_user_id:
+            # Nutzer ist nicht eingeloggt
+            self.page.snack_bar = ft.SnackBar(
+                ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
+                open=True,
+            )
+            self.page.update()
+            return
+
+        post_id = item.get("id")
+        if not post_id:
+            return
+
+        try:
+            if item.get("is_favorite"):
+                # Aus Favoriten entfernen
+                (
+                    self.sb.table("favorite")
+                    .delete()
+                    .eq("user_id", self.current_user_id)
+                    .eq("post_id", post_id)
+                    .execute()
+                )
+                item["is_favorite"] = False
+                icon_button.icon = ft.Icons.FAVORITE_BORDER
+                icon_button.icon_color = ft.Colors.GREY_600
+            else:
+                # Zu Favoriten hinzufügen
+                (
+                    self.sb.table("favorite")
+                    .insert(
+                        {
+                            "user_id": self.current_user_id,
+                            "post_id": post_id,
+                        }
+                    )
+                    .execute()
+                )
+                item["is_favorite"] = True
+                icon_button.icon = ft.Icons.FAVORITE
+                icon_button.icon_color = ft.Colors.RED
+
+            self.page.update()
+
+        except Exception as ex:
+            print(f"Fehler beim Aktualisieren der Favoriten: {ex}")
     
     # ════════════════════════════════════════════════════════════════════
     # KARTEN-BUILDER
@@ -672,6 +734,15 @@ class DiscoverView:
             spacing=8,
             wrap=True,
         )
+
+        # ♥-Button (Favorit)
+        is_fav = item.get("is_favorite", False)
+        favorite_btn = ft.IconButton(
+            icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
+            icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
+            tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
+            on_click=lambda e, it=item, btn=None: self._toggle_favorite(it, e.control),
+        )
         
         # Header
         header = ft.Row(
@@ -679,6 +750,7 @@ class DiscoverView:
                 ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
                 badges,
+                favorite_btn,
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
@@ -782,7 +854,22 @@ class DiscoverView:
                 query = query.eq("breed_id", int(self.filter_rasse.value))
             
             result = query.limit(self.MAX_POSTS_LIMIT).execute()
-            items = result.data
+            items = result.data or []
+
+            # Favoriten dieses Users laden
+            favorite_ids = set()
+            if self.current_user_id:
+                fav_res = (
+                    self.sb.table("favorite")
+                    .select("post_id")
+                    .eq("user_id", self.current_user_id)
+                    .execute()
+                )
+                favorite_ids = {row["post_id"] for row in (fav_res.data or [])}
+
+            # Flag is_favorite für jedes Item setzen
+            for item in items:
+                item["is_favorite"] = item["id"] in favorite_ids
             
             # Filter: Suchtext (client-seitig für headline, location_text, description)
             search_text = (self.search_q.value or "").strip().lower()
