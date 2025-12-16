@@ -86,7 +86,7 @@ class PetBuddyApp:
         self.page.update()
     
     def go_to_melden_tab(self, _=None):
-        # Navigiert zum Melden-Tab.
+        # Jetzt melden Button wenn keine Meldungen existieren
         if not self.is_logged_in:
             # Direkt zur Login-Seite wechseln und nach Login zum Melden-Tab
             self.pending_tab_after_login = self.TAB_MELDEN
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     ft.app(
         target=main,
         upload_dir="image_uploads",
-        view=ft.AppView.WEB_BROWSER,
+        view=ft.AppView.WEB_BROWSER if os.getenv("FLY_APP_NAME") is None else None,
         port=port,
         host="0.0.0.0"
     )
