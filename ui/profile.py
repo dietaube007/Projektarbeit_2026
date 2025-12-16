@@ -46,14 +46,13 @@ class ProfileView:
         self.page = page
         self.sb = sb
         self.on_logout = on_logout
-        # Callback, um z.B. die Startseite neu zu laden, wenn sich Favoriten ändern
         self.on_favorites_changed = on_favorites_changed
 
         # Benutzerdaten
         self.user_data = None
         self.user_profile = None
 
-        # Aktueller Bereich (Hauptmenü oder Untermenü)
+        # Aktueller Bereich
         self.current_view = self.VIEW_MAIN
         self.main_container = ft.Column(
             spacing=16,
@@ -62,7 +61,7 @@ class ProfileView:
         )
 
         # Favoriten-Ansicht
-        self.favorites_list = ft.Column(spacing=16, expand=True)
+        self.favorites_list = ft.Column(spacing=14)
         self.favorites_items: List[dict] = []
 
         # UI-Elemente initialisieren
@@ -77,7 +76,6 @@ class ProfileView:
 
     def _init_ui_elements(self):
         """Initialisiert alle UI-Elemente."""
-        # Profilbild
         self.avatar = ft.CircleAvatar(
             radius=self.AVATAR_RADIUS,
             bgcolor=self.PRIMARY_COLOR,
@@ -88,7 +86,6 @@ class ProfileView:
             ),
         )
 
-        # Benutzerinfo
         self.display_name = ft.Text(
             "Lädt...",
             size=24,
@@ -196,10 +193,15 @@ class ProfileView:
     async def _load_favorites(self):
         """Lädt alle favorisierten Meldungen des aktuellen Benutzers."""
         try:
+            self.favorites_list.controls = [
+                ft.Row([ft.ProgressRing(), ft.Text("Favoriten werden geladen...")], spacing=12)
+            ]
+            self.page.update()
+
             user_resp = self.sb.auth.get_user()
             if not user_resp or not user_resp.user:
                 self.favorites_items = []
-                self._render_favorites_list()
+                self._render_favorites_list(not_logged_in=True)
                 return
 
             user_id = user_resp.user.id
@@ -212,14 +214,15 @@ class ProfileView:
                 .execute()
             )
             fav_rows = fav_res.data or []
-            post_ids = [row["post_id"] for row in fav_rows]
+
+            post_ids = [row["post_id"] for row in fav_rows if row.get("post_id")]
 
             if not post_ids:
                 self.favorites_items = []
                 self._render_favorites_list()
                 return
 
-            # 2) Dazu passende Posts laden – alle Felder, die wir für die Karte brauchen
+            # 2) Dazu passende Posts laden
             posts_res = (
                 self.sb.table("post")
                 .select(
@@ -250,26 +253,39 @@ class ProfileView:
             self.favorites_items = []
             self._render_favorites_list()
 
+    def _render_favorites_list(self, not_logged_in: bool = False):
+        """Rendert die Favoriten-Liste."""
+        self.favorites_list.controls.clear()
+
+        if not_logged_in:
+            self.favorites_list.controls.append(
+                ft.Text("Bitte einloggen um Favoriten zu sehen.", color=ft.Colors.GREY_600)
+            )
+        elif not self.favorites_items:
+            self.favorites_list.controls.append(
+                ft.Text("Du hast noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600)
+            )
+        else:
+            for post in self.favorites_items:
+                self.favorites_list.controls.append(self._favorite_card(post))
+        
+        self.page.update()
+
     def _favorite_card(self, post: dict) -> ft.Control:
-        """Karte für eine favorisierte Meldung – ähnlich der großen Karte auf der Startseite."""
-        post_images = post.get("post_image") or []
-        img_src = post_images[0].get("url") if post_images else None
-
+        """Erstellt eine Karte für eine favorisierte Meldung."""
+        # Daten extrahieren
+        post_id = post.get("id")
         title = post.get("headline") or "Ohne Namen"
-
+        
         post_status = post.get("post_status") or {}
-        typ = post_status.get("name", "") if isinstance(post_status, dict) else ""
-
+        typ = post_status.get("name", "Unbekannt") if isinstance(post_status, dict) else "Unbekannt"
+        
         species = post.get("species") or {}
-        art = species.get("name", "") if isinstance(species, dict) else ""
-
+        art = species.get("name", "Unbekannt") if isinstance(species, dict) else "Unbekannt"
+        
         breed = post.get("breed") or {}
-        rasse = (
-            breed.get("name", "Mischling")
-            if isinstance(breed, dict)
-            else "Unbekannt"
-        )
-
+        rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
+        
         post_colors = post.get("post_color") or []
         farben_namen = [
             pc.get("color", {}).get("name", "")
@@ -277,12 +293,15 @@ class ProfileView:
             if pc.get("color")
         ]
         farbe = ", ".join(farben_namen) if farben_namen else ""
-
+        
         ort = post.get("location_text") or ""
         when = (post.get("event_date") or post.get("created_at") or "")[:10]
         status = "Aktiv" if post.get("is_active") else "Inaktiv"
-
+        
         # Bild
+        post_images = post.get("post_image") or []
+        img_src = post_images[0].get("url") if post_images else None
+        
         if img_src:
             visual_content = ft.Image(
                 src=img_src,
@@ -301,14 +320,14 @@ class ProfileView:
                     color=ft.Colors.GREY_500,
                 ),
             )
-
+        
         visual = ft.Container(
             content=visual_content,
             border_radius=16,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
             bgcolor=ft.Colors.GREY_200,
         )
-
+        
         # Badges
         def badge(label: str, color: str) -> ft.Control:
             return ft.Container(
@@ -317,28 +336,24 @@ class ProfileView:
                 border_radius=20,
                 bgcolor=color,
             )
-
-        status_color = "#C5CAE9"  # leichtes Indigo
-        species_color = "#B2DFDB"  # leichtes Teal
-
+        
         badges = ft.Row(
             [
-                badge(typ or "Unbekannt", status_color),
-                badge(art or "Unbekannt", species_color),
+                badge(typ, "#C5CAE9"),
+                badge(art, "#B2DFDB"),
             ],
             spacing=8,
             wrap=True,
         )
-
-        # ♥-Button zum Entfernen
-        post_id = post.get("id")
+        
+        # Entfernen-Button
         remove_btn = ft.IconButton(
             icon=ft.Icons.FAVORITE,
             icon_color=ft.Colors.RED,
             tooltip="Aus Favoriten entfernen",
             on_click=lambda e, pid=post_id: self._remove_favorite(pid),
         )
-
+        
         header = ft.Row(
             [
                 ft.Text(title, size=18, weight=ft.FontWeight.W_600),
@@ -348,44 +363,27 @@ class ProfileView:
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
-
+        
         meta_row = ft.Row(
             [
                 ft.Row(
                     [
-                        ft.Icon(
-                            ft.Icons.LOCATION_ON,
-                            size=16,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
-                        ft.Text(
-                            ort if ort else "—",
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
+                        ft.Icon(ft.Icons.LOCATION_ON, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
+                        ft.Text(ort if ort else "—", color=ft.Colors.ON_SURFACE_VARIANT),
                     ],
                     spacing=6,
                 ),
                 ft.Row(
                     [
-                        ft.Icon(
-                            ft.Icons.SCHEDULE,
-                            size=16,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
-                        ft.Text(
-                            when if when else "—",
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
+                        ft.Icon(ft.Icons.SCHEDULE, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
+                        ft.Text(when if when else "—", color=ft.Colors.ON_SURFACE_VARIANT),
                     ],
                     spacing=6,
                 ),
                 ft.Row(
                     [
-                        ft.Icons.LABEL,
-                        ft.Text(
-                            status,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
+                        ft.Icon(ft.Icons.LABEL, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
+                        ft.Text(status, color=ft.Colors.ON_SURFACE_VARIANT),
                     ],
                     spacing=6,
                 ),
@@ -393,47 +391,29 @@ class ProfileView:
             spacing=16,
             wrap=True,
         )
-
+        
         line1 = ft.Text(
             f"{rasse} • {farbe}".strip(" • "),
             color=ft.Colors.ON_SURFACE_VARIANT,
         )
-
+        
         card_inner = ft.Column(
             [visual, header, line1, meta_row],
             spacing=10,
         )
-
-        card = soft_card(card_inner, pad=12, elev=3)
-
-        return card
-
-    def _render_favorites_list(self):
-        """Rendert die Favoriten-Liste in self.favorites_list."""
-        self.favorites_list.controls.clear()
-
-        if not self.favorites_items:
-            self.favorites_list.controls.append(
-                ft.Text(
-                    "Du hast noch keine Meldungen favorisiert.",
-                    color=ft.Colors.GREY_600,
-                )
-            )
-        else:
-            for post in self.favorites_items:
-                self.favorites_list.controls.append(self._favorite_card(post))
-
-        self.page.update()
+        
+        return soft_card(card_inner, pad=12, elev=3)
 
     def _remove_favorite(self, post_id):
-        """Entfernt einen Post aus den Favoriten und aktualisiert die Liste + Startseite."""
+        """Entfernt einen Post aus den Favoriten."""
         try:
             user_resp = self.sb.auth.get_user()
             if not user_resp or not user_resp.user:
                 return
-
+            
             user_id = user_resp.user.id
-
+            
+            # Aus Datenbank löschen
             (
                 self.sb.table("favorite")
                 .delete()
@@ -441,24 +421,24 @@ class ProfileView:
                 .eq("post_id", post_id)
                 .execute()
             )
-
+            
             # Lokal entfernen
             self.favorites_items = [
                 p for p in self.favorites_items if p.get("id") != post_id
             ]
             self._render_favorites_list()
-
-            # Startseite (DiscoverView) informieren, damit die Herzen dort aktualisiert werden
+            
+            # Startseite informieren
             if self.on_favorites_changed:
                 self.on_favorites_changed()
-
+        
         except Exception as e:
             print(f"Fehler beim Entfernen aus Favoriten: {e}")
 
     def _build_favorites(self) -> list:
-        """Baut die Favoriten-Ansicht im Profil."""
+        """Baut die Favoriten-Ansicht."""
         back_button = self._build_back_button()
-
+        
         favorites_card = soft_card(
             ft.Column(
                 [
@@ -471,7 +451,7 @@ class ProfileView:
             pad=self.SECTION_PADDING,
             elev=self.CARD_ELEVATION,
         )
-
+        
         return [back_button, favorites_card]
 
     # ════════════════════════════════════════════════════════════════════
@@ -495,7 +475,7 @@ class ProfileView:
     def _build_setting_row(
         self, icon, title: str, subtitle: str, control: ft.Control
     ) -> ft.Row:
-        """Erstellt eine Einstellungs-Zeile mit Icon, Text und Control."""
+        """Erstellt eine Einstellungs-Zeile."""
         return ft.Row(
             [
                 ft.Icon(icon, color=self.PRIMARY_COLOR),
@@ -519,7 +499,7 @@ class ProfileView:
         subtitle: str = "",
         on_click=None,
     ) -> ft.Container:
-        """Erstellt einen Menüpunkt mit Icon, Titel und optionalem Untertitel."""
+        """Erstellt einen Menüpunkt."""
         return ft.Container(
             content=ft.Row(
                 [
@@ -532,21 +512,14 @@ class ProfileView:
                     ft.Column(
                         [
                             ft.Text(title, size=16, weight=ft.FontWeight.W_500),
-                            ft.Text(
-                                subtitle,
-                                size=12,
-                                color=ft.Colors.GREY_600,
-                            )
+                            ft.Text(subtitle, size=12, color=ft.Colors.GREY_600)
                             if subtitle
                             else ft.Container(),
                         ],
                         spacing=2,
                         expand=True,
                     ),
-                    ft.Icon(
-                        ft.Icons.CHEVRON_RIGHT,
-                        color=ft.Colors.GREY_400,
-                    ),
+                    ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ft.Colors.GREY_400),
                 ],
                 spacing=16,
             ),
@@ -561,7 +534,7 @@ class ProfileView:
     # ════════════════════════════════════════════════════════════════════
 
     def _build_main_menu(self) -> list:
-        """Baut das Hauptmenü mit Profil-Header und Menüliste."""
+        """Baut das Hauptmenü."""
         profile_header = soft_card(
             ft.Column(
                 [
@@ -569,10 +542,7 @@ class ProfileView:
                         [
                             self.avatar,
                             ft.Column(
-                                [
-                                    self.display_name,
-                                    self.email_text,
-                                ],
+                                [self.display_name, self.email_text],
                                 spacing=4,
                                 expand=True,
                             ),
@@ -666,9 +636,7 @@ class ProfileView:
                             ft.FilledButton(
                                 "Bild ändern",
                                 icon=ft.Icons.CAMERA_ALT,
-                                on_click=lambda _: print(
-                                    "Bild ändern - Funktion kommt später"
-                                ),
+                                on_click=lambda _: print("Bild ändern"),
                             ),
                         ],
                         spacing=20,
@@ -695,9 +663,7 @@ class ProfileView:
                     ft.FilledButton(
                         "Speichern",
                         icon=ft.Icons.SAVE,
-                        on_click=lambda _: print(
-                            "Name speichern - Funktion kommt später"
-                        ),
+                        on_click=lambda _: print("Name speichern"),
                     ),
                 ],
                 spacing=8,
@@ -720,9 +686,7 @@ class ProfileView:
                     ft.OutlinedButton(
                         "Passwort zurücksetzen",
                         icon=ft.Icons.LOCK_RESET,
-                        on_click=lambda _: print(
-                            "Passwort zurücksetzen - Funktion kommt später"
-                        ),
+                        on_click=lambda _: print("Passwort zurücksetzen"),
                     ),
                 ],
                 spacing=8,
@@ -731,7 +695,12 @@ class ProfileView:
             elev=self.CARD_ELEVATION,
         )
 
-        return [self._build_back_button(), change_image_section, change_name_section, password_section]
+        return [
+            self._build_back_button(),
+            change_image_section,
+            change_name_section,
+            password_section,
+        ]
 
     # ════════════════════════════════════════════════════════════════════
     # BUILD - EINSTELLUNGEN
@@ -750,9 +719,7 @@ class ProfileView:
                         "Erhalte Updates zu deinen Meldungen",
                         ft.Switch(
                             value=True,
-                            on_change=lambda _: print(
-                                "Benachrichtigung geändert"
-                            ),
+                            on_change=lambda _: print("Benachrichtigung geändert"),
                         ),
                     ),
                     ft.Divider(height=20),
@@ -784,6 +751,6 @@ class ProfileView:
         return self.main_container
 
     async def refresh(self):
-        """Aktualisiert die Profildaten und zeigt das Hauptmenü."""
+        """Aktualisiert die Profildaten."""
         await self._load_user_data()
         self._show_main_menu()

@@ -163,7 +163,7 @@ class PetBuddyApp:
                 page=self.page,
                 sb=self.sb,
                 on_logout=self._logout,
-                on_favorites_changed=lambda: self.page.run_task(self.discover_view.load_posts),
+                on_favorites_changed=self._on_favorites_changed,
             )
             
             return True
@@ -171,6 +171,11 @@ class PetBuddyApp:
         except Exception as e:
             self._show_error(f"Fehler beim Laden der UI: {str(e)}")
             return False
+    
+    def _on_favorites_changed(self):
+        """Callback wenn sich Favoriten ändern - lädt Startseite neu"""
+        if self.discover_view:
+            self.page.run_task(self.discover_view.load_posts)
     
     def _build_login_banner(self) -> ft.Control:
         # Erstellt ein Banner für nicht eingeloggte Benutzer.
@@ -294,6 +299,17 @@ class PetBuddyApp:
             self.is_logged_in = True
             self.pending_tab_after_login = None
             self._show_main_app()
+            
+            # User in DiscoverView aktualisieren und Daten neu laden
+            if self.discover_view:
+                self.discover_view.refresh_user()
+                self.page.run_task(self.discover_view.load_posts)
+            
+            # Favoriten im Profil laden (async!)
+            if self.profile_view:
+                self.page.run_task(self.profile_view._load_favorites)
+            
+            # Zur Startseite navigieren
             self.current_tab = self.TAB_START
             if self.nav:
                 self.nav.selected_index = self.TAB_START
