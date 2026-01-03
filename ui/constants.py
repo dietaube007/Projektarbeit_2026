@@ -5,6 +5,18 @@ UI Konstanten - Zentrale Definition aller Farben, Größen und Limits.
 import flet as ft
 
 # ══════════════════════════════════════════════════════════════════════
+# PRIMÄRFARBEN (App-weit verwendet)
+# ══════════════════════════════════════════════════════════════════════
+
+PRIMARY_COLOR = "#5B6EE1"          # Blau für Buttons und Akzente
+PRIMARY_SEED = "#4C6FFF"           # Material 3 Seed-Farbe
+BACKGROUND_COLOR = "#F5F7FA"       # Heller grauer Hintergrund
+CARD_COLOR = ft.Colors.WHITE        # Weiße Card
+TEXT_PRIMARY = "#1F2937"            # Dunkler Text
+TEXT_SECONDARY = "#6B7280"          # Grauer Text
+BORDER_COLOR = "#E5E7EB"            # Hellgrauer Rahmen
+
+# ══════════════════════════════════════════════════════════════════════
 # FARBEN FÜR BADGES
 # ══════════════════════════════════════════════════════════════════════
 

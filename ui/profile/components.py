@@ -5,8 +5,8 @@ Gemeinsame UI-Komponenten für die Profil-Ansicht.
 
 import flet as ft
 
+from ui.constants import PRIMARY_COLOR
 
-PRIMARY_COLOR: str = "#5B6EE1"
 AVATAR_RADIUS: int = 50
 SECTION_PADDING: int = 20
 CARD_ELEVATION: int = 2

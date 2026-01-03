@@ -22,13 +22,10 @@ class PostService:
         self.sb = sb
     
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        # Erstellt einen neuen Post.
+        """Erstellt einen neuen Post und gibt ihn zurück."""
         try:
-            self.sb.table("post").insert(payload).execute()
-            
-            res = self.sb.table("post").select("*").eq(
-                "user_id", payload["user_id"]
-            ).order("created_at", desc=True).limit(1).execute()
+            # Insert + Select in einem Aufruf (effizienter)
+            res = self.sb.table("post").insert(payload).select("*").execute()
             
             if not res.data:
                 raise RuntimeError("Keine Daten in der Response")

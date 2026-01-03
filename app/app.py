@@ -294,7 +294,7 @@ class PetBuddyApp:
             
             # Favoriten im Profil laden
             if self.profile_view:
-                self.page.run_task(self.profile_view._load_favorites)
+                self.page.run_task(self.profile_view.load_favorites)
             
             # Zur Startseite navigieren
             self.current_tab = TAB_START

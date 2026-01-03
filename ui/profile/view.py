@@ -26,6 +26,11 @@ from .favorites import (
     remove_favorite,
     render_favorites_list,
 )
+from .my_posts import (
+    load_my_posts,
+    delete_post,
+    render_my_posts_list,
+)
 from .edit_profile import (
     build_change_image_section,
     build_change_name_section,
@@ -42,6 +47,7 @@ class ProfileView:
     VIEW_EDIT_PROFILE: str = "edit_profile"
     VIEW_SETTINGS: str = "settings"
     VIEW_FAVORITES: str = "favorites"
+    VIEW_MY_POSTS: str = "my_posts"
 
     def __init__(
         self,
@@ -71,6 +77,10 @@ class ProfileView:
         # Favoriten-Ansicht
         self.favorites_list = ft.Column(spacing=14)
         self.favorites_items: List[dict] = []
+
+        # Meine Meldungen Ansicht
+        self.my_posts_list = ft.Column(spacing=14)
+        self.my_posts_items: List[dict] = []
 
         # UI-Elemente initialisieren
         self._init_ui_elements()
@@ -164,7 +174,13 @@ class ProfileView:
         """Zeigt die Favoriten-Ansicht."""
         self.current_view = self.VIEW_FAVORITES
         self._rebuild()
-        self.page.run_task(self._load_favorites)
+        self.page.run_task(self.load_favorites)
+
+    def _show_my_posts(self):
+        """Zeigt die Meine Meldungen Ansicht."""
+        self.current_view = self.VIEW_MY_POSTS
+        self._rebuild()
+        self.page.run_task(self._load_my_posts)
 
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
@@ -175,6 +191,7 @@ class ProfileView:
             self.VIEW_EDIT_PROFILE: self._build_edit_profile,
             self.VIEW_SETTINGS: self._build_settings,
             self.VIEW_FAVORITES: self._build_favorites,
+            self.VIEW_MY_POSTS: self._build_my_posts,
         }
 
         builder = view_builders.get(self.current_view, self._build_main_menu)
@@ -264,6 +281,153 @@ class ProfileView:
         except Exception as e:
             print(f"Fehler beim Entfernen aus Favoriten: {e}")
 
+    # ════════════════════════════════════════════════════════════════════
+    # MEINE MELDUNGEN
+    # ════════════════════════════════════════════════════════════════════
+
+    async def _load_my_posts(self):
+        """Lädt alle eigenen Meldungen des aktuellen Benutzers."""
+        try:
+            self.my_posts_list.controls = [loading_indicator("Meldungen werden geladen...")]
+            self.page.update()
+
+            user_resp = self.sb.auth.get_user()
+            if not user_resp or not user_resp.user:
+                self.my_posts_items = []
+                render_my_posts_list(
+                    self.my_posts_list,
+                    self.my_posts_items,
+                    page=self.page,
+                    on_edit=self._edit_post,
+                    on_delete=self._confirm_delete_post,
+                    not_logged_in=True,
+                )
+                self.page.update()
+                return
+
+            user_id = user_resp.user.id
+            self.my_posts_items = await load_my_posts(self.sb, user_id)
+            render_my_posts_list(
+                self.my_posts_list,
+                self.my_posts_items,
+                page=self.page,
+                on_edit=self._edit_post,
+                on_delete=self._confirm_delete_post,
+            )
+            self.page.update()
+
+        except Exception as e:
+            print(f"Fehler beim Laden der eigenen Meldungen: {e}")
+            self.my_posts_items = []
+            render_my_posts_list(
+                self.my_posts_list,
+                self.my_posts_items,
+                page=self.page,
+                on_edit=self._edit_post,
+                on_delete=self._confirm_delete_post,
+            )
+            self.page.update()
+
+    def _edit_post(self, post: dict):
+        """Bearbeiten einer Meldung (Platzhalter)."""
+        # TODO: Zum Bearbeiten-Formular navigieren
+        self.page.snack_bar = ft.SnackBar(
+            ft.Text(f"Bearbeiten von '{post.get('headline', 'Meldung')}' kommt bald!"),
+            open=True,
+        )
+        self.page.update()
+
+    def _confirm_delete_post(self, post_id: int):
+        """Zeigt Bestätigungsdialog zum Löschen."""
+        def on_confirm(e):
+            self.page.close(dialog)
+            self._delete_post(post_id)
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Meldung löschen?"),
+            content=ft.Text(
+                "Möchtest du diese Meldung wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel),
+                ft.ElevatedButton(
+                    "Löschen",
+                    bgcolor=ft.Colors.RED_600,
+                    color=ft.Colors.WHITE,
+                    on_click=on_confirm,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
+    def _delete_post(self, post_id: int):
+        """Löscht einen Post."""
+        try:
+            if delete_post(self.sb, post_id):
+                # Lokal entfernen
+                self.my_posts_items = [
+                    p for p in self.my_posts_items if p.get("id") != post_id
+                ]
+                render_my_posts_list(
+                    self.my_posts_list,
+                    self.my_posts_items,
+                    page=self.page,
+                    on_edit=self._edit_post,
+                    on_delete=self._confirm_delete_post,
+                )
+                self.page.snack_bar = ft.SnackBar(
+                    ft.Text("Meldung erfolgreich gelöscht."),
+                    open=True,
+                )
+                self.page.update()
+
+                # Startseite informieren falls Callback existiert
+                if self.on_favorites_changed:
+                    self.on_favorites_changed()
+            else:
+                self.page.snack_bar = ft.SnackBar(
+                    ft.Text("Fehler beim Löschen der Meldung."),
+                    open=True,
+                )
+                self.page.update()
+
+        except Exception as e:
+            print(f"Fehler beim Löschen des Posts: {e}")
+
+    def _build_my_posts(self) -> list:
+        """Baut die Meine Meldungen Ansicht."""
+        back_button = build_back_button(lambda _: self._show_main_menu())
+
+        # Anzahl der Meldungen
+        count_text = f"{len(self.my_posts_items)} Meldung(en)" if self.my_posts_items else ""
+
+        my_posts_card = soft_card(
+            ft.Column(
+                [
+                    ft.Row(
+                        [
+                            build_section_title("Meine Meldungen"),
+                            ft.Container(expand=True),
+                            ft.Text(count_text, size=12, color=ft.Colors.GREY_600),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    ft.Container(height=8),
+                    self.my_posts_list,
+                ],
+                spacing=12,
+            ),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        return [back_button, my_posts_card]
+
     def _build_favorites(self) -> list:
         """Baut die Favoriten-Ansicht."""
         back_button = build_back_button(lambda _: self._show_main_menu())
@@ -322,7 +486,8 @@ class ProfileView:
                     build_menu_item(
                         ft.Icons.ARTICLE_OUTLINED,
                         "Meine Meldungen",
-                        on_click=lambda _: print("Meine Meldungen"),
+                        subtitle="Deine erstellten Tier-Meldungen",
+                        on_click=lambda _: self._show_my_posts(),
                     ),
                     ft.Divider(height=1),
                     build_menu_item(
