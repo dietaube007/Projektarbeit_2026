@@ -1,45 +1,51 @@
 """
-Post Form - Meldungsformular für Haustiere.
+Post Form View - Hauptformular zum Erstellen von Tier-Meldungen.
 
-Dieses Modul implementiert das Formular zum Erstellen neuer Tiermeldungen
-(Vermisste oder gefundene Haustiere) in der PetBuddy-Anwendung.
-
+Dieses Modul enthält die PostForm-Klasse, die das UI für
+Vermisst-/Gefunden-Meldungen bereitstellt.
 """
 
 import os
-import io
-import base64
 from datetime import datetime
 from typing import Callable, Optional
 
 import flet as ft
-from PIL import Image
+
 from services.references import ReferenceService
 from services.posts import PostService
+
+from ui.post_form.constants import (
+    VALID_IMAGE_TYPES,
+    DATE_FORMAT,
+    ALLOWED_POST_STATUSES,
+    NO_SELECTION_VALUE,
+    NO_SELECTION_LABEL,
+    UPLOAD_DIR,
+)
+from ui.post_form.photo_manager import (
+    upload_to_storage,
+    remove_from_storage,
+    cleanup_local_file,
+    get_upload_path,
+)
+from ui.post_form.form_fields import (
+    create_meldungsart_button,
+    create_photo_preview,
+    create_name_field,
+    create_title_label,
+    create_species_dropdown,
+    create_breed_dropdown,
+    create_sex_dropdown,
+    create_description_field,
+    create_location_field,
+    create_date_field,
+    create_status_text,
+    populate_dropdown_options,
+)
 
 
 class PostForm:
     """Formular zum Erstellen von Tier-Meldungen (vermisst/gefunden)."""
-    
-    # ════════════════════════════════════════════════════════════════════
-    # KONSTANTEN
-    # ════════════════════════════════════════════════════════════════════
-    
-    VALID_IMAGE_TYPES: list[str] = ["jpg", "jpeg", "png", "gif", "webp"]
-    PLACEHOLDER_IMAGE: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-    STORAGE_BUCKET: str = "pet-images"
-    UPLOAD_DIR: str = "image_uploads"
-    DATE_FORMAT: str = "%d.%m.%Y"
-    ALLOWED_POST_STATUSES: list[str] = ["vermisst", "fundtier"]
-    MAX_IMAGE_SIZE: tuple[int, int] = (800, 800)
-    IMAGE_QUALITY: int = 85
-    
-    # UI-Konstanten
-    FIELD_WIDTH_SMALL: int = 250
-    FIELD_WIDTH_MEDIUM: int = 400
-    FIELD_WIDTH_LARGE: int = 500
-    NO_SELECTION_VALUE: str = "none"
-    NO_SELECTION_LABEL: str = "— Keine Angabe —"
     
     def __init__(
         self,
@@ -47,7 +53,8 @@ class PostForm:
         sb,
         on_saved_callback: Optional[Callable] = None
     ):
-        """Initialisiert das Meldungsformular.
+        """
+        Initialisiert das Meldungsformular.
         
         Args:
             page: Flet Page-Instanz
@@ -81,42 +88,31 @@ class PostForm:
         # Daten laden
         self.page.run_task(self._load_refs)
     
+    # ════════════════════════════════════════════════════════════════════
+    # UI-INITIALISIERUNG
+    # ════════════════════════════════════════════════════════════════════
+    
     def _init_ui_elements(self):
-        # Initialisiert alle UI-Elemente.
-        # Meldungsart SegmentedButton 
-        self.meldungsart = ft.SegmentedButton(
-            selected={"1"},
-            segments=[ft.Segment(value="1", label=ft.Text("Vermisst"))],
-            allow_empty_selection=False,
-            allow_multiple_selection=False,
-            on_change=self._update_title_label,
-        )
+        """Initialisiert alle UI-Elemente."""
+        # Meldungsart
+        self.meldungsart = create_meldungsart_button(self._update_title_label)
         
         # Foto-Vorschau
-        self.photo_preview = ft.Image(
-            width=self.FIELD_WIDTH_MEDIUM, height=250,
-            fit=ft.ImageFit.COVER,
-            visible=False,
-            src_base64=self.PLACEHOLDER_IMAGE
-        )
+        self.photo_preview = create_photo_preview()
         
         # Name/Überschrift
-        self.title_label = ft.Text(
-            "Name﹡", size=14,
-            weight=ft.FontWeight.W_600,
-            color=ft.Colors.GREY_700
-        )
-        self.name_tf = ft.TextField(width=self.FIELD_WIDTH_MEDIUM)
+        self.title_label = create_title_label()
+        self.name_tf = create_name_field()
         
         # Dropdowns
-        self.species_dd = ft.Dropdown(label="Tierart﹡", text_size=14, width=self.FIELD_WIDTH_SMALL)
-        self.breed_dd = ft.Dropdown(label="Rasse (optional)", width=self.FIELD_WIDTH_SMALL)
-        self.sex_dd = ft.Dropdown(label="Geschlecht (optional)", width=self.FIELD_WIDTH_SMALL)
+        self.species_dd = create_species_dropdown()
+        self.breed_dd = create_breed_dropdown()
+        self.sex_dd = create_sex_dropdown()
         
         # Species-Dropdown Event
         self.species_dd.on_change = lambda _: self.page.run_task(self._update_breeds)
         
-        # Farben-Container
+        # Farben-Container (werden in _load_refs gefüllt)
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
         
@@ -142,36 +138,26 @@ class PostForm:
             bgcolor=ft.Colors.GREY_100,
         )
         
-        # Beschreibung
-        self.info_tf = ft.TextField(
-            multiline=True,
-            max_lines=4,
-            width=self.FIELD_WIDTH_LARGE,
-            min_lines=2,
-        )
-        
-        # Standort & Datum
-        self.location_tf = ft.TextField(label="Ort﹡", width=self.FIELD_WIDTH_LARGE)
-        self.date_tf = ft.TextField(
-            label="Datum﹡ (TT.MM.YYYY)",
-            width=self.FIELD_WIDTH_SMALL,
-            hint_text="z.B. 15.11.2025"
-        )
+        # Beschreibung & Standort
+        self.info_tf = create_description_field()
+        self.location_tf = create_location_field()
+        self.date_tf = create_date_field()
         
         # Status-Nachricht
-        self.status_text = ft.Text("", color=ft.Colors.BLUE, size=12)
+        self.status_text = create_status_text()
     
     # ════════════════════════════════════════════════════════════════════
     # EVENT HANDLER
     # ════════════════════════════════════════════════════════════════════
     
     def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
-        """Zeigt eine Statusnachricht an.
+        """
+        Zeigt eine Statusnachricht an.
         
         Args:
             message: Die anzuzeigende Nachricht
             is_error: True für Fehlermeldung (rot)
-            is_loading: True für Ladevorgang (blau)w
+            is_loading: True für Ladevorgang (blau)
         """
         if is_error:
             self.status_text.color = ft.Colors.RED
@@ -183,7 +169,7 @@ class PostForm:
         self.page.update()
     
     def _toggle_farben_panel(self, _):
-        # Toggle für das Farben-Panel.
+        """Toggle für das Farben-Panel."""
         self.farben_panel_visible = not self.farben_panel_visible
         self.farben_panel.visible = self.farben_panel_visible
         self.farben_toggle_icon.name = (
@@ -193,7 +179,7 @@ class PostForm:
         self.page.update()
     
     def _update_title_label(self, _=None):
-        # Aktualisiert das Label basierend auf der gewählten Meldungsart.
+        """Aktualisiert das Label basierend auf der gewählten Meldungsart."""
         selected_id = list(self.meldungsart.selected)[0] if self.meldungsart.selected else None
         
         selected_status = None
@@ -208,28 +194,21 @@ class PostForm:
             self.title_label.value = "Überschrift﹡"
         self.page.update()
     
+    def _on_color_change(self, color_id: int, is_selected: bool):
+        """Handler für Farbänderungen."""
+        if is_selected:
+            if color_id not in self.selected_farben:
+                self.selected_farben.append(color_id)
+        else:
+            if color_id in self.selected_farben:
+                self.selected_farben.remove(color_id)
+    
     # ════════════════════════════════════════════════════════════════════
     # FOTO-MANAGEMENT
     # ════════════════════════════════════════════════════════════════════
     
-    def _compress_image(self, file_path: str) -> tuple[bytes, str]:
-        # Komprimiert ein Bild für schnelleres Laden.
-        with Image.open(file_path) as img:
-            # EXIF-Orientierung beibehalten
-            img = img.convert("RGB")
-            
-            # Größe anpassen wenn nötig
-            img.thumbnail(self.MAX_IMAGE_SIZE, Image.Resampling.LANCZOS)
-            
-            # Als JPEG komprimieren
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=self.IMAGE_QUALITY, optimize=True)
-            buffer.seek(0)
-            
-            return buffer.read(), "jpeg"
-    
     async def _pick_photo(self):
-        # Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch.
+        """Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch."""
         
         def on_result(ev: ft.FilePickerResultEvent):
             if ev.files:
@@ -244,34 +223,24 @@ class PostForm:
         def on_upload(ev: ft.FilePickerUploadEvent):
             if ev.progress == 1.0:
                 try:
-                    upload_path = f"{self.UPLOAD_DIR}/{ev.file_name}"
+                    upload_path = get_upload_path(ev.file_name)
                     
-                    # Bild komprimieren für schnelleres Laden
-                    compressed_bytes, file_ext = self._compress_image(upload_path)
-                    image_data = base64.b64encode(compressed_bytes).decode()
+                    # Bild hochladen und komprimieren
+                    result = upload_to_storage(self.sb, upload_path, ev.file_name)
                     
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    # Immer .jpg als Extension da wir zu JPEG konvertieren
-                    original_name = ev.file_name.rsplit(".", 1)[0]
-                    storage_filename = f"{timestamp}_{original_name}.jpg"
+                    if result["url"]:
+                        self.selected_photo["path"] = result["path"]
+                        self.selected_photo["base64"] = result["base64"]
+                        self.selected_photo["url"] = result["url"]
+                        
+                        self.photo_preview.src_base64 = result["base64"]
+                        self.photo_preview.visible = True
+                        self._show_status(f"✓ Hochgeladen: {ev.file_name}")
+                    else:
+                        self._show_status("❌ Fehler beim Hochladen", is_error=True)
                     
-                    self.sb.storage.from_(self.STORAGE_BUCKET).upload(
-                        path=storage_filename,
-                        file=compressed_bytes,
-                        file_options={"content-type": "image/jpeg"}
-                    )
-                    
-                    public_url = self.sb.storage.from_(self.STORAGE_BUCKET).get_public_url(storage_filename)
-                    
-                    self.selected_photo["path"] = storage_filename
-                    self.selected_photo["base64"] = image_data
-                    self.selected_photo["url"] = public_url
-                    
-                    self.photo_preview.src_base64 = image_data
-                    self.photo_preview.visible = True
-                    self._show_status(f"✓ Hochgeladen: {ev.file_name}")
-                    
-                    os.remove(upload_path)
+                    # Lokale Datei aufräumen
+                    cleanup_local_file(upload_path)
                     
                 except Exception as ex:
                     self._show_status(f"❌ Fehler: {ex}", is_error=True)
@@ -279,15 +248,11 @@ class PostForm:
         fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
         self.page.overlay.append(fp)
         self.page.update()
-        fp.pick_files(allow_multiple=False, allowed_extensions=self.VALID_IMAGE_TYPES)
+        fp.pick_files(allow_multiple=False, allowed_extensions=VALID_IMAGE_TYPES)
     
     def _remove_photo(self):
-        # Entfernt das Foto aus der Vorschau und aus Supabase Storage.
-        try:
-            if self.selected_photo.get("path"):
-                self.sb.storage.from_(self.STORAGE_BUCKET).remove([self.selected_photo["path"]])
-        except Exception as ex:
-            print(f"Fehler beim Löschen aus Storage: {ex}")
+        """Entfernt das Foto aus der Vorschau und aus Supabase Storage."""
+        remove_from_storage(self.sb, self.selected_photo.get("path"))
         
         self.selected_photo = {"path": None, "name": None, "url": None, "base64": None}
         self.photo_preview.visible = False
@@ -299,7 +264,7 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     
     async def _save_post(self, _=None):
-        # Speichert die Meldung in der Datenbank.
+        """Speichert die Meldung in der Datenbank."""
         
         # Validierung
         errors = []
@@ -324,7 +289,7 @@ class PostForm:
         
         # Datum parsen
         try:
-            event_date = datetime.strptime(self.date_tf.value.strip(), self.DATE_FORMAT).date()
+            event_date = datetime.strptime(self.date_tf.value.strip(), DATE_FORMAT).date()
         except ValueError:
             self._show_status("❌ Ungültiges Datum. Format: TT.MM.YYYY", is_error=True)
             return
@@ -349,8 +314,8 @@ class PostForm:
                 "headline": self.name_tf.value.strip(),
                 "description": self.info_tf.value.strip(),
                 "species_id": int(self.species_dd.value),
-                "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != self.NO_SELECTION_VALUE else None,
-                "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != self.NO_SELECTION_VALUE else None,
+                "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != NO_SELECTION_VALUE else None,
+                "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != NO_SELECTION_VALUE else None,
                 "event_date": event_date.isoformat(),
                 "location_text": self.location_tf.value.strip(),
             }
@@ -386,11 +351,11 @@ class PostForm:
             # Rassen für die ausgewählte Tierart laden
             species_id = self.species_list[0]["id"]
             breeds = self.breeds_by_species.get(species_id, [])
-            self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, "- Keine Angabe -")] + [
+            self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)] + [
                 ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds
             ]
-        self.breed_dd.value = self.NO_SELECTION_VALUE
-        self.sex_dd.value = self.NO_SELECTION_VALUE
+        self.breed_dd.value = NO_SELECTION_VALUE
+        self.sex_dd.value = NO_SELECTION_VALUE
         self.info_tf.value = ""
         self.location_tf.value = ""
         self.date_tf.value = ""
@@ -411,13 +376,13 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     
     async def _load_refs(self, _=None):
-        # Lädt alle Referenzdaten aus der Datenbank.
+        """Lädt alle Referenzdaten aus der Datenbank."""
         try:
             # Meldungsarten laden
             all_statuses = self.ref_service.get_post_statuses()
             self.post_statuses = [
                 s for s in all_statuses
-                if s["name"].lower() in self.ALLOWED_POST_STATUSES
+                if s["name"].lower() in ALLOWED_POST_STATUSES
             ]
             self.meldungsart.segments = [
                 ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
@@ -433,29 +398,16 @@ class PostForm:
             self.sex_list = self.ref_service.get_sex()
             
             # Species Dropdown füllen
-            self.species_dd.options = [
-                ft.dropdown.Option(str(s["id"]), s["name"])
-                for s in self.species_list
-            ]
+            populate_dropdown_options(self.species_dd, self.species_list)
             
             # Geschlecht Dropdown mit "Keine Angabe"
-            self.sex_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
-            self.sex_dd.options += [
-                ft.dropdown.Option(str(s["id"]), s["name"])
-                for s in self.sex_list
-            ]
-            self.sex_dd.value = self.NO_SELECTION_VALUE
+            populate_dropdown_options(self.sex_dd, self.sex_list, with_none_option=True)
             
             # Farben-Checkboxes erstellen
             self.farben_container.controls = []
             for color in self.colors_list:
                 def on_color_change(e, c_id=color["id"]):
-                    if e.control.value:
-                        if c_id not in self.selected_farben:
-                            self.selected_farben.append(c_id)
-                    else:
-                        if c_id in self.selected_farben:
-                            self.selected_farben.remove(c_id)
+                    self._on_color_change(c_id, e.control.value)
                 
                 cb = ft.Checkbox(label=color["name"], value=False, on_change=on_color_change)
                 self.farben_checkboxes[color["id"]] = cb
@@ -480,15 +432,15 @@ class PostForm:
         try:
             sid = int(self.species_dd.value) if self.species_dd.value else None
             if sid and sid in self.breeds_by_species:
-                self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
+                self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)]
                 self.breed_dd.options += [
                     ft.dropdown.Option(str(b["id"]), b["name"])
                     for b in self.breeds_by_species[sid]
                 ]
-                self.breed_dd.value = self.NO_SELECTION_VALUE
+                self.breed_dd.value = NO_SELECTION_VALUE
             else:
-                self.breed_dd.options = [ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)]
-                self.breed_dd.value = self.NO_SELECTION_VALUE
+                self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)]
+                self.breed_dd.value = NO_SELECTION_VALUE
             self.page.update()
         except Exception as ex:
             print(f"Fehler beim Aktualisieren der Rassen: {ex}")
@@ -498,7 +450,27 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     
     def build(self) -> ft.Column:
-        # Baut und gibt das Formular-Layout zurück.
+        """Baut und gibt das Formular-Layout zurück."""
+        
+        # Foto-Upload Bereich
+        photo_area = ft.Container(
+            content=ft.Column([
+                ft.Container(
+                    content=ft.Column([
+                        ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=ft.Colors.GREY_500),
+                        ft.Text("Foto hochladen (Tippen)", color=ft.Colors.GREY_700, size=12),
+                    ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    width=400,
+                    height=150,
+                    border=ft.border.all(2, ft.Colors.GREY_300),
+                    border_radius=8,
+                    on_click=lambda _: self.page.run_task(self._pick_photo),
+                ),
+                self.photo_preview,
+                ft.TextButton("Foto entfernen", icon=ft.Icons.DELETE, on_click=lambda _: self._remove_photo()),
+            ], spacing=10),
+        )
+        
         form_column = ft.Column(
             [
                 ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
@@ -508,23 +480,7 @@ class PostForm:
                 ft.Divider(height=20),
                 
                 ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
-                ft.Container(
-                    content=ft.Column([
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=ft.Colors.GREY_500),
-                                ft.Text("Foto hochladen (Tippen)", color=ft.Colors.GREY_700, size=12),
-                            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                            width=400,
-                            height=150,
-                            border=ft.border.all(2, ft.Colors.GREY_300),
-                            border_radius=8,
-                            on_click=lambda _: self.page.run_task(self._pick_photo),
-                        ),
-                        self.photo_preview,
-                        ft.TextButton("Foto entfernen", icon=ft.Icons.DELETE, on_click=lambda _: self._remove_photo()),
-                    ], spacing=10),
-                ),
+                photo_area,
                 ft.Divider(height=20),
                 
                 self.title_label,

@@ -1,5 +1,6 @@
 """
-Discover View - Entdecke Meldungen mit Listen- und Kartendarstellung.
+ui/discover/view.py
+Discover-View mit Listen- und Kartendarstellung (refaktoriert).
 """
 
 from __future__ import annotations
@@ -8,31 +9,35 @@ from typing import Callable, Optional
 import flet as ft
 
 from ui.theme import soft_card, chip
+from ui.constants import STATUS_COLORS, SPECIES_COLORS, MAX_POSTS_LIMIT, DEFAULT_PLACEHOLDER
+from ui.helpers import extract_item_data
 from services.references import ReferenceService
+
+from .cards import (
+    build_small_card,
+    build_big_card,
+    show_detail_dialog,
+)
+from .filters import (
+    create_search_field,
+    create_dropdown,
+    populate_dropdown,
+    create_farben_panel,
+    create_farben_header,
+    create_view_toggle,
+    create_reset_button,
+)
+from .data import (
+    build_query,
+    filter_by_search,
+    filter_by_colors,
+    get_favorite_ids,
+    mark_favorites,
+)
 
 
 class DiscoverView:
     """Klasse für die Startseite mit Meldungsübersicht."""
-
-    # Farben für Badges
-    STATUS_COLORS: dict[str, str] = {
-        "vermisst": ft.Colors.RED_200,
-        "fundtier": ft.Colors.INDIGO_300,
-        "wiedervereint": ft.Colors.LIGHT_GREEN_200,
-    }
-
-    SPECIES_COLORS: dict[str, str] = {
-        "hund": ft.Colors.PURPLE_200,
-        "katze": ft.Colors.PINK_200,
-        "kleintier": ft.Colors.TEAL_200,
-    }
-
-    # UI-Konstanten
-    MAX_POSTS_LIMIT = 30
-    CARD_IMAGE_HEIGHT = 160
-    LIST_IMAGE_HEIGHT = 220
-    DIALOG_IMAGE_HEIGHT = 280
-    DEFAULT_PLACEHOLDER = "—"
 
     def __init__(
         self,
@@ -72,7 +77,7 @@ class DiscoverView:
     # ──────────────────────────────────────────────────────────────────
 
     def _get_current_user_id(self) -> Optional[str]:
-        """Zieht die aktuelle User-ID aus Supabase (immer frisch)."""
+        """Zieht die aktuelle User-ID aus Supabase."""
         try:
             user_resp = self.sb.auth.get_user()
             if user_resp and getattr(user_resp, "user", None):
@@ -91,82 +96,51 @@ class DiscoverView:
 
     def _init_ui_elements(self):
         # Suche
-        self.search_q = ft.TextField(
-            label="Suche",
-            prefix_icon=ft.Icons.SEARCH,
-            expand=True,
-            on_change=lambda _: self.page.run_task(self.load_posts),
+        self.search_q = create_search_field(
+            on_change=lambda _: self.page.run_task(self.load_posts)
         )
 
-        # Filter
-        self.filter_typ = ft.Dropdown(
+        # Filter Dropdowns
+        self.filter_typ = create_dropdown(
             label="Kategorie",
-            options=[ft.dropdown.Option("alle", "Alle")],
-            value="alle",
-            expand=True,
             on_change=lambda _: self.page.run_task(self.load_posts),
         )
 
-        self.filter_art = ft.Dropdown(
+        self.filter_art = create_dropdown(
             label="Tierart",
-            options=[ft.dropdown.Option("alle", "Alle")],
-            value="alle",
-            expand=True,
             on_change=self._on_tierart_change,
         )
 
-        self.filter_geschlecht = ft.Dropdown(
+        self.filter_geschlecht = create_dropdown(
             label="Geschlecht",
-            options=[
+            on_change=lambda _: self.page.run_task(self.load_posts),
+            initial_options=[
                 ft.dropdown.Option("alle", "Alle"),
                 ft.dropdown.Option("keine_angabe", "Keine Angabe"),
             ],
-            value="alle",
-            expand=True,
-            on_change=lambda _: self.page.run_task(self.load_posts),
         )
 
-        self.filter_rasse = ft.Dropdown(
+        self.filter_rasse = create_dropdown(
             label="Rasse",
-            options=[ft.dropdown.Option("alle", "Alle")],
-            value="alle",
-            expand=True,
             on_change=lambda _: self.page.run_task(self.load_posts),
         )
 
-        # Farben Panel
+        # Farben Panel - wird später in _load_references befüllt
         self.farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN)
-
         self.farben_panel = ft.Container(
             content=self.farben_filter_container,
             padding=12,
             visible=False,
         )
 
-        self.farben_header = ft.Container(
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.PALETTE, size=18),
-                    ft.Text("Farben wählen", size=14),
-                    ft.Container(expand=True),
-                    self.farben_toggle_icon,
-                ],
-                spacing=12,
-            ),
-            padding=8,
+        self.farben_header = create_farben_header(
+            toggle_icon=self.farben_toggle_icon,
             on_click=self._toggle_farben_panel,
-            border_radius=8,
-            bgcolor=ft.Colors.GREY_50,
-            border=ft.border.all(1, ft.Colors.GREY_200),
         )
 
         # Buttons
-        self.reset_btn = ft.TextButton(
-            "Filter zurücksetzen",
-            icon=ft.Icons.RESTART_ALT,
-            on_click=self._reset_filters,
-        )
+        self.reset_btn = create_reset_button(on_click=self._reset_filters)
 
         self.search_row = ft.ResponsiveRow(
             controls=[
@@ -184,14 +158,7 @@ class DiscoverView:
         )
 
         # View toggle
-        self.view_toggle = ft.SegmentedButton(
-            selected={"list"},
-            segments=[
-                ft.Segment(value="list", label=ft.Text("Liste"), icon=ft.Icon(ft.Icons.VIEW_AGENDA)),
-                ft.Segment(value="grid", label=ft.Text("Kacheln"), icon=ft.Icon(ft.Icons.GRID_VIEW)),
-            ],
-            on_change=self._on_view_change,
-        )
+        self.view_toggle = create_view_toggle(on_change=self._on_view_change)
 
         # Ergebnisbereiche
         self.list_view = ft.Column(spacing=14, expand=True)
@@ -214,7 +181,6 @@ class DiscoverView:
     def _on_view_change(self, e: ft.ControlEvent):
         val = next(iter(e.control.selected), "list")
         self.view_mode = val
-        # neu rendern aus current_items
         self._render_items(self.current_items)
 
     # ──────────────────────────────────────────────────────────────────
@@ -223,13 +189,6 @@ class DiscoverView:
 
     async def _load_references(self):
         try:
-            def populate_dropdown(dropdown: ft.Dropdown, items, id_key="id", name_key="name"):
-                dropdown.options = [ft.dropdown.Option("alle", "Alle")]
-                for it in items or []:
-                    dropdown.options.append(
-                        ft.dropdown.Option(str(it.get(id_key)), it.get(name_key, ""))
-                    )
-
             populate_dropdown(self.filter_typ, self.ref_service.get_post_statuses())
             populate_dropdown(self.filter_art, self.ref_service.get_species())
 
@@ -282,7 +241,6 @@ class DiscoverView:
                 species_id = int(self.filter_art.value)
                 breeds = self._all_breeds.get(species_id, []) if hasattr(self, "_all_breeds") else []
             else:
-                # wenn keine Art gewählt: alle Rassen aus allen Arten
                 breeds = []
                 if hasattr(self, "_all_breeds"):
                     for arr in self._all_breeds.values():
@@ -314,11 +272,9 @@ class DiscoverView:
 
     def _toggle_favorite(self, item: dict, icon_button: ft.IconButton):
         """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""
-        # User immer frisch ziehen (sonst nach Login noch None)
         self.refresh_user()
 
         if not self.current_user_id:
-            # Login-Dialog anzeigen
             if self.on_login_required:
                 self.on_login_required()
             else:
@@ -385,87 +341,30 @@ class DiscoverView:
         self.page.update()
 
         try:
-            # User immer frisch ziehen (damit Favoriten nach Login korrekt)
             self.refresh_user()
 
-            query = (
-                self.sb.table("post")
-                .select(
-                    """
-                    id, headline, description, location_text, event_date, created_at, is_active,
-                    post_status(id, name),
-                    species(id, name),
-                    breed(id, name),
-                    sex(id, name),
-                    post_image(url),
-                    post_color(color(id, name))
-                    """
-                )
-                .order("created_at", desc=True)
-            )
+            # Filter-Werte sammeln
+            filters = {
+                "typ": self.filter_typ.value,
+                "art": self.filter_art.value,
+                "geschlecht": self.filter_geschlecht.value,
+                "rasse": self.filter_rasse.value,
+            }
 
-            # Filter: Kategorie (post_status)
-            if self.filter_typ.value and self.filter_typ.value != "alle":
-                query = query.eq("post_status_id", int(self.filter_typ.value))
-
-            # Filter: Tierart (species)
-            if self.filter_art.value and self.filter_art.value != "alle":
-                query = query.eq("species_id", int(self.filter_art.value))
-
-            # Filter: Geschlecht
-            if self.filter_geschlecht.value and self.filter_geschlecht.value != "alle":
-                if self.filter_geschlecht.value == "keine_angabe":
-                    query = query.is_("sex_id", "null")
-                else:
-                    query = query.eq("sex_id", int(self.filter_geschlecht.value))
-
-            # Filter: Rasse
-            if self.filter_rasse.value and self.filter_rasse.value != "alle":
-                query = query.eq("breed_id", int(self.filter_rasse.value))
-
-            # Farbenfilter: über join-Tabelle post_color
-            # (einfacher Ansatz: nachträglich filtern – reicht für Demo)
-            result = query.limit(self.MAX_POSTS_LIMIT).execute()
+            # Query bauen und ausführen
+            query = build_query(self.sb, filters)
+            result = query.limit(MAX_POSTS_LIMIT).execute()
             items = result.data or []
 
-            # Suche (Python-Filter, damit es robust bleibt)
-            q = (self.search_q.value or "").strip().lower()
-            if q:
-                def matches(it: dict) -> bool:
-                    h = (it.get("headline") or "").lower()
-                    d = (it.get("description") or "").lower()
-                    l = (it.get("location_text") or "").lower()
-                    return q in h or q in d or q in l
-                items = [it for it in items if matches(it)]
+            # Suche (Python-Filter)
+            items = filter_by_search(items, self.search_q.value)
 
-            # Farben (Python-Filter: post_color -> color.id)
-            if self.selected_farben:
-                wanted = set(self.selected_farben)
-
-                def has_color(it: dict) -> bool:
-                    pcs = it.get("post_color") or []
-                    ids = set()
-                    for pc in pcs:
-                        c = pc.get("color") if isinstance(pc, dict) else None
-                        if isinstance(c, dict) and c.get("id") is not None:
-                            ids.add(c["id"])
-                    return bool(ids.intersection(wanted))
-
-                items = [it for it in items if has_color(it)]
+            # Farben (Python-Filter)
+            items = filter_by_colors(items, set(self.selected_farben))
 
             # Favoritenstatus markieren
-            favorite_ids = set()
-            if self.current_user_id:
-                fav_res = (
-                    self.sb.table("favorite")
-                    .select("post_id")
-                    .eq("user_id", self.current_user_id)
-                    .execute()
-                )
-                favorite_ids = {row["post_id"] for row in (fav_res.data or []) if "post_id" in row}
-
-            for it in items:
-                it["is_favorite"] = it.get("id") in favorite_ids
+            favorite_ids = get_favorite_ids(self.sb, self.current_user_id)
+            items = mark_favorites(items, favorite_ids)
 
             self.current_items = items
             self._render_items(items)
@@ -503,264 +402,42 @@ class DiscoverView:
             return
 
         if self.view_mode == "grid":
-            self.grid_view.controls = [self._small_card(it) for it in items]
+            self.grid_view.controls = [
+                build_small_card(
+                    item=it,
+                    page=self.page,
+                    on_favorite_click=self._toggle_favorite,
+                    on_card_click=self._show_detail_dialog,
+                )
+                for it in items
+            ]
             self.list_view.controls = []
             self.list_view.visible = False
             self.grid_view.visible = True
         else:
-            self.list_view.controls = [self._big_card(it) for it in items]
+            self.list_view.controls = [
+                build_big_card(
+                    item=it,
+                    page=self.page,
+                    on_favorite_click=self._toggle_favorite,
+                    on_card_click=self._show_detail_dialog,
+                    on_contact_click=self.on_contact_click,
+                )
+                for it in items
+            ]
             self.grid_view.controls = []
             self.list_view.visible = True
             self.grid_view.visible = False
 
         self.page.update()
 
-    # ──────────────────────────────────────────────────────────────────
-    # UI HELPERS / CARD BUILDER
-    # ──────────────────────────────────────────────────────────────────
-
-    def _badge_for_typ(self, typ: str) -> ft.Control:
-        typ_lower = (typ or "").lower().strip()
-        color = self.STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
-        label = typ.capitalize() if typ else "Unbekannt"
-        return chip(label, color)
-
-    def _badge_for_species(self, species: str) -> ft.Control:
-        species_lower = (species or "").lower().strip()
-        color = self.SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
-        label = species.capitalize() if species else "Unbekannt"
-        return chip(label, color)
-
-    def _meta(self, icon, text: str) -> ft.Control:
-        return ft.Row(
-            [ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT), ft.Text(text, color=ft.Colors.ON_SURFACE_VARIANT)],
-            spacing=6,
-        )
-
-    def _build_image_placeholder(self, height: int, icon_size: int = 50) -> ft.Container:
-        return ft.Container(
-            height=height,
-            bgcolor=ft.Colors.GREY_200,
-            alignment=ft.alignment.center,
-            content=ft.Icon(ft.Icons.PETS, size=icon_size, color=ft.Colors.GREY_400),
-            expand=True,
-        )
-
-    def _extract_item_data(self, item: dict) -> dict:
-        post_images = item.get("post_image") or []
-        img_src = post_images[0].get("url") if post_images else None
-
-        title = item.get("headline") or "Ohne Namen"
-
-        post_status = item.get("post_status") or {}
-        typ = post_status.get("name", "") if isinstance(post_status, dict) else ""
-
-        species = item.get("species") or {}
-        art = species.get("name", "") if isinstance(species, dict) else ""
-
-        breed = item.get("breed") or {}
-        rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
-
-        post_colors = item.get("post_color") or []
-        farben_namen = [
-            pc.get("color", {}).get("name", "")
-            for pc in post_colors
-            if isinstance(pc, dict) and pc.get("color")
-        ]
-        farbe = ", ".join([x for x in farben_namen if x]) if farben_namen else ""
-
-        ort = item.get("location_text") or ""
-        when = (item.get("event_date") or item.get("created_at") or "")[:10]
-        status = "Aktiv" if item.get("is_active") else "Inaktiv"
-
-        return {
-            "img_src": img_src,
-            "title": title,
-            "typ": typ,
-            "art": art,
-            "rasse": rasse,
-            "farbe": farbe,
-            "ort": ort,
-            "when": when,
-            "status": status,
-        }
-
-    def _small_card(self, item: dict) -> ft.Control:
-        data = self._extract_item_data(item)
-
-        visual_content = (
-            ft.Image(src=data["img_src"], height=self.CARD_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
-            if data["img_src"]
-            else self._build_image_placeholder(self.CARD_IMAGE_HEIGHT)
-        )
-
-        visual = ft.Container(
-            content=visual_content,
-            border_radius=16,
-            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-            bgcolor=ft.Colors.GREY_200,
-        )
-
-        badges = ft.Row(
-            [self._badge_for_typ(data["typ"]), self._badge_for_species(data["art"])],
-            spacing=8,
-            wrap=True,
-        )
-
-        is_fav = item.get("is_favorite", False)
-        favorite_btn = ft.IconButton(
-            icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
-            icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
-            tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
-            on_click=lambda e, it=item: self._toggle_favorite(it, e.control),
-        )
-
-        header = ft.Row(
-            [
-                ft.Text(data["title"], size=14, weight=ft.FontWeight.W_600, max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
-                ft.Container(expand=True),
-                favorite_btn,
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-        )
-
-        card_inner = ft.Column([visual, badges, header], spacing=8)
-        card = soft_card(card_inner, pad=12, elev=2)
-
-        wrapper = ft.Container(
-            content=card,
-            animate_scale=200,
-            scale=ft.Scale(1.0),
-            on_click=lambda _, it=item: self._show_detail_dialog(it),
-        )
-
-        def on_hover(e: ft.HoverEvent):
-            wrapper.scale = ft.Scale(1.02) if e.data == "true" else ft.Scale(1.0)
-            self.page.update()
-
-        wrapper.on_hover = on_hover
-
-        return ft.Container(content=wrapper, col={"xs": 6, "sm": 4, "md": 3, "lg": 2.4})
-
-    def _big_card(self, item: dict) -> ft.Control:
-        data = self._extract_item_data(item)
-
-        visual_content = (
-            ft.Image(src=data["img_src"], height=self.LIST_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
-            if data["img_src"]
-            else self._build_image_placeholder(self.LIST_IMAGE_HEIGHT, icon_size=64)
-        )
-
-        visual = ft.Container(
-            content=visual_content,
-            border_radius=16,
-            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-            bgcolor=ft.Colors.GREY_200,
-        )
-
-        badges = ft.Row(
-            [self._badge_for_typ(data["typ"]), self._badge_for_species(data["art"])],
-            spacing=8,
-            wrap=True,
-        )
-
-        is_fav = item.get("is_favorite", False)
-        favorite_btn = ft.IconButton(
-            icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
-            icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
-            tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
-            on_click=lambda e, it=item: self._toggle_favorite(it, e.control),
-        )
-
-        header = ft.Row(
-            [
-                ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600),
-                ft.Container(expand=True),
-                badges,
-                favorite_btn,
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-        )
-
-        line1 = ft.Text(f"{data['rasse']} • {data['farbe']}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
-
-        metas = ft.Row(
-            [
-                self._meta(ft.Icons.LOCATION_ON, data["ort"] or self.DEFAULT_PLACEHOLDER),
-                self._meta(ft.Icons.SCHEDULE, data["when"] or self.DEFAULT_PLACEHOLDER),
-                self._meta(ft.Icons.LABEL, data["status"]),
-            ],
-            spacing=16,
-            wrap=True,
-        )
-
-        actions = ft.Row(
-            [
-                ft.FilledButton(
-                    "Kontakt",
-                    icon=ft.Icons.EMAIL,
-                    on_click=lambda e, it=item: self.on_contact_click(it) if self.on_contact_click else None,
-                ),
-            ],
-            spacing=10,
-        )
-
-        card_inner = ft.Column([visual, header, line1, metas, actions], spacing=10)
-        card = soft_card(card_inner, pad=12, elev=3)
-
-        wrapper = ft.Container(
-            content=card,
-            animate_scale=300,
-            scale=ft.Scale(1.0),
-            on_click=lambda _, it=item: self._show_detail_dialog(it),
-        )
-
-        def on_hover(e: ft.HoverEvent):
-            wrapper.scale = ft.Scale(1.01) if e.data == "true" else ft.Scale(1.0)
-            self.page.update()
-
-        wrapper.on_hover = on_hover
-        return wrapper
-
     def _show_detail_dialog(self, item: dict):
-        data = self._extract_item_data(item)
-
-        visual = (
-            ft.Image(src=data["img_src"], height=self.DIALOG_IMAGE_HEIGHT, fit=ft.ImageFit.COVER)
-            if data["img_src"]
-            else self._build_image_placeholder(self.DIALOG_IMAGE_HEIGHT, icon_size=72)
+        """Wrapper-Methode für den Detail-Dialog."""
+        show_detail_dialog(
+            item=item,
+            page=self.page,
+            on_contact_click=self.on_contact_click,
         )
-
-        dlg = ft.AlertDialog(
-            title=ft.Text(data["title"]),
-            content=ft.Column(
-                [
-                    ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-                    ft.Container(height=8),
-                    ft.Text(item.get("description") or "Keine Beschreibung.", color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Container(height=8),
-                    self._meta(ft.Icons.LOCATION_ON, data["ort"] or self.DEFAULT_PLACEHOLDER),
-                    self._meta(ft.Icons.SCHEDULE, data["when"] or self.DEFAULT_PLACEHOLDER),
-                    self._meta(ft.Icons.LABEL, data["status"]),
-                ],
-                tight=True,
-                spacing=8,
-            ),
-            actions=[
-                ft.TextButton("Schließen", on_click=lambda _: self.page.close(dlg)),
-                ft.FilledButton(
-                    "Kontakt",
-                    icon=ft.Icons.EMAIL,
-                    on_click=lambda e, it=item: self.on_contact_click(it) if self.on_contact_click else None,
-                ),
-            ],
-        )
-        self.page.open(dlg)
-
-    def _close_dialog(self):
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
 
     # ──────────────────────────────────────────────────────────────────
     # FILTER RESET
