@@ -631,7 +631,7 @@ class DiscoverView:
             content=card,
             animate_scale=200,
             scale=ft.Scale(1.0),
-            on_click=lambda _: self._show_detail_dialog(item),
+            on_click=lambda _, it=item: self._show_detail_dialog(it),
         )
 
         def on_hover(e: ft.HoverEvent):
@@ -712,7 +712,7 @@ class DiscoverView:
             content=card,
             animate_scale=300,
             scale=ft.Scale(1.0),
-            on_click=lambda _: self._show_detail_dialog(item),
+            on_click=lambda _, it=item: self._show_detail_dialog(it),
         )
 
         def on_hover(e: ft.HoverEvent):
@@ -747,7 +747,7 @@ class DiscoverView:
                 spacing=8,
             ),
             actions=[
-                ft.TextButton("Schließen", on_click=lambda _: self._close_dialog()),
+                ft.TextButton("Schließen", on_click=lambda _: self.page.close(dlg)),
                 ft.FilledButton(
                     "Kontakt",
                     icon=ft.Icons.EMAIL,
@@ -755,9 +755,7 @@ class DiscoverView:
                 ),
             ],
         )
-        self.page.dialog = dlg
-        dlg.open = True
-        self.page.update()
+        self.page.open(dlg)
 
     def _close_dialog(self):
         if self.page.dialog:
