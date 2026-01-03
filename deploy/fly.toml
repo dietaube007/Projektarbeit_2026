@@ -7,7 +7,6 @@ app = 'petbuddy'
 primary_region = 'fra'
 
 [build]
-  dockerfile = "deploy/Dockerfile"
 
 [env]
   PORT = '8080'
