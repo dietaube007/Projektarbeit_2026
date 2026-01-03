@@ -58,7 +58,7 @@ class PetBuddyApp:
             self.theme_manager = ThemeManager(self.page)
             self.theme_manager.apply_theme("light")
             
-            # Supabase-Client initialisieren
+            # Supabase-Client initialisieren            
             self.sb = get_client()
             return True
             
@@ -71,6 +71,37 @@ class PetBuddyApp:
         self.page.snack_bar = ft.SnackBar(ft.Text(message))
         self.page.snack_bar.open = True
         self.page.update()
+    
+    def _show_login_required_dialog(self, target_tab: int):
+        """Zeigt ein Pop-up Dialog für nicht eingeloggte Benutzer."""
+        def on_login_click(e):
+            self.page.close(dialog)
+            self.pending_tab_after_login = target_tab
+            self._show_login()
+        
+        def on_cancel_click(e):
+            self.page.close(dialog)
+            # Navigation zurücksetzen auf Start
+            if self.nav:
+                self.nav.selected_index = self.TAB_START
+            self.page.update()
+        
+        tab_name = "Melden" if target_tab == self.TAB_MELDEN else "Profil"
+        
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Anmeldung erforderlich"),
+            content=ft.Text(
+                f"Um auf '{tab_name}' zuzugreifen, musst du dich anmelden oder registrieren."
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel_click),
+                ft.ElevatedButton("Anmelden", on_click=on_login_click),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.open(dialog)
     
     # ════════════════════════════════════════════════════════════════════
     # NAVIGATION
@@ -88,9 +119,8 @@ class PetBuddyApp:
     def go_to_melden_tab(self, _=None):
         # Jetzt melden Button wenn keine Meldungen existieren
         if not self.is_logged_in:
-            # Direkt zur Login-Seite wechseln und nach Login zum Melden-Tab
-            self.pending_tab_after_login = self.TAB_MELDEN
-            self._show_login()
+            # Pop-up Dialog anzeigen
+            self._show_login_required_dialog(self.TAB_MELDEN)
             return
         self.current_tab = self.TAB_MELDEN
         if self.nav:
@@ -112,9 +142,8 @@ class PetBuddyApp:
 
         # Login erforderlich für Melden und Profil
         if new_tab in [self.TAB_MELDEN, self.TAB_PROFIL] and not self.is_logged_in:
-            # Direkt zur Login-Seite wechseln und nach Login zum gewählten Tab
-            self.pending_tab_after_login = new_tab
-            self._show_login()
+            # Pop-up Dialog anzeigen
+            self._show_login_required_dialog(new_tab)
             return
 
         self.current_tab = new_tab
