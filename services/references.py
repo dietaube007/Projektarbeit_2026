@@ -1,13 +1,11 @@
 """Referenzdaten-Management.
 
-Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank, die
-für Dropdowns, Filter und die Formularvalidierung benötigt werden
+Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank, die für Dropdowns, Filter und die Formularvalidierung benötigt werden
 
 """
 
 from supabase import Client
 from typing import List, Dict, Any
-
 
 class ReferenceService:
     # Service-Klasse für das Laden von Referenzdaten aus der Datenbank.
@@ -33,7 +31,7 @@ class ReferenceService:
             self._post_statuses = res.data or []
             return self._post_statuses
         except Exception as ex:
-            print(f"Fehler beim Laden von Post-Statuses: {ex}")
+            print(f"Fehler beim Laden von Meldungstypen: {ex}")
             return []
     
     def get_species(self, use_cache: bool = True) -> List[Dict[str, Any]]:

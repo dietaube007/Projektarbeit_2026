@@ -58,7 +58,7 @@ class PetBuddyApp:
             self.theme_manager = ThemeManager(self.page)
             self.theme_manager.apply_theme("light")
             
-            # Supabase-Client initialisieren            
+            # Supabase-Client initialisieren
             self.sb = get_client()
             return True
             
@@ -92,7 +92,7 @@ class PetBuddyApp:
             modal=True,
             title=ft.Text("Anmeldung erforderlich"),
             content=ft.Text(
-                f"Um auf '{tab_name}' zuzugreifen, musst du dich anmelden oder registrieren."
+                f"Bitte melden Sie sich an, um eine Meldung zu erstellen oder auf Profilbereich zuzugreifen."
             ),
             actions=[
                 ft.TextButton("Abbrechen", on_click=on_cancel_click),

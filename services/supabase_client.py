@@ -37,18 +37,15 @@ def get_client() -> Client:
     if not url or not key:
         # Hilfreiche Fehlermeldung mit Status-Indikatoren
         raise RuntimeError(
-            "❌ Supabase-Konfiguration unvollständig!\n\n"
+            "Supabase-Konfiguration unvollständig!\n\n"
             "Bitte .env-Datei mit folgenden Variablen erstellen:\n"
             "  - SUPABASE_URL: {} {}\n"
             "  - SUPABASE_ANON_KEY: {} {}\n\n"
             "Beispiel .env:\n"
             "  SUPABASE_URL=https://yourproject.supabase.co\n"
             "  SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...".format(
-                "✓" if url else "❌",
                 "(vorhanden)" if url else "(FEHLT)",
-                "✓" if key else "❌",
-                "(vorhanden)" if key else "(FEHLT)"
-            )
+                "(vorhanden)" if key else "(FEHLT)")
         )
 
     # Versuche Client zu initialisieren
@@ -57,7 +54,7 @@ def get_client() -> Client:
         return client
     except Exception as ex:
         raise RuntimeError(
-            f"❌ Fehler beim Erstellen des Supabase Clients:\n"
+            f"Fehler beim Erstellen des Supabase Clients:\n"
             f"{str(ex)}\n\n"
             f"Überprüfe:\n"
             f"1. SUPABASE_URL ist gültig und erreichbar\n"
