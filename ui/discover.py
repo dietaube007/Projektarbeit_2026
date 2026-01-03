@@ -40,11 +40,13 @@ class DiscoverView:
         sb,
         on_contact_click: Optional[Callable] = None,
         on_melden_click: Optional[Callable] = None,
+        on_login_required: Optional[Callable] = None,
     ):
         self.page = page
         self.sb = sb
         self.on_contact_click = on_contact_click
         self.on_melden_click = on_melden_click
+        self.on_login_required = on_login_required
 
         # Services
         self.ref_service = ReferenceService(self.sb)
@@ -316,11 +318,15 @@ class DiscoverView:
         self.refresh_user()
 
         if not self.current_user_id:
-            self.page.snack_bar = ft.SnackBar(
-                ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
-                open=True,
-            )
-            self.page.update()
+            # Login-Dialog anzeigen
+            if self.on_login_required:
+                self.on_login_required()
+            else:
+                self.page.snack_bar = ft.SnackBar(
+                    ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
+                    open=True,
+                )
+                self.page.update()
             return
 
         post_id = item.get("id")

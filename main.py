@@ -88,11 +88,38 @@ class PetBuddyApp:
         
         tab_name = "Melden" if target_tab == self.TAB_MELDEN else "Profil"
         
+        if target_tab == self.TAB_MELDEN:
+            message = "Bitte melden Sie sich an, um Meldungen zu erstellen."
+        else:
+            message = "Bitte melden Sie sich an, um auf Profilbereich zuzugreifen."
+        
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Anmeldung erforderlich"),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel_click),
+                ft.ElevatedButton("Anmelden", on_click=on_login_click),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.open(dialog)
+    
+    def _show_favorite_login_dialog(self):
+        """Zeigt ein Pop-up Dialog wenn Gast auf Favorit klickt."""
+        def on_login_click(e):
+            self.page.close(dialog)
+            self._show_login()
+        
+        def on_cancel_click(e):
+            self.page.close(dialog)
+        
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Anmeldung erforderlich"),
             content=ft.Text(
-                f"Bitte melden Sie sich an, um eine Meldung zu erstellen oder auf Profilbereich zuzugreifen."
+                "Bitte melden Sie sich an, um Meldungen zu favorisieren."
             ),
             actions=[
                 ft.TextButton("Abbrechen", on_click=on_cancel_click),
@@ -177,7 +204,8 @@ class PetBuddyApp:
                 page=self.page,
                 sb=self.sb,
                 on_contact_click=None,
-                on_melden_click=self.go_to_melden_tab
+                on_melden_click=self.go_to_melden_tab,
+                on_login_required=self._show_favorite_login_dialog
             )
             
             # PostForm erstellen
