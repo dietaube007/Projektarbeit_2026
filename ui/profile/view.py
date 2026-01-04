@@ -152,18 +152,26 @@ class ProfileView:
                 self.display_name.value = display_name
 
                 # Optional: User-Profil aus user Tabelle laden (falls andere Daten benötigt werden)
+                # Hinweis: Dies ist optional und wird nur ausgeführt, wenn die user Tabelle existiert
+                # und der Benutzer Zugriff darauf hat. Fehler werden ignoriert.
                 try:
+                    # Versuche nur spezifische Spalten zu laden (nicht *), um Fehler zu vermeiden
+                    # wenn Spalten fehlen (z.B. display_name wurde gelöscht)
                     profile = (
                         self.sb.table("user")
-                        .select("*")
+                        .select("id,created_at,updated_at")
                         .eq("id", self.user_data.id)
-                        .single()
+                        .maybe_single()
                         .execute()
                     )
                     if profile.data:
                         self.user_profile = profile.data
+                    else:
+                        self.user_profile = None
                 except Exception as profile_error:
-                    logger.warning(f"Fehler beim Laden des User-Profils: {profile_error}")
+                    # Fehler beim Laden der user Tabelle ist nicht kritisch
+                    # da display_name jetzt aus user_metadata kommt
+                    logger.debug(f"User-Profil konnte nicht geladen werden (optional): {profile_error}")
                     self.user_profile = None
 
                 self.page.update()
