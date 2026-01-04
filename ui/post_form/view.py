@@ -53,14 +53,7 @@ class PostForm:
         sb,
         on_saved_callback: Optional[Callable] = None
     ):
-        """
-        Initialisiert das Meldungsformular.
-        
-        Args:
-            page: Flet Page-Instanz
-            sb: Supabase Client
-            on_saved_callback: Callback nach erfolgreichem Speichern
-        """
+        """Initialisiert das Meldungsformular."""
         self.page = page
         self.sb = sb
         self.on_saved_callback = on_saved_callback
@@ -151,14 +144,7 @@ class PostForm:
     # ════════════════════════════════════════════════════════════════════
     
     def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
-        """
-        Zeigt eine Statusnachricht an.
-        
-        Args:
-            message: Die anzuzeigende Nachricht
-            is_error: True für Fehlermeldung (rot)
-            is_loading: True für Ladevorgang (blau)
-        """
+        """Zeigt eine Statusnachricht an."""
         if is_error:
             self.status_text.color = ft.Colors.RED
         elif is_loading:
@@ -167,6 +153,85 @@ class PostForm:
             self.status_text.color = ft.Colors.GREEN
         self.status_text.value = message
         self.page.update()
+    
+    def _show_validation_dialog(self, title: str, message: str, items: list):
+        """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
+        def close_dialog(e):
+            self.page.close(dlg)
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                [
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
+                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+                ],
+                spacing=8,
+            ),
+            content=ft.Column(
+                [
+                    ft.Text(message, size=13, color=ft.Colors.GREY_700),
+                    ft.Column(
+                        [ft.Text(item, size=12, color=ft.Colors.GREY_800) for item in items],
+                        spacing=2,
+                    ),
+                ],
+                spacing=8,
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.open(dlg)
+    
+    def _show_success_dialog(self, title: str, message: str):
+        """Zeigt einen Erfolgs-Dialog an."""
+        def close_dialog(e):
+            self.page.close(dlg)
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                [
+                    ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
+                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+                ],
+                spacing=8,
+            ),
+            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.open(dlg)
+    
+    def _show_error_dialog(self, title: str, message: str):
+        """Zeigt einen Fehler-Dialog an."""
+        def close_dialog(e):
+            self.page.close(dlg)
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                [
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
+                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+                ],
+                spacing=8,
+            ),
+            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.open(dlg)
     
     def _toggle_farben_panel(self, _):
         """Toggle für das Farben-Panel."""
@@ -269,40 +334,48 @@ class PostForm:
         # Validierung
         errors = []
         if not self.name_tf.value or not self.name_tf.value.strip():
-            errors.append("Name/Überschrift")
+            errors.append("• Name/Überschrift")
         if not self.species_dd.value:
-            errors.append("Tierart")
+            errors.append("• Tierart")
         if not self.selected_farben:
-            errors.append("Mindestens eine Farbe")
+            errors.append("• Mindestens eine Farbe")
         if not self.info_tf.value or not self.info_tf.value.strip():
-            errors.append("Beschreibung")
+            errors.append("• Beschreibung")
         if not self.location_tf.value or not self.location_tf.value.strip():
-            errors.append("Ort")
+            errors.append("• Ort")
         if not self.date_tf.value or not self.date_tf.value.strip():
-            errors.append("Datum")
+            errors.append("• Datum")
         if not self.selected_photo.get("url"):
-            errors.append("Foto")
+            errors.append("• Foto")
         
         if errors:
-            self._show_status(f"❌ Bitte ausfüllen: {', '.join(errors)}", is_error=True)
+            self._show_validation_dialog(
+                "Pflichtfelder fehlen",
+                "Bitte fülle folgende Felder aus:",
+                errors
+            )
             return
         
         # Datum parsen
         try:
             event_date = datetime.strptime(self.date_tf.value.strip(), DATE_FORMAT).date()
         except ValueError:
-            self._show_status("❌ Ungültiges Datum. Format: TT.MM.YYYY", is_error=True)
+            self._show_validation_dialog(
+                "Ungültiges Format",
+                "Das Datum hat ein falsches Format.",
+                ["• Bitte verwende: TT.MM.YYYY", "• Beispiel: 04.01.2026"]
+            )
             return
         
         # Eingeloggten Benutzer holen
         try:
             user_response = self.sb.auth.get_user()
             if not user_response or not user_response.user:
-                self._show_status("❌ Nicht eingeloggt. Bitte neu anmelden.", is_error=True)
+                self._show_error_dialog("Nicht eingeloggt", "Bitte melde dich an, um eine Meldung zu erstellen.")
                 return
             user_id = user_response.user.id
         except Exception as e:
-            self._show_status(f"❌ Fehler beim Abrufen des Benutzers: {e}", is_error=True)
+            self._show_error_dialog("Fehler", f"Fehler beim Abrufen des Benutzers: {e}")
             return
         
         try:
@@ -331,7 +404,8 @@ class PostForm:
             if self.selected_photo.get("url"):
                 self.post_service.add_photo(post_id, self.selected_photo["url"])
             
-            self._show_status("✓ Meldung erfolgreich erstellt!")
+            self._show_status("")
+            self._show_success_dialog("Meldung erstellt", "Deine Meldung wurde erfolgreich veröffentlicht!")
             
             self._reset_form()
             
@@ -339,7 +413,8 @@ class PostForm:
                 self.on_saved_callback(post_id)
                 
         except Exception as ex:
-            self._show_status(f"❌ Fehler beim Speichern: {ex}", is_error=True)
+            self._show_status("")
+            self._show_error_dialog("Speichern fehlgeschlagen", f"Fehler beim Erstellen der Meldung: {ex}")
     
     def _reset_form(self):
         """Setzt das Formular auf Standardwerte zurück."""

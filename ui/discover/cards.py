@@ -61,17 +61,7 @@ def build_small_card(
     on_favorite_click: Callable,
     on_card_click: Callable
 ) -> ft.Control:
-    """Erstellt eine kleine Kachel-Karte für die Grid-Ansicht.
-    
-    Args:
-        item: Meldungsdaten
-        page: Flet Page für Updates
-        on_favorite_click: Callback für Favoriten-Klick
-        on_card_click: Callback für Karten-Klick
-    
-    Returns:
-        ft.Container mit der Karte
-    """
+    """Erstellt eine kleine Kachel-Karte für die Grid-Ansicht."""
     data = extract_item_data(item)
 
     visual_content = (
@@ -136,18 +126,7 @@ def build_big_card(
     on_card_click: Callable,
     on_contact_click: Optional[Callable] = None
 ) -> ft.Control:
-    """Erstellt eine große Listen-Karte für die Listen-Ansicht.
-    
-    Args:
-        item: Meldungsdaten
-        page: Flet Page für Updates
-        on_favorite_click: Callback für Favoriten-Klick
-        on_card_click: Callback für Karten-Klick
-        on_contact_click: Callback für Kontakt-Klick
-    
-    Returns:
-        ft.Container mit der Karte
-    """
+    """Erstellt eine große Listen-Karte für die Listen-Ansicht."""
     data = extract_item_data(item)
 
     visual_content = (
@@ -233,13 +212,7 @@ def show_detail_dialog(
     item: dict,
     on_contact_click: Optional[Callable] = None
 ):
-    """Zeigt den Detail-Dialog für eine Meldung.
-    
-    Args:
-        page: Flet Page
-        item: Meldungsdaten
-        on_contact_click: Callback für Kontakt-Klick
-    """
+    """Zeigt den Detail-Dialog für eine Meldung."""
     data = extract_item_data(item)
 
     visual = (

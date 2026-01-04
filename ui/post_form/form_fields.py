@@ -24,15 +24,7 @@ from ui.post_form.constants import (
 
 
 def create_meldungsart_button(on_change: Callable) -> ft.SegmentedButton:
-    """
-    Erstellt den SegmentedButton für die Meldungsart.
-    
-    Args:
-        on_change: Callback bei Änderung
-        
-    Returns:
-        SegmentedButton für Vermisst/Gefunden
-    """
+    """Erstellt den SegmentedButton für die Meldungsart."""
     return ft.SegmentedButton(
         selected={"1"},
         segments=[ft.Segment(value="1", label=ft.Text("Vermisst"))],
@@ -43,12 +35,7 @@ def create_meldungsart_button(on_change: Callable) -> ft.SegmentedButton:
 
 
 def create_photo_preview() -> ft.Image:
-    """
-    Erstellt das Image-Element für die Foto-Vorschau.
-    
-    Returns:
-        Image-Element (initial unsichtbar)
-    """
+    """Erstellt das Image-Element für die Foto-Vorschau."""
     return ft.Image(
         width=FIELD_WIDTH_MEDIUM,
         height=250,
@@ -59,22 +46,12 @@ def create_photo_preview() -> ft.Image:
 
 
 def create_name_field() -> ft.TextField:
-    """
-    Erstellt das Eingabefeld für Name/Überschrift.
-    
-    Returns:
-        TextField für den Namen
-    """
+    """Erstellt das Eingabefeld für Name/Überschrift."""
     return ft.TextField(width=FIELD_WIDTH_MEDIUM)
 
 
 def create_title_label() -> ft.Text:
-    """
-    Erstellt das Label für Name/Überschrift.
-    
-    Returns:
-        Text-Element mit dynamischem Inhalt
-    """
+    """Erstellt das Label für Name/Überschrift."""
     return ft.Text(
         "Name﹡",
         size=14,
@@ -84,12 +61,7 @@ def create_title_label() -> ft.Text:
 
 
 def create_species_dropdown() -> ft.Dropdown:
-    """
-    Erstellt das Dropdown für die Tierart.
-    
-    Returns:
-        Dropdown ohne Options (werden später geladen)
-    """
+    """Erstellt das Dropdown für die Tierart."""
     return ft.Dropdown(
         label="Tierart﹡",
         text_size=14,
@@ -98,12 +70,7 @@ def create_species_dropdown() -> ft.Dropdown:
 
 
 def create_breed_dropdown() -> ft.Dropdown:
-    """
-    Erstellt das Dropdown für die Rasse.
-    
-    Returns:
-        Dropdown mit "Keine Angabe" Option
-    """
+    """Erstellt das Dropdown für die Rasse."""
     return ft.Dropdown(
         label="Rasse (optional)",
         width=FIELD_WIDTH_SMALL
@@ -111,12 +78,7 @@ def create_breed_dropdown() -> ft.Dropdown:
 
 
 def create_sex_dropdown() -> ft.Dropdown:
-    """
-    Erstellt das Dropdown für das Geschlecht.
-    
-    Returns:
-        Dropdown mit "Keine Angabe" Option
-    """
+    """Erstellt das Dropdown für das Geschlecht."""
     return ft.Dropdown(
         label="Geschlecht (optional)",
         width=FIELD_WIDTH_SMALL
@@ -124,12 +86,7 @@ def create_sex_dropdown() -> ft.Dropdown:
 
 
 def create_description_field() -> ft.TextField:
-    """
-    Erstellt das mehrzeilige Beschreibungsfeld.
-    
-    Returns:
-        TextField für Beschreibung
-    """
+    """Erstellt das mehrzeilige Beschreibungsfeld."""
     return ft.TextField(
         multiline=True,
         max_lines=4,
@@ -139,12 +96,7 @@ def create_description_field() -> ft.TextField:
 
 
 def create_location_field() -> ft.TextField:
-    """
-    Erstellt das Eingabefeld für den Ort.
-    
-    Returns:
-        TextField für den Standort
-    """
+    """Erstellt das Eingabefeld für den Ort."""
     return ft.TextField(
         label="Ort﹡",
         width=FIELD_WIDTH_LARGE
@@ -152,12 +104,7 @@ def create_location_field() -> ft.TextField:
 
 
 def create_date_field() -> ft.TextField:
-    """
-    Erstellt das Eingabefeld für das Datum.
-    
-    Returns:
-        TextField für das Datum
-    """
+    """Erstellt das Eingabefeld für das Datum."""
     return ft.TextField(
         label="Datum﹡ (TT.MM.YYYY)",
         width=FIELD_WIDTH_SMALL,
@@ -166,12 +113,7 @@ def create_date_field() -> ft.TextField:
 
 
 def create_status_text() -> ft.Text:
-    """
-    Erstellt das Status-Text Element für Meldungen.
-    
-    Returns:
-        Text-Element für Statusnachrichten
-    """
+    """Erstellt das Status-Text Element für Meldungen."""
     return ft.Text("", color=ft.Colors.BLUE, size=12)
 
 
@@ -179,16 +121,7 @@ def create_farben_panel(
     colors_list: List[Dict],
     on_color_change: Callable[[int, bool], None]
 ) -> tuple[ft.ResponsiveRow, ft.Container, ft.Container, ft.Icon, Dict[int, ft.Checkbox]]:
-    """
-    Erstellt das Farben-Panel mit Checkboxes.
-    
-    Args:
-        colors_list: Liste der verfügbaren Farben aus der DB
-        on_color_change: Callback bei Farbänderung (color_id, is_selected)
-        
-    Returns:
-        Tuple aus (container, panel, header, toggle_icon, checkboxes_dict)
-    """
+    """Erstellt das Farben-Panel mit Checkboxes."""
     farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
     farben_checkboxes: Dict[int, ft.Checkbox] = {}
     
@@ -240,17 +173,7 @@ def create_photo_upload_area(
     on_pick_photo: Callable,
     on_remove_photo: Callable
 ) -> ft.Container:
-    """
-    Erstellt den Foto-Upload Bereich.
-    
-    Args:
-        photo_preview: Image-Element für Vorschau
-        on_pick_photo: Callback für Foto-Auswahl
-        on_remove_photo: Callback für Foto-Entfernung
-        
-    Returns:
-        Container mit Upload-Bereich
-    """
+    """Erstellt den Foto-Upload Bereich."""
     return ft.Container(
         content=ft.Column([
             ft.Container(
@@ -275,15 +198,7 @@ def create_photo_upload_area(
 
 
 def create_save_button(on_click: Callable) -> ft.FilledButton:
-    """
-    Erstellt den Speichern-Button.
-    
-    Args:
-        on_click: Callback beim Klick
-        
-    Returns:
-        FilledButton für Meldung erstellen
-    """
+    """Erstellt den Speichern-Button."""
     return ft.FilledButton(
         "Meldung erstellen",
         width=200,
@@ -296,14 +211,7 @@ def populate_dropdown_options(
     items: List[Dict],
     with_none_option: bool = False
 ) -> None:
-    """
-    Füllt ein Dropdown mit Optionen.
-    
-    Args:
-        dropdown: Das zu füllende Dropdown
-        items: Liste von Dicts mit 'id' und 'name'
-        with_none_option: Ob "Keine Angabe" eingefügt werden soll
-    """
+    """Füllt ein Dropdown mit Optionen."""
     options = []
     
     if with_none_option:

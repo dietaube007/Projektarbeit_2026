@@ -486,7 +486,7 @@ class ProfileView:
                     build_menu_item(
                         ft.Icons.ARTICLE_OUTLINED,
                         "Meine Meldungen",
-                        subtitle="Deine erstellten Tier-Meldungen",
+                        subtitle="Deine erstellten Meldungen",
                         on_click=lambda _: self._show_my_posts(),
                     ),
                     ft.Divider(height=1),

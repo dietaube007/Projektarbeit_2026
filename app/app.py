@@ -187,12 +187,7 @@ class PetBuddyApp:
     # ════════════════════════════════════════════════════════════════════
     
     def build_ui(self) -> bool:
-        """
-        Baut die UI-Bereiche auf.
-        
-        Returns:
-            False bei Fehler, sonst True
-        """
+        """Baut die UI-Bereiche auf."""
         try:
             # DiscoverView erstellen
             self.discover_view = DiscoverView(

@@ -24,8 +24,7 @@ class PostService:
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Erstellt einen neuen Post und gibt ihn zurück."""
         try:
-            # Insert + Select in einem Aufruf (effizienter)
-            res = self.sb.table("post").insert(payload).select("*").execute()
+            res = self.sb.table("post").insert(payload).execute()
             
             if not res.data:
                 raise RuntimeError("Keine Daten in der Response")
@@ -36,7 +35,7 @@ class PostService:
     def update(self, post_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         # Aktualisiert einen bestehenden Post.
         try:
-            res = self.sb.table("post").update(payload).eq("id", post_id).select("*").execute()
+            res = self.sb.table("post").update(payload).eq("id", post_id).execute()
             if not res.data:
                 raise RuntimeError("Keine Daten in der Response")
             return res.data[0]

@@ -26,14 +26,7 @@ from ui.post_form.constants import (
 def compress_image(file_path: str) -> Tuple[bytes, str]:
     """
     Komprimiert ein Bild für schnelleres Laden.
-    
     Konvertiert das Bild zu JPEG und passt die Größe an.
-    
-    Args:
-        file_path: Pfad zum Quellbild
-        
-    Returns:
-        Tuple aus (komprimierte_bytes, file_extension)
     """
     with Image.open(file_path) as img:
         # EXIF-Orientierung beibehalten, zu RGB konvertieren
@@ -55,17 +48,7 @@ def upload_to_storage(
     file_path: str,
     original_filename: str
 ) -> Dict[str, Optional[str]]:
-    """
-    Komprimiert und lädt ein Bild zu Supabase Storage hoch.
-    
-    Args:
-        sb: Supabase Client
-        file_path: Lokaler Pfad zur Bilddatei
-        original_filename: Originalname der Datei
-        
-    Returns:
-        Dict mit path, base64, url oder None bei Fehler
-    """
+    """Komprimiert und lädt ein Bild zu Supabase Storage hoch."""
     try:
         # Bild komprimieren
         compressed_bytes, file_ext = compress_image(file_path)
@@ -99,16 +82,7 @@ def upload_to_storage(
 
 
 def remove_from_storage(sb, storage_path: Optional[str]) -> bool:
-    """
-    Entfernt ein Bild aus Supabase Storage.
-    
-    Args:
-        sb: Supabase Client
-        storage_path: Pfad im Storage Bucket
-        
-    Returns:
-        True bei Erfolg, False bei Fehler
-    """
+    """Entfernt ein Bild aus Supabase Storage."""
     if not storage_path:
         return True
         
@@ -121,15 +95,7 @@ def remove_from_storage(sb, storage_path: Optional[str]) -> bool:
 
 
 def cleanup_local_file(file_path: str) -> bool:
-    """
-    Löscht eine lokale temporäre Datei.
-    
-    Args:
-        file_path: Pfad zur Datei
-        
-    Returns:
-        True bei Erfolg, False bei Fehler
-    """
+    """Löscht eine lokale temporäre Datei."""
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -140,13 +106,5 @@ def cleanup_local_file(file_path: str) -> bool:
 
 
 def get_upload_path(filename: str) -> str:
-    """
-    Erstellt den lokalen Upload-Pfad für eine Datei.
-    
-    Args:
-        filename: Name der Datei
-        
-    Returns:
-        Vollständiger Pfad im Upload-Verzeichnis
-    """
+    """Erstellt den lokalen Upload-Pfad für eine Datei."""
     return f"{UPLOAD_DIR}/{filename}"

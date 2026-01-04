@@ -92,9 +92,6 @@ class ThemeManager:
         
         Hinweis: Verwendet aktuell das gleiche Theme wie Light-Modus.
         Flet passt Farben automatisch an den Dark-Modus an.
-        
-        Returns:
-            ft.Theme: Konfiguriertes Theme mit Material 3 Design.
         """
         return ThemeManager.build_theme_light()
     
@@ -103,12 +100,7 @@ class ThemeManager:
     # ════════════════════════════════════════════════════════════════════
     
     def apply_theme(self, mode: str = THEME_LIGHT) -> None:
-        """
-        Wendet ein Theme auf die Seite an und setzt den Modus.
-        
-        Args:
-            mode: Theme-Modus ('light' oder 'dark'). Standard: 'light'
-        """
+        """Wendet ein Theme auf die Seite an und setzt den Modus."""
         if mode not in (THEME_LIGHT, THEME_DARK):
             print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende '{THEME_LIGHT}'.")
             mode = THEME_LIGHT
@@ -135,12 +127,7 @@ class ThemeManager:
         self.page.update()
     
     def create_toggle_button(self) -> ft.IconButton:
-        """
-        Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
-        
-        Returns:
-            ft.IconButton: Button mit Theme-Toggle-Funktionalität.
-        """
+        """Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus."""
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),
             tooltip="Theme wechseln",

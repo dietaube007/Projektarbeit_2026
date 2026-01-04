@@ -336,13 +336,30 @@ async def load_my_posts(sb, user_id: str) -> List[dict]:
 
 
 def delete_post(sb, post_id: int) -> bool:
-    """Löscht einen Post und alle verknüpften Daten."""
+    """Löscht einen Post und alle verknüpften Daten inkl. Storage-Bilder."""
     try:
-        # Bilder löschen
+        STORAGE_BUCKET = "pet-images"
+        
+        # 1. Hole die Bild-URLs
+        images_res = sb.table("post_image").select("url").eq("post_id", post_id).execute()
+        image_urls = [img["url"] for img in (images_res.data or [])]
+        
+        # 2. Lösche Bilder aus Supabase Storage
+        for url in image_urls:
+            try:
+                if STORAGE_BUCKET in url:
+                    parts = url.split(f"{STORAGE_BUCKET}/")
+                    if len(parts) > 1:
+                        file_path = parts[1].split("?")[0]
+                        sb.storage.from_(STORAGE_BUCKET).remove([file_path])
+            except Exception:
+                pass  # Weitermachen auch wenn Storage-Löschung fehlschlägt
+        
+        # 3. Lösche verknüpfte Daten aus der Datenbank
         sb.table("post_image").delete().eq("post_id", post_id).execute()
-        # Farben löschen
         sb.table("post_color").delete().eq("post_id", post_id).execute()
-        # Post löschen
+        
+        # 4. Lösche den Post selbst
         sb.table("post").delete().eq("id", post_id).execute()
         return True
     except Exception as e:
