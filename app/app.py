@@ -211,6 +211,7 @@ class PetBuddyApp:
                 sb=self.sb,
                 on_logout=self._logout,
                 on_favorites_changed=self._on_favorites_changed,
+                on_posts_changed=self._on_posts_changed,
             )
             
             return True
@@ -221,6 +222,11 @@ class PetBuddyApp:
     
     def _on_favorites_changed(self):
         """Callback wenn sich Favoriten ändern."""
+        if self.discover_view:
+            self.page.run_task(self.discover_view.load_posts)
+    
+    def _on_posts_changed(self):
+        """Callback wenn Meldungen bearbeitet/gelöscht werden."""
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
     

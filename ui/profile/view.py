@@ -31,6 +31,7 @@ from .my_posts import (
     delete_post,
     render_my_posts_list,
 )
+from .edit_post import EditPostDialog
 from .edit_profile import (
     build_change_image_section,
     build_change_name_section,
@@ -55,12 +56,14 @@ class ProfileView:
         sb,
         on_logout: Optional[Callable] = None,
         on_favorites_changed: Optional[Callable] = None,
+        on_posts_changed: Optional[Callable] = None,
     ):
         """Initialisiert die Profil-Ansicht."""
         self.page = page
         self.sb = sb
         self.on_logout = on_logout
         self.on_favorites_changed = on_favorites_changed
+        self.on_posts_changed = on_posts_changed
 
         # Benutzerdaten
         self.user_data = None
@@ -373,13 +376,22 @@ class ProfileView:
             self.page.update()
 
     def _edit_post(self, post: dict):
-        """Bearbeiten einer Meldung (Platzhalter)."""
-        # TODO: Zum Bearbeiten-Formular navigieren
-        self.page.snack_bar = ft.SnackBar(
-            ft.Text(f"Bearbeiten von '{post.get('headline', 'Meldung')}' kommt bald!"),
-            open=True,
+        """Bearbeiten einer Meldung."""
+        def on_save():
+            # Meldungen neu laden
+            self.page.run_task(self._load_my_posts)
+            # Startseite aktualisieren
+            if self.on_posts_changed:
+                self.on_posts_changed()
+        
+        # Bearbeitungsdialog öffnen
+        dialog = EditPostDialog(
+            page=self.page,
+            sb=self.sb,
+            post=post,
+            on_save_callback=on_save,
         )
-        self.page.update()
+        dialog.show()
 
     def _confirm_delete_post(self, post_id: int):
         """Zeigt Bestätigungsdialog zum Löschen."""
@@ -427,9 +439,9 @@ class ProfileView:
                 self._show_success_dialog("Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
                 self.page.update()
 
-                # Startseite informieren falls Callback existiert
-                if self.on_favorites_changed:
-                    self.on_favorites_changed()
+                # Startseite aktualisieren
+                if self.on_posts_changed:
+                    self.on_posts_changed()
             else:
                 self._show_error_dialog("Löschen fehlgeschlagen", "Die Meldung konnte nicht gelöscht werden.")
                 self.page.update()

@@ -106,6 +106,21 @@ class PostService:
         except Exception as ex:
             print(f"Fehler beim Hinzufügen der Farbe {color_id} zu Post {post_id}: {ex}")
     
+    def update_colors(self, post_id: str, color_ids: List[int]) -> None:
+        """Aktualisiert die Farben eines Posts (löscht alte, fügt neue hinzu)."""
+        try:
+            # Alte Farben löschen
+            self.sb.table("post_color").delete().eq("post_id", post_id).execute()
+            
+            # Neue Farben hinzufügen
+            for color_id in color_ids:
+                self.sb.table("post_color").insert({
+                    "post_id": post_id,
+                    "color_id": color_id,
+                }).execute()
+        except Exception as ex:
+            print(f"Fehler beim Aktualisieren der Farben für Post {post_id}: {ex}")
+    
     def add_photo(self, post_id: str, photo_url: str) -> None:
         # Speichert eine Foto-URL für einen Post.
         try:

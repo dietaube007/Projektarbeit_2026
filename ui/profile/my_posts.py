@@ -7,7 +7,7 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from ui.theme import soft_card
-from ui.constants import STATUS_COLORS, SPECIES_COLORS
+from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
 
 
 def _show_post_details(page: ft.Page, post: dict) -> None:
@@ -258,7 +258,7 @@ def build_my_post_card(
             ft.IconButton(
                 icon=ft.Icons.EDIT_OUTLINED,
                 icon_size=20,
-                icon_color=ft.Colors.BLUE_600,
+                icon_color=PRIMARY_COLOR,
                 tooltip="Bearbeiten",
                 on_click=lambda e, p=post: on_edit(p) if on_edit else None,
             ),
