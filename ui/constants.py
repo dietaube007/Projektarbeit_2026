@@ -33,13 +33,61 @@ SPECIES_COLORS: dict[str, str] = {
 }
 
 # ══════════════════════════════════════════════════════════════════════
+# FENSTERGRÖSSEN
+# ══════════════════════════════════════════════════════════════════════
+
+WINDOW_MIN_WIDTH = 420
+"""Minimale Fensterbreite in Pixeln."""
+
+WINDOW_DEFAULT_WIDTH = 1100
+"""Standard-Fensterbreite in Pixeln."""
+
+WINDOW_DEFAULT_HEIGHT = 820
+"""Standard-Fensterhöhe in Pixeln."""
+
+# ══════════════════════════════════════════════════════════════════════
 # GRÖSSSEN UND LIMITS
 # ══════════════════════════════════════════════════════════════════════
 
 MAX_POSTS_LIMIT = 30
+"""Maximale Anzahl von Posts die auf einmal geladen werden."""
+
+DEFAULT_POSTS_LIMIT = 200
+"""Standard-Limit für Post-Abfragen in der Datenbank."""
+
 CARD_IMAGE_HEIGHT = 160
+"""Höhe von Bildern in Karten-Ansicht (Grid)."""
+
 LIST_IMAGE_HEIGHT = 220
+"""Höhe von Bildern in Listen-Ansicht."""
+
 DIALOG_IMAGE_HEIGHT = 280
+"""Höhe von Bildern in Detail-Dialogen."""
+
+# ══════════════════════════════════════════════════════════════════════
+# TEXT-LÄNGEN-LIMITS
+# ══════════════════════════════════════════════════════════════════════
+
+MAX_HEADLINE_LENGTH = 200
+"""Maximale Länge für Post-Überschrift/Name."""
+
+MAX_DESCRIPTION_LENGTH = 2000
+"""Maximale Länge für Post-Beschreibung."""
+
+MAX_LOCATION_LENGTH = 200
+"""Maximale Länge für Ortsangabe."""
+
+MAX_DISPLAY_NAME_LENGTH = 50
+"""Maximale Länge für Anzeigename (Profil)."""
+
+MAX_SEARCH_QUERY_LENGTH = 200
+"""Maximale Länge für Suchbegriffe."""
+
+MIN_DESCRIPTION_LENGTH = 10
+"""Minimale Länge für Post-Beschreibung."""
+
+TRUNCATE_TEXT_LENGTH = 100
+"""Standard-Länge für Text-Kürzung in Vorschauen."""
 
 # ══════════════════════════════════════════════════════════════════════
 # PLATZHALTER

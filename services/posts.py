@@ -13,6 +13,7 @@ from __future__ import annotations
 from supabase import Client
 from typing import Dict, Any, List, Optional
 from utils.logging_config import get_logger
+from ui.constants import DEFAULT_POSTS_LIMIT
 
 logger = get_logger(__name__)
 
@@ -179,7 +180,7 @@ class PostService:
             logger.error(f"Fehler beim Laden des Posts {post_id}: {ex}", exc_info=True)
             return None
     
-    def get_all(self, limit: int = 200) -> List[Dict[str, Any]]:
+    def get_all(self, limit: int = DEFAULT_POSTS_LIMIT) -> List[Dict[str, Any]]:
         """Holt alle Posts mit Relationen.
 
         Args:

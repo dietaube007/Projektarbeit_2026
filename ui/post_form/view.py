@@ -26,6 +26,12 @@ from ui.components import (
     show_error_dialog,
     show_validation_dialog,
 )
+from ui.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MAX_LOCATION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+)
 
 logger = get_logger(__name__)
 
@@ -287,9 +293,9 @@ class PostForm:
         if not name_valid:
             errors.append(f"• {name_error}")
         else:
-            # Länge prüfen (max. 200 Zeichen)
+            # Länge prüfen (max. MAX_HEADLINE_LENGTH Zeichen)
             name_length_valid, name_length_error = validate_length(
-                self.name_tf.value, max_length=200, field_name="Name/Überschrift"
+                self.name_tf.value, max_length=MAX_HEADLINE_LENGTH, field_name="Name/Überschrift"
             )
             if not name_length_valid:
                 errors.append(f"• {name_length_error}")
@@ -310,9 +316,9 @@ class PostForm:
         if not desc_valid:
             errors.append(f"• {desc_error}")
         else:
-            # Beschreibung sollte mindestens 10 Zeichen haben
+            # Beschreibung sollte mindestens MIN_DESCRIPTION_LENGTH Zeichen haben
             desc_length_valid, desc_length_error = validate_length(
-                self.info_tf.value, min_length=10, max_length=2000, field_name="Beschreibung"
+                self.info_tf.value, min_length=MIN_DESCRIPTION_LENGTH, max_length=MAX_DESCRIPTION_LENGTH, field_name="Beschreibung"
             )
             if not desc_length_valid:
                 errors.append(f"• {desc_length_error}")
@@ -322,9 +328,9 @@ class PostForm:
         if not location_valid:
             errors.append(f"• {location_error}")
         else:
-            # Ort sollte max. 200 Zeichen haben
+            # Ort sollte max. MAX_LOCATION_LENGTH Zeichen haben
             location_length_valid, location_length_error = validate_length(
-                self.location_tf.value, max_length=200, field_name="Ort"
+                self.location_tf.value, max_length=MAX_LOCATION_LENGTH, field_name="Ort"
             )
             if not location_length_valid:
                 errors.append(f"• {location_length_error}")
@@ -373,9 +379,9 @@ class PostForm:
             self._show_status("⏳ Erstelle Meldung...", is_loading=True)
             
             # Input sanitizen vor dem Speichern
-            headline = sanitize_string(self.name_tf.value, max_length=200)
-            description = sanitize_string(self.info_tf.value, max_length=2000)
-            location = sanitize_string(self.location_tf.value, max_length=200)
+            headline = sanitize_string(self.name_tf.value, max_length=MAX_HEADLINE_LENGTH)
+            description = sanitize_string(self.info_tf.value, max_length=MAX_DESCRIPTION_LENGTH)
+            location = sanitize_string(self.location_tf.value, max_length=MAX_LOCATION_LENGTH)
             
             post_data = {
                 "user_id": user_id,

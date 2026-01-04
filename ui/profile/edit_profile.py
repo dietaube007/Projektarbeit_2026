@@ -7,6 +7,7 @@ import flet as ft
 
 from ui.theme import soft_card
 from .components import build_section_title, SECTION_PADDING, CARD_ELEVATION
+from ui.constants import MAX_DISPLAY_NAME_LENGTH
 from utils.logging_config import get_logger
 from utils.validators import validate_not_empty, validate_length, sanitize_string, validate_email
 
@@ -117,15 +118,15 @@ async def update_display_name(sb, user_id: str, new_name: str) -> bool:
         logger.warning(f"Ungültiger Anzeigename: {name_error}")
         return False
     
-    # Länge validieren (max. 50 Zeichen)
-    length_valid, length_error = validate_length(new_name, max_length=50, field_name="Anzeigename")
+    # Länge validieren (max. MAX_DISPLAY_NAME_LENGTH Zeichen)
+    length_valid, length_error = validate_length(new_name, max_length=MAX_DISPLAY_NAME_LENGTH, field_name="Anzeigename")
     if not length_valid:
         logger.warning(f"Anzeigename zu lang: {length_error}")
         return False
     
     try:
         # Input sanitizen
-        sanitized_name = sanitize_string(new_name, max_length=50)
+        sanitized_name = sanitize_string(new_name, max_length=MAX_DISPLAY_NAME_LENGTH)
         sb.table("user").update({"display_name": sanitized_name}).eq("id", user_id).execute()
         return True
     except Exception as e:

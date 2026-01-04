@@ -20,6 +20,11 @@ from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
 from ui.auth import AuthView
+from ui.constants import (
+    WINDOW_MIN_WIDTH,
+    WINDOW_DEFAULT_WIDTH,
+    WINDOW_DEFAULT_HEIGHT,
+)
 
 from app.dialogs import (
     create_login_required_dialog,
@@ -67,9 +72,9 @@ class PetBuddyApp:
             self.page.title = "PetBuddy"
             self.page.padding = 0
             self.page.scroll = ft.ScrollMode.ADAPTIVE
-            self.page.window_min_width = 420
-            self.page.window_width = 1100
-            self.page.window_height = 820
+            self.page.window_min_width = WINDOW_MIN_WIDTH
+            self.page.window_width = WINDOW_DEFAULT_WIDTH
+            self.page.window_height = WINDOW_DEFAULT_HEIGHT
             
             # Theme anwenden
             self.theme_manager = ThemeManager(self.page)

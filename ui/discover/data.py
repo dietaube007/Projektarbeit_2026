@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional, Dict, List, Set, Any
 from utils.logging_config import get_logger
+from ui.constants import MAX_SEARCH_QUERY_LENGTH
 
 logger = get_logger(__name__)
 
@@ -102,8 +103,8 @@ def filter_by_search(items: List[Dict[str, Any]], search_query: str) -> List[Dic
         logger.warning(f"Ungültiger Suchbegriff-Typ: {type(search_query)}")
         return items
     
-    # Sanitize: Whitespace normalisieren, max. 200 Zeichen
-    q = " ".join(search_query.split())[:200].lower()
+    # Sanitize: Whitespace normalisieren, max. MAX_SEARCH_QUERY_LENGTH Zeichen
+    q = " ".join(search_query.split())[:MAX_SEARCH_QUERY_LENGTH].lower()
     
     if not q:
         return items
