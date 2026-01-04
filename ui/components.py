@@ -2,8 +2,10 @@
 Wiederverwendbare UI-Komponenten.
 """
 
+from __future__ import annotations
+
 import flet as ft
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 from ui.constants import STATUS_COLORS, SPECIES_COLORS
 
@@ -15,11 +17,19 @@ from ui.constants import STATUS_COLORS, SPECIES_COLORS
 def show_login_required_dialog(
     page: ft.Page,
     message: str,
-    on_login: Callable,
-    on_cancel: Optional[Callable] = None,
+    on_login: Callable[[], None],
+    on_cancel: Optional[Callable[[], None]] = None,
     title: str = "Anmeldung erforderlich"
-):
-    """Zeigt einen Dialog wenn Login erforderlich ist."""
+) -> None:
+    """Zeigt einen Dialog wenn Login erforderlich ist.
+    
+    Args:
+        page: Flet Page-Instanz
+        message: Nachricht die angezeigt werden soll
+        on_login: Callback-Funktion für Login-Button
+        on_cancel: Optionaler Callback für Abbrechen-Button
+        title: Titel des Dialogs (Standard: "Anmeldung erforderlich")
+    """
     def handle_login(e):
         page.close(dialog)
         on_login()
@@ -47,12 +57,22 @@ def show_confirm_dialog(
     page: ft.Page,
     title: str,
     message: str,
-    on_confirm: Callable,
-    on_cancel: Optional[Callable] = None,
+    on_confirm: Callable[[], None],
+    on_cancel: Optional[Callable[[], None]] = None,
     confirm_text: str = "Bestätigen",
     cancel_text: str = "Abbrechen"
-):
-    """Zeigt einen Bestätigungs-Dialog."""
+) -> None:
+    """Zeigt einen Bestätigungs-Dialog.
+    
+    Args:
+        page: Flet Page-Instanz
+        title: Titel des Dialogs
+        message: Nachricht die angezeigt werden soll
+        on_confirm: Callback-Funktion für Bestätigen-Button
+        on_cancel: Optionaler Callback für Abbrechen-Button
+        confirm_text: Text für Bestätigen-Button (Standard: "Bestätigen")
+        cancel_text: Text für Abbrechen-Button (Standard: "Abbrechen")
+    """
     def handle_confirm(e):
         page.close(dialog)
         on_confirm()
@@ -80,8 +100,16 @@ def show_confirm_dialog(
 # BADGES
 # ══════════════════════════════════════════════════════════════════════
 
-def status_badge(text: str, bgcolor: str = None) -> ft.Container:
-    """Erstellt ein Status-Badge."""
+def status_badge(text: str, bgcolor: Optional[str] = None) -> ft.Container:
+    """Erstellt ein Status-Badge.
+    
+    Args:
+        text: Badge-Text
+        bgcolor: Optionaler Hintergrundfarbe (Standard: aus STATUS_COLORS)
+    
+    Returns:
+        Container mit Status-Badge
+    """
     if bgcolor is None:
         bgcolor = STATUS_COLORS.get(text.lower(), ft.Colors.GREY_300)
     
@@ -93,8 +121,16 @@ def status_badge(text: str, bgcolor: str = None) -> ft.Container:
     )
 
 
-def species_badge(text: str, bgcolor: str = None) -> ft.Container:
-    """Erstellt ein Tierart-Badge."""
+def species_badge(text: str, bgcolor: Optional[str] = None) -> ft.Container:
+    """Erstellt ein Tierart-Badge.
+    
+    Args:
+        text: Badge-Text
+        bgcolor: Optionaler Hintergrundfarbe (Standard: aus SPECIES_COLORS)
+    
+    Returns:
+        Container mit Tierart-Badge
+    """
     if bgcolor is None:
         bgcolor = SPECIES_COLORS.get(text.lower(), ft.Colors.GREY_300)
     
@@ -111,7 +147,15 @@ def species_badge(text: str, bgcolor: str = None) -> ft.Container:
 # ══════════════════════════════════════════════════════════════════════
 
 def image_placeholder(height: int = 160, icon_size: int = 48) -> ft.Container:
-    """Erstellt einen Bild-Platzhalter."""
+    """Erstellt einen Bild-Platzhalter.
+    
+    Args:
+        height: Höhe des Platzhalters (Standard: 160)
+        icon_size: Größe des Platzhalter-Icons (Standard: 48)
+    
+    Returns:
+        Container mit Platzhalter-Icon
+    """
     return ft.Container(
         content=ft.Icon(ft.Icons.PETS, size=icon_size, color=ft.Colors.GREY_400),
         height=height,
@@ -125,8 +169,15 @@ def image_placeholder(height: int = 160, icon_size: int = 48) -> ft.Container:
 # BANNER
 # ══════════════════════════════════════════════════════════════════════
 
-def login_banner(on_login_click: Callable) -> ft.Container:
-    """Erstellt ein Login-Banner für nicht eingeloggte Benutzer."""
+def login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
+    """Erstellt ein Login-Banner für nicht eingeloggte Benutzer.
+    
+    Args:
+        on_login_click: Callback-Funktion für Login-Button-Klick
+    
+    Returns:
+        Container mit Login-Banner
+    """
     return ft.Container(
         content=ft.Row(
             [
@@ -161,10 +212,21 @@ def empty_state(
     icon: str,
     title: str,
     subtitle: str = "",
-    action_text: str = None,
-    on_action: Callable = None
+    action_text: Optional[str] = None,
+    on_action: Optional[Callable[[ft.ControlEvent], None]] = None
 ) -> ft.Column:
-    """Erstellt eine Leere-Zustand-Anzeige."""
+    """Erstellt eine Leere-Zustand-Anzeige.
+    
+    Args:
+        icon: Icon-Name für die Anzeige
+        title: Titel-Text
+        subtitle: Optionaler Untertitel-Text
+        action_text: Optionaler Text für Aktions-Button
+        on_action: Optionaler Callback für Aktions-Button
+    
+    Returns:
+        Column mit Leere-Zustand-Komponente
+    """
     controls = [
         ft.Container(height=40),
         ft.Icon(icon, size=64, color=ft.Colors.GREY_400),

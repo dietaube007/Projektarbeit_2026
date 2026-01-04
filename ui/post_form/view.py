@@ -14,6 +14,13 @@ import flet as ft
 from services.references import ReferenceService
 from services.posts import PostService
 from utils.logging_config import get_logger
+from utils.validators import (
+    validate_not_empty,
+    validate_length,
+    validate_date_format,
+    validate_list_not_empty,
+    sanitize_string,
+)
 
 logger = get_logger(__name__)
 
@@ -334,35 +341,78 @@ class PostForm:
     async def _save_post(self, _=None):
         """Speichert die Meldung in der Datenbank."""
         
-        # Validierung
+        # Validierung mit zentralen Validatoren
         errors = []
-        if not self.name_tf.value or not self.name_tf.value.strip():
-            errors.append("• Name/Überschrift")
+        
+        # Name/Überschrift validieren
+        name_valid, name_error = validate_not_empty(self.name_tf.value, "Name/Überschrift")
+        if not name_valid:
+            errors.append(f"• {name_error}")
+        else:
+            # Länge prüfen (max. 200 Zeichen)
+            name_length_valid, name_length_error = validate_length(
+                self.name_tf.value, max_length=200, field_name="Name/Überschrift"
+            )
+            if not name_length_valid:
+                errors.append(f"• {name_length_error}")
+        
+        # Tierart validieren
         if not self.species_dd.value:
-            errors.append("• Tierart")
-        if not self.selected_farben:
-            errors.append("• Mindestens eine Farbe")
-        if not self.info_tf.value or not self.info_tf.value.strip():
-            errors.append("• Beschreibung")
-        if not self.location_tf.value or not self.location_tf.value.strip():
-            errors.append("• Ort")
-        if not self.date_tf.value or not self.date_tf.value.strip():
-            errors.append("• Datum")
+            errors.append("• Tierart ist erforderlich")
+        
+        # Farben validieren
+        colors_valid, colors_error = validate_list_not_empty(
+            self.selected_farben, "Farben", min_items=1
+        )
+        if not colors_valid:
+            errors.append(f"• {colors_error}")
+        
+        # Beschreibung validieren
+        desc_valid, desc_error = validate_not_empty(self.info_tf.value, "Beschreibung")
+        if not desc_valid:
+            errors.append(f"• {desc_error}")
+        else:
+            # Beschreibung sollte mindestens 10 Zeichen haben
+            desc_length_valid, desc_length_error = validate_length(
+                self.info_tf.value, min_length=10, max_length=2000, field_name="Beschreibung"
+            )
+            if not desc_length_valid:
+                errors.append(f"• {desc_length_error}")
+        
+        # Ort validieren
+        location_valid, location_error = validate_not_empty(self.location_tf.value, "Ort")
+        if not location_valid:
+            errors.append(f"• {location_error}")
+        else:
+            # Ort sollte max. 200 Zeichen haben
+            location_length_valid, location_length_error = validate_length(
+                self.location_tf.value, max_length=200, field_name="Ort"
+            )
+            if not location_length_valid:
+                errors.append(f"• {location_length_error}")
+        
+        # Datum validieren
+        date_valid, date_error = validate_date_format(self.date_tf.value, DATE_FORMAT)
+        if not date_valid:
+            errors.append(f"• {date_error}")
+        
+        # Foto validieren
         if not self.selected_photo.get("url"):
-            errors.append("• Foto")
+            errors.append("• Foto ist erforderlich")
         
         if errors:
             self._show_validation_dialog(
                 "Pflichtfelder fehlen",
-                "Bitte fülle folgende Felder aus:",
+                "Bitte korrigiere folgende Fehler:",
                 errors
             )
             return
         
-        # Datum parsen
+        # Datum parsen (nach Validierung)
         try:
             event_date = datetime.strptime(self.date_tf.value.strip(), DATE_FORMAT).date()
         except ValueError:
+            # Sollte nicht passieren nach Validierung, aber als Fallback
             self._show_validation_dialog(
                 "Ungültiges Format",
                 "Das Datum hat ein falsches Format.",
@@ -384,16 +434,21 @@ class PostForm:
         try:
             self._show_status("⏳ Erstelle Meldung...", is_loading=True)
             
+            # Input sanitizen vor dem Speichern
+            headline = sanitize_string(self.name_tf.value, max_length=200)
+            description = sanitize_string(self.info_tf.value, max_length=2000)
+            location = sanitize_string(self.location_tf.value, max_length=200)
+            
             post_data = {
                 "user_id": user_id,
                 "post_status_id": int(list(self.meldungsart.selected)[0]),
-                "headline": self.name_tf.value.strip(),
-                "description": self.info_tf.value.strip(),
+                "headline": headline,
+                "description": description,
                 "species_id": int(self.species_dd.value),
                 "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != NO_SELECTION_VALUE else None,
                 "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != NO_SELECTION_VALUE else None,
                 "event_date": event_date.isoformat(),
-                "location_text": self.location_tf.value.strip(),
+                "location_text": location,
             }
             
             new_post = self.post_service.create(post_data)

@@ -8,6 +8,7 @@ import flet as ft
 from ui.theme import soft_card
 from .components import build_section_title, SECTION_PADDING, CARD_ELEVATION
 from utils.logging_config import get_logger
+from utils.validators import validate_not_empty, validate_length, sanitize_string, validate_email
 
 logger = get_logger(__name__)
 
@@ -100,9 +101,32 @@ def build_password_section(on_reset=None) -> ft.Container:
 
 
 async def update_display_name(sb, user_id: str, new_name: str) -> bool:
-    """Aktualisiert den Anzeigenamen in der Datenbank."""
+    """Aktualisiert den Anzeigenamen in der Datenbank.
+    
+    Args:
+        sb: Supabase Client-Instanz
+        user_id: ID des Benutzers
+        new_name: Neuer Anzeigename
+    
+    Returns:
+        True bei Erfolg, False bei Fehler
+    """
+    # Validierung
+    name_valid, name_error = validate_not_empty(new_name, "Anzeigename")
+    if not name_valid:
+        logger.warning(f"Ungültiger Anzeigename: {name_error}")
+        return False
+    
+    # Länge validieren (max. 50 Zeichen)
+    length_valid, length_error = validate_length(new_name, max_length=50, field_name="Anzeigename")
+    if not length_valid:
+        logger.warning(f"Anzeigename zu lang: {length_error}")
+        return False
+    
     try:
-        sb.table("user").update({"display_name": new_name}).eq("id", user_id).execute()
+        # Input sanitizen
+        sanitized_name = sanitize_string(new_name, max_length=50)
+        sb.table("user").update({"display_name": sanitized_name}).eq("id", user_id).execute()
         return True
     except Exception as e:
         logger.error(f"Fehler beim Aktualisieren des Namens (User {user_id}): {e}", exc_info=True)
@@ -110,9 +134,25 @@ async def update_display_name(sb, user_id: str, new_name: str) -> bool:
 
 
 async def send_password_reset(sb, email: str) -> bool:
-    """Sendet eine Passwort-Zurücksetzen-E-Mail."""
+    """Sendet eine Passwort-Zurücksetzen-E-Mail.
+    
+    Args:
+        sb: Supabase Client-Instanz
+        email: E-Mail-Adresse des Benutzers
+    
+    Returns:
+        True bei Erfolg, False bei Fehler
+    """
+    # E-Mail validieren
+    email_valid, email_error = validate_email(email)
+    if not email_valid:
+        logger.warning(f"Ungültige E-Mail-Adresse: {email_error}")
+        return False
+    
     try:
-        sb.auth.reset_password_email(email)
+        # E-Mail normalisieren (lowercase)
+        normalized_email = email.strip().lower()
+        sb.auth.reset_password_email(normalized_email)
         return True
     except Exception as e:
         logger.error(f"Fehler beim Senden der Reset-E-Mail ({email}): {e}", exc_info=True)

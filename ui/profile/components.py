@@ -3,7 +3,10 @@ ui/profile/components.py
 Gemeinsame UI-Komponenten für die Profil-Ansicht.
 """
 
+from __future__ import annotations
+
 import flet as ft
+from typing import Callable, Optional
 
 from ui.constants import PRIMARY_COLOR
 
@@ -12,8 +15,15 @@ SECTION_PADDING: int = 20
 CARD_ELEVATION: int = 2
 
 
-def build_back_button(on_click) -> ft.Container:
-    """Erstellt einen Zurück-Button."""
+def build_back_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
+    """Erstellt einen Zurück-Button.
+    
+    Args:
+        on_click: Callback-Funktion für Button-Klick
+    
+    Returns:
+        Container mit Zurück-Button
+    """
     return ft.Container(
         content=ft.TextButton(
             "← Zurück",
@@ -24,17 +34,34 @@ def build_back_button(on_click) -> ft.Container:
 
 
 def build_section_title(title: str) -> ft.Text:
-    """Erstellt einen Abschnitts-Titel."""
+    """Erstellt einen Abschnitts-Titel.
+    
+    Args:
+        title: Titel-Text
+    
+    Returns:
+        Text-Widget mit formatiertem Titel
+    """
     return ft.Text(title, size=18, weight=ft.FontWeight.W_600)
 
 
 def build_setting_row(
-    icon,
+    icon: str,
     title: str,
     subtitle: str,
     control: ft.Control,
 ) -> ft.Row:
-    """Erstellt eine Einstellungs-Zeile. """
+    """Erstellt eine Einstellungs-Zeile.
+    
+    Args:
+        icon: Icon-Name
+        title: Titel-Text
+        subtitle: Untertitel-Text
+        control: Control-Widget für die Einstellung
+    
+    Returns:
+        Row mit Einstellungs-Zeile
+    """
     return ft.Row(
         [
             ft.Icon(icon, color=PRIMARY_COLOR),
@@ -56,9 +83,19 @@ def build_menu_item(
     icon: str,
     title: str,
     subtitle: str = "",
-    on_click=None,
+    on_click: Optional[Callable[[ft.ControlEvent], None]] = None,
 ) -> ft.Container:
-    """Erstellt einen Menüpunkt."""
+    """Erstellt einen Menüpunkt.
+    
+    Args:
+        icon: Icon-Name
+        title: Titel-Text
+        subtitle: Optionaler Untertitel-Text
+        on_click: Optionaler Callback für Klick
+    
+    Returns:
+        Container mit Menüpunkt
+    """
     return ft.Container(
         content=ft.Row(
             [
@@ -89,8 +126,15 @@ def build_menu_item(
     )
 
 
-def build_logout_button(on_click) -> ft.Container:
-    """Erstellt den Logout-Button."""
+def build_logout_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
+    """Erstellt den Logout-Button.
+    
+    Args:
+        on_click: Callback-Funktion für Button-Klick
+    
+    Returns:
+        Container mit Logout-Button
+    """
     return ft.Container(
         content=ft.OutlinedButton(
             "Abmelden",
@@ -108,7 +152,14 @@ def build_logout_button(on_click) -> ft.Container:
 
 
 def build_avatar(display_name: str = "") -> ft.CircleAvatar:
-    """Erstellt einen Avatar."""
+    """Erstellt einen Avatar.
+    
+    Args:
+        display_name: Optionaler Anzeigename (aktuell nicht verwendet)
+    
+    Returns:
+        CircleAvatar mit Standard-Icon
+    """
     # Falls Name vorhanden, könnten wir Initialen anzeigen
     # Für jetzt: Standard-Icon
     return ft.CircleAvatar(
@@ -123,7 +174,14 @@ def build_avatar(display_name: str = "") -> ft.CircleAvatar:
 
 
 def loading_indicator(text: str = "Lädt...") -> ft.Row:
-    """Erstellt einen Lade-Indikator."""
+    """Erstellt einen Lade-Indikator.
+    
+    Args:
+        text: Optionaler Text neben dem Indikator (Standard: "Lädt...")
+    
+    Returns:
+        Row mit ProgressRing und Text
+    """
     return ft.Row(
         [
             ft.ProgressRing(width=24, height=24),

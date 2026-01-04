@@ -5,7 +5,9 @@ Enthält Funktionen zum Erstellen von kleinen und großen Meldungskarten
 sowie den Detail-Dialog.
 """
 
-from typing import Callable, Optional
+from __future__ import annotations
+
+from typing import Callable, Optional, Dict, Any
 import flet as ft
 
 from ui.theme import soft_card, chip
@@ -18,7 +20,14 @@ from ui.helpers import extract_item_data
 
 
 def badge_for_typ(typ: str) -> ft.Control:
-    """Erstellt ein Badge für den Meldungstyp (Vermisst/Fundtier)."""
+    """Erstellt ein Badge für den Meldungstyp (Vermisst/Fundtier).
+    
+    Args:
+        typ: Meldungstyp (z.B. "Vermisst", "Fundtier")
+    
+    Returns:
+        Control-Widget mit Badge für den Typ
+    """
     typ_lower = (typ or "").lower().strip()
     color = STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
     label = typ.capitalize() if typ else "Unbekannt"
@@ -26,15 +35,30 @@ def badge_for_typ(typ: str) -> ft.Control:
 
 
 def badge_for_species(species: str) -> ft.Control:
-    """Erstellt ein Badge für die Tierart."""
+    """Erstellt ein Badge für die Tierart.
+    
+    Args:
+        species: Tierart (z.B. "Hund", "Katze")
+    
+    Returns:
+        Control-Widget mit Badge für die Tierart
+    """
     species_lower = (species or "").lower().strip()
     color = SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
     label = species.capitalize() if species else "Unbekannt"
     return chip(label, color)
 
 
-def meta_row(icon, text: str) -> ft.Control:
-    """Erstellt eine Zeile mit Icon und Text für Metadaten."""
+def meta_row(icon: str, text: str) -> ft.Control:
+    """Erstellt eine Zeile mit Icon und Text für Metadaten.
+    
+    Args:
+        icon: Icon-Name (z.B. ft.Icons.LOCATION_ON)
+        text: Anzuzeigender Text
+    
+    Returns:
+        Row-Widget mit Icon und Text
+    """
     return ft.Row(
         [
             ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -45,7 +69,15 @@ def meta_row(icon, text: str) -> ft.Control:
 
 
 def image_placeholder(height: int, icon_size: int = 50) -> ft.Container:
-    """Erstellt einen Platzhalter für fehlende Bilder."""
+    """Erstellt einen Platzhalter für fehlende Bilder.
+    
+    Args:
+        height: Höhe des Platzhalters
+        icon_size: Größe des Platzhalter-Icons (Standard: 50)
+    
+    Returns:
+        Container mit Platzhalter-Icon
+    """
     return ft.Container(
         height=height,
         bgcolor=ft.Colors.GREY_200,
@@ -56,12 +88,22 @@ def image_placeholder(height: int, icon_size: int = 50) -> ft.Container:
 
 
 def build_small_card(
-    item: dict,
+    item: Dict[str, Any],
     page: ft.Page,
-    on_favorite_click: Callable,
-    on_card_click: Callable
+    on_favorite_click: Callable[[Dict[str, Any], ft.Control], None],
+    on_card_click: Callable[[Dict[str, Any]], None]
 ) -> ft.Control:
-    """Erstellt eine kleine Kachel-Karte für die Grid-Ansicht."""
+    """Erstellt eine kleine Kachel-Karte für die Grid-Ansicht.
+    
+    Args:
+        item: Post-Dictionary mit allen Daten
+        page: Flet Page-Instanz
+        on_favorite_click: Callback (item, control) für Favoriten-Toggle
+        on_card_click: Callback (item) für Karten-Klick
+    
+    Returns:
+        Container mit kleiner Karten-Komponente
+    """
     data = extract_item_data(item)
 
     visual_content = (
@@ -120,13 +162,24 @@ def build_small_card(
 
 
 def build_big_card(
-    item: dict,
+    item: Dict[str, Any],
     page: ft.Page,
-    on_favorite_click: Callable,
-    on_card_click: Callable,
-    on_contact_click: Optional[Callable] = None
+    on_favorite_click: Callable[[Dict[str, Any], ft.Control], None],
+    on_card_click: Callable[[Dict[str, Any]], None],
+    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None
 ) -> ft.Control:
-    """Erstellt eine große Listen-Karte für die Listen-Ansicht."""
+    """Erstellt eine große Listen-Karte für die Listen-Ansicht.
+    
+    Args:
+        item: Post-Dictionary mit allen Daten
+        page: Flet Page-Instanz
+        on_favorite_click: Callback (item, control) für Favoriten-Toggle
+        on_card_click: Callback (item) für Karten-Klick
+        on_contact_click: Optionaler Callback (item) für Kontakt-Button
+    
+    Returns:
+        Container mit großer Karten-Komponente
+    """
     data = extract_item_data(item)
 
     visual_content = (
@@ -209,10 +262,16 @@ def build_big_card(
 
 def show_detail_dialog(
     page: ft.Page,
-    item: dict,
-    on_contact_click: Optional[Callable] = None
-):
-    """Zeigt den Detail-Dialog für eine Meldung."""
+    item: Dict[str, Any],
+    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None
+) -> None:
+    """Zeigt den Detail-Dialog für eine Meldung.
+    
+    Args:
+        page: Flet Page-Instanz
+        item: Post-Dictionary mit allen Daten
+        on_contact_click: Optionaler Callback (item) für Kontakt-Button
+    """
     data = extract_item_data(item)
 
     visual = (
