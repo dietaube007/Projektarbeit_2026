@@ -5,8 +5,9 @@ Discover-View mit Listen- und Kartendarstellung (refaktoriert).
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any, List
 import flet as ft
+from supabase import Client
 
 from ui.theme import soft_card, chip
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, MAX_POSTS_LIMIT, DEFAULT_PLACEHOLDER
@@ -45,11 +46,11 @@ class DiscoverView:
     def __init__(
         self,
         page: ft.Page,
-        sb,
-        on_contact_click: Optional[Callable] = None,
-        on_melden_click: Optional[Callable] = None,
-        on_login_required: Optional[Callable] = None,
-    ):
+        sb: Client,
+        on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_melden_click: Optional[Callable[[], None]] = None,
+        on_login_required: Optional[Callable[[], None]] = None,
+    ) -> None:
         self.page = page
         self.sb = sb
         self.on_contact_click = on_contact_click
@@ -89,7 +90,7 @@ class DiscoverView:
             pass
         return None
 
-    def refresh_user(self):
+    def refresh_user(self) -> None:
         """Kann von außen (z.B. nach Login) aufgerufen werden."""
         self.current_user_id = self._get_current_user_id()
 
@@ -97,7 +98,7 @@ class DiscoverView:
     # INIT UI
     # ──────────────────────────────────────────────────────────────────
 
-    def _init_ui_elements(self):
+    def _init_ui_elements(self) -> None:
         # Suche
         self.search_q = create_search_field(
             on_change=lambda _: self.page.run_task(self.load_posts)
@@ -181,7 +182,7 @@ class DiscoverView:
             pad=24,
         )
 
-    def _on_view_change(self, e: ft.ControlEvent):
+    def _on_view_change(self, e: ft.ControlEvent) -> None:
         val = next(iter(e.control.selected), "list")
         self.view_mode = val
         self._render_items(self.current_items)
@@ -233,11 +234,11 @@ class DiscoverView:
         except Exception as ex:
             logger.error(f"Fehler beim Laden der Referenzen: {ex}", exc_info=True)
 
-    def _on_tierart_change(self, e: ft.ControlEvent):
+    def _on_tierart_change(self, e: ft.ControlEvent) -> None:
         self._update_rassen_dropdown()
         self.page.run_task(self.load_posts)
 
-    def _update_rassen_dropdown(self):
+    def _update_rassen_dropdown(self) -> None:
         self.filter_rasse.options = [ft.dropdown.Option("alle", "Alle")]
         try:
             if self.filter_art.value and self.filter_art.value != "alle":
@@ -261,7 +262,7 @@ class DiscoverView:
 
         self.page.update()
 
-    def _toggle_farben_panel(self, _=None):
+    def _toggle_farben_panel(self, _: Optional[ft.ControlEvent] = None) -> None:
         self.farben_panel_visible = not self.farben_panel_visible
         self.farben_panel.visible = self.farben_panel_visible
         self.farben_toggle_icon.name = (
@@ -273,7 +274,7 @@ class DiscoverView:
     # FAVORITEN
     # ──────────────────────────────────────────────────────────────────
 
-    def _toggle_favorite(self, item: dict, icon_button: ft.IconButton):
+    def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
         """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""
         self.refresh_user()
 
@@ -323,7 +324,7 @@ class DiscoverView:
     # DATEN LADEN
     # ──────────────────────────────────────────────────────────────────
 
-    async def load_posts(self, _=None):
+    async def load_posts(self, _: Optional[ft.ControlEvent] = None) -> None:
         """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen + Favoritenstatus."""
         loading_indicator = ft.Container(
             content=ft.Column(
@@ -381,7 +382,7 @@ class DiscoverView:
             self.grid_view.visible = False
             self.page.update()
 
-    def _render_items(self, items: list[dict]):
+    def _render_items(self, items: List[Dict[str, Any]]) -> None:
         if not items:
             no_results = soft_card(
                 ft.Column(
@@ -434,7 +435,7 @@ class DiscoverView:
 
         self.page.update()
 
-    def _show_detail_dialog(self, item: dict):
+    def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
         """Wrapper-Methode für den Detail-Dialog."""
         show_detail_dialog(
             item=item,
@@ -446,7 +447,7 @@ class DiscoverView:
     # FILTER RESET
     # ──────────────────────────────────────────────────────────────────
 
-    def _reset_filters(self, _=None):
+    def _reset_filters(self, _: Optional[ft.ControlEvent] = None) -> None:
         self.search_q.value = ""
         self.filter_typ.value = "alle"
         self.filter_art.value = "alle"

@@ -7,6 +7,8 @@ Enthält Funktionen zum Erstellen von:
 - Login-Banner für Gäste
 """
 
+from __future__ import annotations
+
 from typing import Callable
 
 import flet as ft
@@ -15,8 +17,8 @@ import flet as ft
 def create_login_required_dialog(
     page: ft.Page,
     target_tab: int,
-    on_login_click: Callable,
-    on_cancel_click: Callable
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog für nicht eingeloggte Benutzer."""
     tab_name = "Melden" if target_tab == 1 else "Profil"
@@ -40,8 +42,8 @@ def create_login_required_dialog(
 
 def create_favorite_login_dialog(
     page: ft.Page,
-    on_login_click: Callable,
-    on_cancel_click: Callable
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog wenn Gast auf Favorit klickt."""
     return ft.AlertDialog(
@@ -58,7 +60,7 @@ def create_favorite_login_dialog(
     )
 
 
-def create_login_banner(on_login_click: Callable) -> ft.Container:
+def create_login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
     """Erstellt ein Banner für nicht eingeloggte Benutzer."""
     return ft.Container(
         content=ft.Row(

@@ -6,6 +6,8 @@ Enthält Funktionen zum Erstellen von:
 - AppBar (Top Bar)
 """
 
+from __future__ import annotations
+
 from typing import Callable, List
 
 import flet as ft
@@ -19,7 +21,7 @@ TAB_PROFIL = 2
 
 def create_navigation_bar(
     current_tab: int,
-    on_change: Callable
+    on_change: Callable[[ft.ControlEvent], None]
 ) -> ft.NavigationBar:
     """Erstellt die Navigationsleiste."""
     return ft.NavigationBar(
@@ -46,7 +48,7 @@ def create_navigation_bar(
 
 def create_app_bar(
     is_logged_in: bool,
-    on_logout: Callable,
+    on_logout: Callable[[ft.ControlEvent], None],
     theme_toggle_button: ft.Control
 ) -> ft.AppBar:
     """Erstellt die App-Bar."""
