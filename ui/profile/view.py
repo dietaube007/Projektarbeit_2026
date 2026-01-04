@@ -43,6 +43,8 @@ from .edit_profile import (
     build_change_image_section,
     build_change_name_section,
     build_password_section,
+    update_display_name,
+    send_password_reset,
 )
 from .settings import build_notifications_section
 
@@ -180,8 +182,19 @@ class ProfileView:
 
     def _show_edit_profile(self):
         """Zeigt das Profil-Bearbeiten-Menü."""
-        self.current_view = self.VIEW_EDIT_PROFILE
-        self._rebuild()
+        try:
+            logger.info("_show_edit_profile aufgerufen")
+            self.current_view = self.VIEW_EDIT_PROFILE
+            logger.info(f"Current view gesetzt auf: {self.current_view}")
+            self._rebuild()
+            logger.info("_rebuild erfolgreich aufgerufen")
+        except Exception as e:
+            logger.error(f"Fehler beim Anzeigen der Profil-Bearbeiten-Ansicht: {e}", exc_info=True)
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                f"Die Profil-Bearbeiten-Ansicht konnte nicht geladen werden: {str(e)}"
+            )
 
     def _show_settings(self):
         """Zeigt die Einstellungen."""
@@ -202,19 +215,30 @@ class ProfileView:
 
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
-        self.main_container.controls.clear()
+        try:
+            self.main_container.controls.clear()
 
-        view_builders = {
-            self.VIEW_MAIN: self._build_main_menu,
-            self.VIEW_EDIT_PROFILE: self._build_edit_profile,
-            self.VIEW_SETTINGS: self._build_settings,
-            self.VIEW_FAVORITES: self._build_favorites,
-            self.VIEW_MY_POSTS: self._build_my_posts,
-        }
+            view_builders = {
+                self.VIEW_MAIN: self._build_main_menu,
+                self.VIEW_EDIT_PROFILE: self._build_edit_profile,
+                self.VIEW_SETTINGS: self._build_settings,
+                self.VIEW_FAVORITES: self._build_favorites,
+                self.VIEW_MY_POSTS: self._build_my_posts,
+            }
 
-        builder = view_builders.get(self.current_view, self._build_main_menu)
-        self.main_container.controls = builder()
-        self.page.update()
+            builder = view_builders.get(self.current_view, self._build_main_menu)
+            controls = builder()
+            self.main_container.controls = controls
+            self.page.update()
+        except Exception as e:
+            logger.error(f"Fehler beim Rebuild der Ansicht ({self.current_view}): {e}", exc_info=True)
+            # Fallback: Zeige Hauptmenü
+            try:
+                self.current_view = self.VIEW_MAIN
+                self.main_container.controls = self._build_main_menu()
+                self.page.update()
+            except Exception as fallback_error:
+                logger.error(f"Fehler beim Fallback: {fallback_error}", exc_info=True)
 
     # ════════════════════════════════════════════════════════════════════
     # AKTIONEN
@@ -228,6 +252,104 @@ class ProfileView:
                 self.on_logout()
         except Exception as e:
             logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
+    
+    # ════════════════════════════════════════════════════════════════════
+    # PROFIL BEARBEITEN
+    # ════════════════════════════════════════════════════════════════════
+    
+    async def _save_display_name(self, name_field: ft.TextField):
+        """Speichert den neuen Anzeigenamen.
+        
+        Args:
+            name_field: TextField mit dem neuen Anzeigenamen
+        """
+        new_name = name_field.value
+        
+        if not new_name or not new_name.strip():
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                "Der Anzeigename darf nicht leer sein."
+            )
+            return
+        
+        try:
+            user_resp = self.sb.auth.get_user()
+            if not user_resp or not user_resp.user:
+                show_error_dialog(
+                    self.page,
+                    "Fehler",
+                    "Nicht eingeloggt. Bitte melde dich an."
+                )
+                return
+            
+            user_id = user_resp.user.id
+            
+            # Anzeigenamen aktualisieren
+            success = await update_display_name(self.sb, user_id, new_name)
+            
+            if success:
+                # Lokale Daten aktualisieren
+                self.display_name.value = new_name
+                self.page.update()
+                
+                show_success_dialog(
+                    self.page,
+                    "Erfolg",
+                    "Der Anzeigename wurde erfolgreich aktualisiert."
+                )
+            else:
+                show_error_dialog(
+                    self.page,
+                    "Fehler",
+                    "Der Anzeigename konnte nicht aktualisiert werden. Bitte überprüfe die Eingabe."
+                )
+        
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern des Anzeigenamens: {e}", exc_info=True)
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                f"Ein Fehler ist aufgetreten: {str(e)}"
+            )
+    
+    async def _handle_password_reset(self, email: str):
+        """Sendet eine Passwort-Zurücksetzen-E-Mail.
+        
+        Args:
+            email: E-Mail-Adresse des Benutzers
+        """
+        if not email:
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                "Keine E-Mail-Adresse gefunden."
+            )
+            return
+        
+        try:
+            success = await send_password_reset(self.sb, email)
+            
+            if success:
+                show_success_dialog(
+                    self.page,
+                    "E-Mail gesendet",
+                    f"Eine Passwort-Zurücksetzen-E-Mail wurde an {email} gesendet."
+                )
+            else:
+                show_error_dialog(
+                    self.page,
+                    "Fehler",
+                    "Die E-Mail konnte nicht gesendet werden. Bitte überprüfe die E-Mail-Adresse."
+                )
+        
+        except Exception as e:
+            logger.error(f"Fehler beim Senden der Passwort-Reset-E-Mail: {e}", exc_info=True)
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                f"Ein Fehler ist aufgetreten: {str(e)}"
+            )
 
     # ════════════════════════════════════════════════════════════════════
     # FAVORITEN
@@ -501,7 +623,7 @@ class ProfileView:
                     build_menu_item(
                         ft.Icons.EDIT_OUTLINED,
                         "Profil bearbeiten",
-                        on_click=lambda _: self._show_edit_profile(),
+                        on_click=lambda e: self._show_edit_profile(),
                     ),
                     ft.Divider(height=1),
                     build_menu_item(
@@ -552,23 +674,52 @@ class ProfileView:
 
     def _build_edit_profile(self) -> list:
         """Baut die Profil-Bearbeiten-Ansicht."""
-        back_button = build_back_button(lambda _: self._show_main_menu())
-        
-        change_image_section = build_change_image_section(
-            self.avatar,
-            on_change_image=lambda _: print("Bild ändern"),
-        )
-        
-        change_name_section = build_change_name_section(
-            self.display_name.value,
-            on_save=lambda _: print("Name speichern"),
-        )
-        
-        password_section = build_password_section(
-            on_reset=lambda _: print("Passwort zurücksetzen"),
-        )
+        try:
+            back_button = build_back_button(lambda _: self._show_main_menu())
+            
+            change_image_section = build_change_image_section(
+                self.avatar,
+                on_change_image=lambda _: logger.info("Bild ändern (noch nicht implementiert)"),
+            )
+            
+            # Name-Section mit TextField-Referenz für Zugriff
+            # Sicherstellen dass display_name initialisiert ist
+            current_name = "Benutzer"
+            if hasattr(self, 'display_name') and self.display_name and self.display_name.value:
+                current_name = self.display_name.value
+            elif self.user_profile and self.user_profile.get("display_name"):
+                current_name = self.user_profile.get("display_name")
+            
+            change_name_section, name_field = build_change_name_section(
+                current_name,
+                on_save=lambda field: self.page.run_task(self._save_display_name, field),
+            )
+            
+            # Passwort-Section mit E-Mail aus User-Daten
+            user_email = ""
+            if self.user_data:
+                # user_data kann ein User-Objekt sein, prüfe verschiedene Attribute
+                if hasattr(self.user_data, 'email'):
+                    user_email = self.user_data.email
+                elif isinstance(self.user_data, dict) and self.user_data.get("email"):
+                    user_email = self.user_data.get("email")
+            
+            password_section = build_password_section(
+                on_reset=lambda _: self.page.run_task(self._handle_password_reset, user_email),
+            )
 
-        return [back_button, change_image_section, change_name_section, password_section]
+            return [back_button, change_image_section, change_name_section, password_section]
+        except Exception as e:
+            logger.error(f"Fehler beim Aufbau der Profil-Bearbeiten-Ansicht: {e}", exc_info=True)
+            # Fallback: Zeige nur Back-Button und Fehlermeldung
+            return [
+                build_back_button(lambda _: self._show_main_menu()),
+                soft_card(
+                    ft.Text(f"Fehler beim Laden: {str(e)}", color=ft.Colors.RED),
+                    pad=SECTION_PADDING,
+                    elev=CARD_ELEVATION,
+                )
+            ]
 
     # ════════════════════════════════════════════════════════════════════
     # BUILD - EINSTELLUNGEN

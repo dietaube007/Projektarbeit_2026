@@ -3,7 +3,10 @@ ui/profile/edit_profile.py
 Profil-Bearbeiten-Ansicht und Logik.
 """
 
+from __future__ import annotations
+
 import flet as ft
+from typing import Tuple, Optional, Callable
 
 from ui.theme import soft_card
 from .components import build_section_title, SECTION_PADDING, CARD_ELEVATION
@@ -46,16 +49,31 @@ def build_change_image_section(
 
 def build_change_name_section(
     current_name: str,
-    on_save=None,
-) -> ft.Container:
-    """Erstellt den Anzeigenamen-Abschnitt."""
+    on_save: Optional[Callable[[ft.TextField], None]] = None,
+) -> Tuple[ft.Container, ft.TextField]:
+    """Erstellt den Anzeigenamen-Abschnitt.
+    
+    Args:
+        current_name: Aktueller Anzeigename
+        on_save: Callback-Funktion die mit (name_field) aufgerufen wird
+    
+    Returns:
+        Tuple mit (Container, TextField) - TextField für Zugriff auf den Wert
+    """
     name_field = ft.TextField(
         value=current_name,
         width=300,
         prefix_icon=ft.Icons.PERSON_OUTLINE,
+        label="Anzeigename",
+        hint_text=f"Max. {MAX_DISPLAY_NAME_LENGTH} Zeichen",
+        max_length=MAX_DISPLAY_NAME_LENGTH,
     )
     
-    return soft_card(
+    def handle_save(_):
+        if on_save:
+            on_save(name_field)
+    
+    container = soft_card(
         ft.Column(
             [
                 build_section_title("Anzeigename"),
@@ -65,7 +83,7 @@ def build_change_name_section(
                 ft.FilledButton(
                     "Speichern",
                     icon=ft.Icons.SAVE,
-                    on_click=on_save or (lambda _: print("Name speichern")),
+                    on_click=handle_save,
                 ),
             ],
             spacing=8,
@@ -73,6 +91,8 @@ def build_change_name_section(
         pad=SECTION_PADDING,
         elev=CARD_ELEVATION,
     )
+    
+    return container, name_field
 
 
 def build_password_section(on_reset=None) -> ft.Container:
@@ -102,7 +122,11 @@ def build_password_section(on_reset=None) -> ft.Container:
 
 
 async def update_display_name(sb, user_id: str, new_name: str) -> bool:
-    """Aktualisiert den Anzeigenamen in der Datenbank.
+    """Aktualisiert den Anzeigenamen in beiden Tabellen (auth.users und user).
+    
+    Aktualisiert:
+    - auth.users.user_metadata.display_name (über Supabase Auth)
+    - user.display_name (in der eigenen user Tabelle)
     
     Args:
         sb: Supabase Client-Instanz
@@ -127,7 +151,33 @@ async def update_display_name(sb, user_id: str, new_name: str) -> bool:
     try:
         # Input sanitizen
         sanitized_name = sanitize_string(new_name, max_length=MAX_DISPLAY_NAME_LENGTH)
+        
+        # 1. Aktualisiere auth.users.user_metadata.display_name
+        # Hinweis: Supabase Auth API aktualisiert user_metadata über update_user()
+        try:
+            # Hole aktuelles user_metadata um bestehende Daten zu behalten
+            current_user = sb.auth.get_user()
+            current_metadata = {}
+            if current_user and current_user.user and current_user.user.user_metadata:
+                current_metadata = dict(current_user.user.user_metadata)  # Kopie erstellen
+            
+            # Füge/aktualisiere display_name in user_metadata
+            current_metadata["display_name"] = sanitized_name
+            
+            # Aktualisiere user_metadata über Supabase Auth API
+            # Die update_user() Methode erwartet ein Dictionary mit "data" für user_metadata
+            sb.auth.update_user({
+                "data": current_metadata
+            })
+            logger.info(f"Auth user_metadata.display_name aktualisiert für User {user_id}")
+        except Exception as auth_error:
+            logger.warning(f"Fehler beim Aktualisieren von auth.users (User {user_id}): {auth_error}", exc_info=True)
+            # Weiter mit user Tabelle, auch wenn auth Update fehlschlägt
+        
+        # 2. Aktualisiere user.display_name in der eigenen Tabelle
         sb.table("user").update({"display_name": sanitized_name}).eq("id", user_id).execute()
+        logger.info(f"User.display_name aktualisiert für User {user_id}")
+        
         return True
     except Exception as e:
         logger.error(f"Fehler beim Aktualisieren des Namens (User {user_id}): {e}", exc_info=True)
