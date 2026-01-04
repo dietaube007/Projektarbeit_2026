@@ -155,6 +155,50 @@ class ProfileView:
     # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
 
+    def _show_success_dialog(self, title: str, message: str):
+        """Zeigt einen Erfolgs-Dialog an."""
+        def close_dialog(e):
+            self.page.close(dlg)
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                [
+                    ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
+                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+                ],
+                spacing=8,
+            ),
+            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dlg)
+    
+    def _show_error_dialog(self, title: str, message: str):
+        """Zeigt einen Fehler-Dialog an."""
+        def close_dialog(e):
+            self.page.close(dlg)
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                [
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
+                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+                ],
+                spacing=8,
+            ),
+            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dlg)
+
     def _show_main_menu(self):
         """Zeigt das Hauptmenü."""
         self.current_view = self.VIEW_MAIN
@@ -174,7 +218,7 @@ class ProfileView:
         """Zeigt die Favoriten-Ansicht."""
         self.current_view = self.VIEW_FAVORITES
         self._rebuild()
-        self.page.run_task(self.load_favorites)
+        self.page.run_task(self._load_favorites)
 
     def _show_my_posts(self):
         """Zeigt die Meine Meldungen Ansicht."""
@@ -380,20 +424,14 @@ class ProfileView:
                     on_edit=self._edit_post,
                     on_delete=self._confirm_delete_post,
                 )
-                self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Meldung erfolgreich gelöscht."),
-                    open=True,
-                )
+                self._show_success_dialog("Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
                 self.page.update()
 
                 # Startseite informieren falls Callback existiert
                 if self.on_favorites_changed:
                     self.on_favorites_changed()
             else:
-                self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Fehler beim Löschen der Meldung."),
-                    open=True,
-                )
+                self._show_error_dialog("Löschen fehlgeschlagen", "Die Meldung konnte nicht gelöscht werden.")
                 self.page.update()
 
         except Exception as e:
