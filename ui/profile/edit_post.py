@@ -11,6 +11,7 @@ from services.references import ReferenceService
 from services.posts import PostService
 from ui.constants import PRIMARY_COLOR
 from utils.logging_config import get_logger
+from ui.components import show_success_dialog
 
 logger = get_logger(__name__)
 
@@ -416,27 +417,7 @@ class EditPostDialog:
 
     def _show_success_dialog(self, title: str, message: str):
         """Zeigt einen Erfolgs-Dialog an."""
-        self._show_dialog(title, message, ft.Icons.CHECK_CIRCLE_OUTLINE, ft.Colors.GREEN_600)
-
-    def _show_dialog(self, title: str, message: str, icon: str, icon_color: str):
-        """Zeigt einen Dialog mit Icon an."""
-        def close_dlg(_):
-            dlg.open = False
-            self.page.update()
-
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [ft.Icon(icon, color=icon_color, size=24), ft.Text(title, size=16, weight=ft.FontWeight.W_600)],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[ft.TextButton("OK", on_click=close_dlg)],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.overlay.append(dlg)
-        dlg.open = True
-        self.page.update()
+        show_success_dialog(self.page, title, message)
 
     def _close(self, _):
         """Schließt den Dialog."""

@@ -247,3 +247,133 @@ def empty_state(
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         alignment=ft.MainAxisAlignment.CENTER,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# DIALOGE - Zentrale Dialog-Funktionen
+# ══════════════════════════════════════════════════════════════════════
+
+def show_success_dialog(
+    page: ft.Page,
+    title: str,
+    message: str,
+    on_close: Optional[Callable[[], None]] = None
+) -> None:
+    """Zeigt einen Erfolgs-Dialog an.
+    
+    Args:
+        page: Flet Page-Instanz
+        title: Titel des Dialogs
+        message: Nachricht die angezeigt werden soll
+        on_close: Optionaler Callback der nach Schließen aufgerufen wird
+    """
+    def close_dialog(e: ft.ControlEvent) -> None:
+        page.close(dlg)
+        if on_close:
+            on_close()
+    
+    dlg = ft.AlertDialog(
+        modal=True,
+        title=ft.Row(
+            [
+                ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
+                ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+            ],
+            spacing=8,
+        ),
+        content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+        actions=[
+            ft.TextButton("OK", on_click=close_dialog),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+    
+    page.open(dlg)
+
+
+def show_error_dialog(
+    page: ft.Page,
+    title: str,
+    message: str,
+    on_close: Optional[Callable[[], None]] = None
+) -> None:
+    """Zeigt einen Fehler-Dialog an.
+    
+    Args:
+        page: Flet Page-Instanz
+        title: Titel des Dialogs
+        message: Fehlermeldung die angezeigt werden soll
+        on_close: Optionaler Callback der nach Schließen aufgerufen wird
+    """
+    def close_dialog(e: ft.ControlEvent) -> None:
+        page.close(dlg)
+        if on_close:
+            on_close()
+    
+    dlg = ft.AlertDialog(
+        modal=True,
+        title=ft.Row(
+            [
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
+                ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+            ],
+            spacing=8,
+        ),
+        content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+        actions=[
+            ft.TextButton("OK", on_click=close_dialog),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+    
+    page.open(dlg)
+
+
+def show_validation_dialog(
+    page: ft.Page,
+    title: str,
+    message: str,
+    items: list[str],
+    on_close: Optional[Callable[[], None]] = None
+) -> None:
+    """Zeigt einen Validierungs-Dialog mit Fehlermeldungen an.
+    
+    Args:
+        page: Flet Page-Instanz
+        title: Titel des Dialogs
+        message: Hauptnachricht
+        items: Liste von Validierungsfehlern die angezeigt werden sollen
+        on_close: Optionaler Callback der nach Schließen aufgerufen wird
+    """
+    def close_dialog(e: ft.ControlEvent) -> None:
+        page.close(dlg)
+        if on_close:
+            on_close()
+    
+    dlg = ft.AlertDialog(
+        modal=True,
+        title=ft.Row(
+            [
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
+                ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+            ],
+            spacing=8,
+        ),
+        content=ft.Column(
+            [
+                ft.Text(message, size=13, color=ft.Colors.GREY_700),
+                ft.Column(
+                    [ft.Text(item, size=12, color=ft.Colors.GREY_800) for item in items],
+                    spacing=2,
+                ),
+            ],
+            spacing=8,
+            tight=True,
+        ),
+        actions=[
+            ft.TextButton("OK", on_click=close_dialog),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+    
+    page.open(dlg)

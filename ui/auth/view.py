@@ -31,6 +31,7 @@ from .forms import (
     create_registration_modal,
     create_login_card,
 )
+from ui.components import show_success_dialog
 
 
 class AuthView:
@@ -201,23 +202,12 @@ class AuthView:
 
     def _show_success_dialog(self, message: str):
         """Zeigt einen Erfolgs-Dialog."""
-        def close_dialog(e):
-            dialog.open = False
-            self.page.update()
-            self._close_modal()
-
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("✅ Erfolg", size=18, weight=ft.FontWeight.BOLD),
-            content=ft.Text(message, size=14),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        show_success_dialog(
+            self.page,
+            "Erfolg",
+            message,
+            on_close=self._close_modal
         )
-        self.page.overlay.append(dialog)
-        dialog.open = True
-        self.page.update()
 
     def _toggle_theme(self, e):
         """Wechselt zwischen Hell- und Dunkelmodus."""

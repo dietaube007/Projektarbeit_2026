@@ -11,6 +11,10 @@ import flet as ft
 
 from ui.theme import soft_card
 from utils.logging_config import get_logger
+from ui.components import (
+    show_success_dialog,
+    show_error_dialog,
+)
 
 logger = get_logger(__name__)
 
@@ -163,47 +167,11 @@ class ProfileView:
 
     def _show_success_dialog(self, title: str, message: str):
         """Zeigt einen Erfolgs-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.open(dlg)
+        show_success_dialog(self.page, title, message)
     
     def _show_error_dialog(self, title: str, message: str):
         """Zeigt einen Fehler-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.open(dlg)
+        show_error_dialog(self.page, title, message)
 
     def _show_main_menu(self):
         """Zeigt das Hauptmenü."""

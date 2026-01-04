@@ -21,6 +21,11 @@ from utils.validators import (
     validate_list_not_empty,
     sanitize_string,
 )
+from ui.components import (
+    show_success_dialog,
+    show_error_dialog,
+    show_validation_dialog,
+)
 
 logger = get_logger(__name__)
 
@@ -166,82 +171,15 @@ class PostForm:
     
     def _show_validation_dialog(self, title: str, message: str, items: list):
         """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Column(
-                [
-                    ft.Text(message, size=13, color=ft.Colors.GREY_700),
-                    ft.Column(
-                        [ft.Text(item, size=12, color=ft.Colors.GREY_800) for item in items],
-                        spacing=2,
-                    ),
-                ],
-                spacing=8,
-                tight=True,
-            ),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
+        show_validation_dialog(self.page, title, message, items)
     
     def _show_success_dialog(self, title: str, message: str):
         """Zeigt einen Erfolgs-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
+        show_success_dialog(self.page, title, message)
     
     def _show_error_dialog(self, title: str, message: str):
         """Zeigt einen Fehler-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
+        show_error_dialog(self.page, title, message)
     
     def _toggle_farben_panel(self, _):
         """Toggle für das Farben-Panel."""
