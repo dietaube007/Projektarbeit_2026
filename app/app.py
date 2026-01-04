@@ -325,14 +325,21 @@ class PetBuddyApp:
         if not self.initialize():
             return
         
-        # Prüfen ob User von E-Mail-Bestätigung kommt (URL enthält #/login)
+        # Prüfen ob User von E-Mail-Bestätigung kommt
+        # Supabase fügt Token-Parameter zur URL hinzu nach Bestätigung
         route = self.page.route or ""
-        from_email_confirmation = "/login" in route or "type=signup" in route
+        query = getattr(self.page, 'query', '') or ""
+        url_str = f"{route}{query}"
+        
+        # Typische Supabase E-Mail-Bestätigungs-Parameter
+        from_email_confirmation = any(param in url_str for param in [
+            "access_token", "token_type", "type=signup", "type=recovery"
+        ])
         
         # Prüfen ob bereits eingeloggt
         try:
             user = self.sb.auth.get_user()
-            if user and user.user and not from_email_confirmation:
+            if user and user.user:
                 self.is_logged_in = True
         except Exception:
             self.is_logged_in = False
@@ -340,7 +347,14 @@ class PetBuddyApp:
         # Bei E-Mail-Bestätigung: zur Login-Seite
         if from_email_confirmation:
             self.is_logged_in = False
+            try:
+                self.sb.auth.sign_out()  # Session beenden damit User sich neu einloggt
+            except Exception:
+                pass
             self._show_login()
+        elif self.is_logged_in:
+            # Bereits eingeloggt: Hauptapp zeigen
+            self._show_main_app()
         else:
-            # Hauptapp zeigen
+            # Nicht eingeloggt: Hauptapp zeigen (Gast-Modus)
             self._show_main_app()

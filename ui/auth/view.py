@@ -246,21 +246,40 @@ class AuthView:
 
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
+        # Login-Felder deaktivieren damit Tab nicht dorthin springt
+        if self._login_email:
+            self._login_email.disabled = True
+        if self._login_pwd:
+            self._login_pwd.disabled = True
+        
         self._reg_modal_bg.visible = True
         if self._reg_modal_bg not in self.page.overlay:
             self.page.overlay.append(self._reg_modal_bg)
+        
         self.page.update()
+        
+        # Fokus auf erstes Feld im Modal (nach update!)
+        if self._reg_email:
+            self._reg_email.focus()
 
     def _close_modal(self, e=None):
         """Schließt das Registrierungs-Modal und setzt Felder zurück."""
         if self._reg_modal_bg in self.page.overlay:
             self.page.overlay.remove(self._reg_modal_bg)
         
+        # Login-Felder wieder aktivieren
+        if self._login_email:
+            self._login_email.disabled = False
+        if self._login_pwd:
+            self._login_pwd.disabled = False
+        
         # Felder zurücksetzen
         if self._reg_email:
             self._reg_email.value = ""
         if self._reg_pwd:
             self._reg_pwd.value = ""
+        if self._reg_pwd_confirm:
+            self._reg_pwd_confirm.value = ""
         if self._reg_username:
             self._reg_username.value = ""
         if self._reg_info:
