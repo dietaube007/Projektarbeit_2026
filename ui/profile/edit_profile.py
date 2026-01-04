@@ -122,11 +122,12 @@ def build_password_section(on_reset=None) -> ft.Container:
 
 
 async def update_display_name(sb, user_id: str, new_name: str) -> bool:
-    """Aktualisiert den Anzeigenamen in beiden Tabellen (auth.users und user).
+    """Aktualisiert den Anzeigenamen in auth.users.user_metadata.
     
     Aktualisiert:
-    - auth.users.user_metadata.display_name (über Supabase Auth)
-    - user.display_name (in der eigenen user Tabelle)
+    - auth.users.user_metadata.display_name (über Supabase Auth API)
+    
+    Hinweis: display_name wird nur in auth.users gespeichert, nicht in der user Tabelle.
     
     Args:
         sb: Supabase Client-Instanz
@@ -152,31 +153,23 @@ async def update_display_name(sb, user_id: str, new_name: str) -> bool:
         # Input sanitizen
         sanitized_name = sanitize_string(new_name, max_length=MAX_DISPLAY_NAME_LENGTH)
         
-        # 1. Aktualisiere auth.users.user_metadata.display_name
+        # Aktualisiere auth.users.user_metadata.display_name
         # Hinweis: Supabase Auth API aktualisiert user_metadata über update_user()
-        try:
-            # Hole aktuelles user_metadata um bestehende Daten zu behalten
-            current_user = sb.auth.get_user()
-            current_metadata = {}
-            if current_user and current_user.user and current_user.user.user_metadata:
-                current_metadata = dict(current_user.user.user_metadata)  # Kopie erstellen
-            
-            # Füge/aktualisiere display_name in user_metadata
-            current_metadata["display_name"] = sanitized_name
-            
-            # Aktualisiere user_metadata über Supabase Auth API
-            # Die update_user() Methode erwartet ein Dictionary mit "data" für user_metadata
-            sb.auth.update_user({
-                "data": current_metadata
-            })
-            logger.info(f"Auth user_metadata.display_name aktualisiert für User {user_id}")
-        except Exception as auth_error:
-            logger.warning(f"Fehler beim Aktualisieren von auth.users (User {user_id}): {auth_error}", exc_info=True)
-            # Weiter mit user Tabelle, auch wenn auth Update fehlschlägt
+        # Hole aktuelles user_metadata um bestehende Daten zu behalten
+        current_user = sb.auth.get_user()
+        current_metadata = {}
+        if current_user and current_user.user and current_user.user.user_metadata:
+            current_metadata = dict(current_user.user.user_metadata)  # Kopie erstellen
         
-        # 2. Aktualisiere user.display_name in der eigenen Tabelle
-        sb.table("user").update({"display_name": sanitized_name}).eq("id", user_id).execute()
-        logger.info(f"User.display_name aktualisiert für User {user_id}")
+        # Füge/aktualisiere display_name in user_metadata
+        current_metadata["display_name"] = sanitized_name
+        
+        # Aktualisiere user_metadata über Supabase Auth API
+        # Die update_user() Methode erwartet ein Dictionary mit "data" für user_metadata
+        sb.auth.update_user({
+            "data": current_metadata
+        })
+        logger.info(f"Auth user_metadata.display_name aktualisiert für User {user_id}")
         
         return True
     except Exception as e:

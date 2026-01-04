@@ -140,21 +140,31 @@ class ProfileView:
                 self.user_data = user_response.user
                 self.email_text.value = self.user_data.email or ""
 
-                profile = (
-                    self.sb.table("user")
-                    .select("*")
-                    .eq("id", self.user_data.id)
-                    .single()
-                    .execute()
-                )
+                # display_name aus auth.users.user_metadata laden
+                # Hinweis: display_name wird nur in auth.users gespeichert, nicht in user Tabelle
+                display_name = "Benutzer"
+                if self.user_data.user_metadata and self.user_data.user_metadata.get("display_name"):
+                    display_name = self.user_data.user_metadata.get("display_name")
+                elif hasattr(self.user_data, 'raw_user_meta_data') and self.user_data.raw_user_meta_data:
+                    # Fallback: Prüfe auch raw_user_meta_data
+                    display_name = self.user_data.raw_user_meta_data.get("display_name", "Benutzer")
+                
+                self.display_name.value = display_name
 
-                if profile.data:
-                    self.user_profile = profile.data
-                    self.display_name.value = profile.data.get(
-                        "display_name", "Benutzer"
+                # Optional: User-Profil aus user Tabelle laden (falls andere Daten benötigt werden)
+                try:
+                    profile = (
+                        self.sb.table("user")
+                        .select("*")
+                        .eq("id", self.user_data.id)
+                        .single()
+                        .execute()
                     )
-                else:
-                    self.display_name.value = "Benutzer"
+                    if profile.data:
+                        self.user_profile = profile.data
+                except Exception as profile_error:
+                    logger.warning(f"Fehler beim Laden des User-Profils: {profile_error}")
+                    self.user_profile = None
 
                 self.page.update()
 
@@ -684,11 +694,12 @@ class ProfileView:
             
             # Name-Section mit TextField-Referenz für Zugriff
             # Sicherstellen dass display_name initialisiert ist
+            # display_name kommt jetzt aus auth.users.user_metadata
             current_name = "Benutzer"
             if hasattr(self, 'display_name') and self.display_name and self.display_name.value:
                 current_name = self.display_name.value
-            elif self.user_profile and self.user_profile.get("display_name"):
-                current_name = self.user_profile.get("display_name")
+            elif self.user_data and self.user_data.user_metadata and self.user_data.user_metadata.get("display_name"):
+                current_name = self.user_data.user_metadata.get("display_name")
             
             change_name_section, name_field = build_change_name_section(
                 current_name,
