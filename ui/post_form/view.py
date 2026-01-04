@@ -13,6 +13,9 @@ import flet as ft
 
 from services.references import ReferenceService
 from services.posts import PostService
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from ui.post_form.constants import (
     VALID_IMAGE_TYPES,
@@ -500,7 +503,7 @@ class PostForm:
                 self.page.update()
                 
         except Exception as ex:
-            print(f"Fehler beim Laden der Referenzdaten: {ex}")
+            logger.error(f"Fehler beim Laden der Referenzdaten: {ex}", exc_info=True)
     
     async def _update_breeds(self, _=None):
         """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
@@ -518,7 +521,7 @@ class PostForm:
                 self.breed_dd.value = NO_SELECTION_VALUE
             self.page.update()
         except Exception as ex:
-            print(f"Fehler beim Aktualisieren der Rassen: {ex}")
+            logger.error(f"Fehler beim Aktualisieren der Rassen: {ex}", exc_info=True)
     
     # ════════════════════════════════════════════════════════════════════
     # BUILD - Erstellt das UI

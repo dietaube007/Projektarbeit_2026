@@ -7,6 +7,9 @@ import flet as ft
 
 from ui.theme import soft_card
 from .components import build_section_title, SECTION_PADDING, CARD_ELEVATION
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_change_image_section(
@@ -102,7 +105,7 @@ async def update_display_name(sb, user_id: str, new_name: str) -> bool:
         sb.table("user").update({"display_name": new_name}).eq("id", user_id).execute()
         return True
     except Exception as e:
-        print(f"Fehler beim Aktualisieren des Namens: {e}")
+        logger.error(f"Fehler beim Aktualisieren des Namens (User {user_id}): {e}", exc_info=True)
         return False
 
 
@@ -112,5 +115,5 @@ async def send_password_reset(sb, email: str) -> bool:
         sb.auth.reset_password_email(email)
         return True
     except Exception as e:
-        print(f"Fehler beim Senden der Reset-E-Mail: {e}")
+        logger.error(f"Fehler beim Senden der Reset-E-Mail ({email}): {e}", exc_info=True)
         return False

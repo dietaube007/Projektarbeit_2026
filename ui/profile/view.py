@@ -10,6 +10,9 @@ from typing import Callable, Optional, List
 import flet as ft
 
 from ui.theme import soft_card
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from .components import (
     PRIMARY_COLOR,
@@ -150,7 +153,7 @@ class ProfileView:
                 self.page.update()
 
         except Exception as e:
-            print(f"Fehler beim Laden der Benutzerdaten: {e}")
+            logger.error(f"Fehler beim Laden der Benutzerdaten: {e}", exc_info=True)
             self.display_name.value = "Fehler beim Laden"
             self.page.update()
 
@@ -256,7 +259,7 @@ class ProfileView:
             if self.on_logout:
                 self.on_logout()
         except Exception as e:
-            print(f"Fehler beim Abmelden: {e}")
+            logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
 
     # ════════════════════════════════════════════════════════════════════
     # FAVORITEN
@@ -290,7 +293,7 @@ class ProfileView:
             self.page.update()
 
         except Exception as e:
-            print(f"Fehler beim Laden der Favoriten: {e}")
+            logger.error(f"Fehler beim Laden der Favoriten: {e}", exc_info=True)
             self.favorites_items = []
             render_favorites_list(
                 self.favorites_list,
@@ -326,7 +329,7 @@ class ProfileView:
                     self.on_favorites_changed()
 
         except Exception as e:
-            print(f"Fehler beim Entfernen aus Favoriten: {e}")
+            logger.error(f"Fehler beim Entfernen aus Favoriten (Post {post_id}): {e}", exc_info=True)
 
     # ════════════════════════════════════════════════════════════════════
     # MEINE MELDUNGEN
@@ -364,7 +367,7 @@ class ProfileView:
             self.page.update()
 
         except Exception as e:
-            print(f"Fehler beim Laden der eigenen Meldungen: {e}")
+            logger.error(f"Fehler beim Laden der eigenen Meldungen: {e}", exc_info=True)
             self.my_posts_items = []
             render_my_posts_list(
                 self.my_posts_list,
@@ -447,7 +450,7 @@ class ProfileView:
                 self.page.update()
 
         except Exception as e:
-            print(f"Fehler beim Löschen des Posts: {e}")
+            logger.error(f"Fehler beim Löschen des Posts {post_id}: {e}", exc_info=True)
 
     def _build_my_posts(self) -> list:
         """Baut die Meine Meldungen Ansicht."""

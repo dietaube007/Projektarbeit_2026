@@ -5,7 +5,7 @@ Dieses Modul enthält die ProfileView-Klasse und zugehörige Komponenten
 für die Anzeige des Benutzerprofils, Favoriten und eigener Meldungen.
 
 Struktur:
-- view.py: Hauptklasse ProfileView (orchestriert alles)
+- view.py: Hauptklasse ProfileView
 - favorites.py: Favoriten-Tab Logik und Karten
 - my_posts.py: Eigene Meldungen Ansicht
 - edit_post.py: Dialog zum Bearbeiten einer Meldung

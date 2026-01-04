@@ -4,6 +4,9 @@ Datenladen und Filterlogik für die Discover-View.
 """
 
 from typing import Optional
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_query(sb, filters: dict):
@@ -134,7 +137,7 @@ async def load_filter_options(sb) -> dict:
         options["sex"] = sex_res.data or []
         
     except Exception as ex:
-        print(f"Fehler beim Laden der Filteroptionen: {ex}")
+        logger.error(f"Fehler beim Laden der Filteroptionen: {ex}", exc_info=True)
     
     return options
 
@@ -154,5 +157,5 @@ def toggle_favorite(sb, user_id: str, post_id: int, is_currently_favorite: bool)
             }).execute()
             return True
     except Exception as ex:
-        print(f"Fehler beim Umschalten des Favoriten: {ex}")
+        logger.error(f"Fehler beim Umschalten des Favoriten (User {user_id}, Post {post_id}): {ex}", exc_info=True)
         return is_currently_favorite

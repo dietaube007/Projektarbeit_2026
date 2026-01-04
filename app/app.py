@@ -12,6 +12,9 @@ import os
 import flet as ft
 
 from services.supabase_client import get_client
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 from ui.theme import ThemeManager, soft_card
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
@@ -180,7 +183,7 @@ class PetBuddyApp:
                 self.pending_tab_after_login = None
             self._show_login()
         except Exception as e:
-            print(f"Fehler beim Abmelden: {e}")
+            logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
     
     # ════════════════════════════════════════════════════════════════════
     # UI-BEREICHE LADEN

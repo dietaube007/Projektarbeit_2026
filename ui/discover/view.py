@@ -12,6 +12,9 @@ from ui.theme import soft_card, chip
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, MAX_POSTS_LIMIT, DEFAULT_PLACEHOLDER
 from ui.helpers import extract_item_data
 from services.references import ReferenceService
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from .cards import (
     build_small_card,
@@ -228,7 +231,7 @@ class DiscoverView:
 
             self.page.update()
         except Exception as ex:
-            print(f"Fehler beim Laden der Referenzen: {ex}")
+            logger.error(f"Fehler beim Laden der Referenzen: {ex}", exc_info=True)
 
     def _on_tierart_change(self, e: ft.ControlEvent):
         self._update_rassen_dropdown()
@@ -314,7 +317,7 @@ class DiscoverView:
             self.page.update()
 
         except Exception as ex:
-            print(f"Fehler beim Aktualisieren der Favoriten: {ex}")
+            logger.error(f"Fehler beim Aktualisieren der Favoriten (Post {post_id}): {ex}", exc_info=True)
 
     # ──────────────────────────────────────────────────────────────────
     # DATEN LADEN
@@ -370,7 +373,7 @@ class DiscoverView:
             self._render_items(items)
 
         except Exception as ex:
-            print(f"Fehler beim Laden der Daten: {ex}")
+            logger.error(f"Fehler beim Laden der Daten: {ex}", exc_info=True)
             self.current_items = []
             self.list_view.controls = [self.empty_state_card]
             self.grid_view.controls = []

@@ -7,6 +7,9 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from ui.theme import soft_card
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_favorite_card(
@@ -189,7 +192,7 @@ async def load_favorites(sb, user_id: str) -> List[dict]:
         return posts_res.data or []
         
     except Exception as e:
-        print(f"Fehler beim Laden der Favoriten: {e}")
+        logger.error(f"Fehler beim Laden der Favoriten (User {user_id}): {e}", exc_info=True)
         return []
 
 
@@ -205,7 +208,7 @@ def remove_favorite(sb, user_id: str, post_id: int) -> bool:
         )
         return True
     except Exception as e:
-        print(f"Fehler beim Entfernen aus Favoriten: {e}")
+        logger.error(f"Fehler beim Entfernen aus Favoriten (User {user_id}, Post {post_id}): {e}", exc_info=True)
         return False
 
 

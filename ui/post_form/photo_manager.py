@@ -21,6 +21,9 @@ from ui.post_form.constants import (
     STORAGE_BUCKET,
     UPLOAD_DIR,
 )
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def compress_image(file_path: str) -> Tuple[bytes, str]:
@@ -77,7 +80,7 @@ def upload_to_storage(
         }
         
     except Exception as ex:
-        print(f"Fehler beim Upload: {ex}")
+        logger.error(f"Fehler beim Upload von {original_filename}: {ex}", exc_info=True)
         return {"path": None, "base64": None, "url": None, "name": None}
 
 
@@ -90,7 +93,7 @@ def remove_from_storage(sb, storage_path: Optional[str]) -> bool:
         sb.storage.from_(STORAGE_BUCKET).remove([storage_path])
         return True
     except Exception as ex:
-        print(f"Fehler beim Löschen aus Storage: {ex}")
+        logger.error(f"Fehler beim Löschen aus Storage ({storage_path}): {ex}", exc_info=True)
         return False
 
 
@@ -101,7 +104,7 @@ def cleanup_local_file(file_path: str) -> bool:
             os.remove(file_path)
         return True
     except Exception as ex:
-        print(f"Fehler beim Löschen der lokalen Datei: {ex}")
+        logger.warning(f"Fehler beim Löschen der lokalen Datei {file_path}: {ex}", exc_info=True)
         return False
 
 

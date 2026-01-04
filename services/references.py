@@ -6,6 +6,9 @@ Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank, die für
 
 from supabase import Client
 from typing import List, Dict, Any
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class ReferenceService:
     # Service-Klasse für das Laden von Referenzdaten aus der Datenbank.
@@ -31,7 +34,7 @@ class ReferenceService:
             self._post_statuses = res.data or []
             return self._post_statuses
         except Exception as ex:
-            print(f"Fehler beim Laden von Meldungstypen: {ex}")
+            logger.error(f"Fehler beim Laden von Meldungstypen: {ex}", exc_info=True)
             return []
     
     def get_species(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -44,7 +47,7 @@ class ReferenceService:
             self._species = res.data or []
             return self._species
         except Exception as ex:
-            print(f"Fehler beim Laden von Tierarten: {ex}")
+            logger.error(f"Fehler beim Laden von Tierarten: {ex}", exc_info=True)
             return []
     
     def get_breeds_by_species(self, use_cache: bool = True) -> Dict[int, List[Dict[str, Any]]]:
@@ -64,7 +67,7 @@ class ReferenceService:
             self._breeds_by_species = grouped
             return self._breeds_by_species
         except Exception as ex:
-            print(f"Fehler beim Laden von Rassen: {ex}")
+            logger.error(f"Fehler beim Laden von Rassen: {ex}", exc_info=True)
             return {}
     
     def get_colors(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -77,7 +80,7 @@ class ReferenceService:
             self._colors = res.data or []
             return self._colors
         except Exception as ex:
-            print(f"Fehler beim Laden von Farben: {ex}")
+            logger.error(f"Fehler beim Laden von Farben: {ex}", exc_info=True)
             return []
     
     def get_sex(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -90,7 +93,7 @@ class ReferenceService:
             self._sex = res.data or []
             return self._sex
         except Exception as ex:
-            print(f"Fehler beim Laden von Geschlechtern: {ex}")
+            logger.error(f"Fehler beim Laden von Geschlechtern: {ex}", exc_info=True)
             return []
     
     def clear_cache(self):

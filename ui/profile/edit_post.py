@@ -10,16 +10,20 @@ import flet as ft
 from services.references import ReferenceService
 from services.posts import PostService
 from ui.constants import PRIMARY_COLOR
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class EditPostDialog:
     """Dialog zum Bearbeiten einer bestehenden Meldung."""
-    
+
     DATE_FORMAT = "%d.%m.%Y"
+    DATE_FORMAT_DB = "%Y-%m-%d"
     NO_SELECTION_VALUE = "-1"
     NO_SELECTION_LABEL = "Keine Angabe"
     ALLOWED_POST_STATUSES = ["vermisst", "gefunden"]
-    
+
     def __init__(
         self,
         page: ft.Page,
@@ -32,35 +36,35 @@ class EditPostDialog:
         self.sb = sb
         self.post = post
         self.on_save_callback = on_save_callback
-        
+
         # Services
         self.ref_service = ReferenceService(self.sb)
         self.post_service = PostService(self.sb)
-        
+
         # Referenzdaten
-        self.post_statuses = []
-        self.species_list = []
-        self.breeds_by_species = {}
-        self.colors_list = []
-        self.sex_list = []
-        
+        self.post_statuses: List[dict] = []
+        self.species_list: List[dict] = []
+        self.breeds_by_species: Dict[int, List[dict]] = {}
+        self.colors_list: List[dict] = []
+        self.sex_list: List[dict] = []
+
         # Ausgewählte Farben
-        self.selected_farben = []
-        self.farben_checkboxes = {}
-        
+        self.selected_farben: List[int] = []
+
         # UI-Elemente
         self._init_ui_elements()
-        
-        # Dialog
-        self.dialog = None
-        self.content_column = None
+
+        # Dialog-Referenzen
+        self.dialog: Optional[ft.AlertDialog] = None
+        self.content_column: Optional[ft.Column] = None
 
         # Fehler-Banner
+        self._error_text = ft.Text("", color=ft.Colors.WHITE, size=13, expand=True)
         self.error_banner = ft.Container(
             content=ft.Row(
                 [
                     ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.WHITE, size=20),
-                    ft.Text("", color=ft.Colors.WHITE, size=13, expand=True),
+                    self._error_text,
                 ],
                 spacing=8,
             ),
@@ -72,7 +76,6 @@ class EditPostDialog:
 
     def _init_ui_elements(self):
         """Initialisiert alle UI-Elemente mit den Daten des Posts."""
-        # Meldungsart
         self.meldungsart = ft.SegmentedButton(
             segments=[],
             selected=set(),
@@ -80,38 +83,34 @@ class EditPostDialog:
             allow_multiple_selection=False,
             expand=True,
         )
-        
-        # Name/Überschrift
+
         self.name_tf = ft.TextField(
             label="Name / Überschrift﹡",
             value=self.post.get("headline", ""),
             border_radius=8,
         )
-        
-        # Dropdowns
+
         self.species_dd = ft.Dropdown(
             label="Tierart﹡",
             width=180,
             border_radius=8,
+            on_change=lambda _: self._on_species_change(),
         )
+
         self.breed_dd = ft.Dropdown(
             label="Rasse",
             width=180,
             border_radius=8,
         )
+
         self.sex_dd = ft.Dropdown(
             label="Geschlecht",
             width=180,
             border_radius=8,
         )
-        
-        # Species-Dropdown Event
-        self.species_dd.on_change = self._on_species_change
-        
-        # Farben-Container
+
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
-        
-        # Beschreibung
+
         self.info_tf = ft.TextField(
             label="Beschreibung﹡",
             value=self.post.get("description", ""),
@@ -120,172 +119,40 @@ class EditPostDialog:
             max_lines=6,
             border_radius=8,
         )
-        
-        # Standort
+
         self.location_tf = ft.TextField(
             label="Ort﹡",
             value=self.post.get("location_text", ""),
             border_radius=8,
         )
-        
-        # Datum
-        event_date = self.post.get("event_date", "")
-        if event_date:
-            try:
-                parsed_date = datetime.strptime(event_date[:10], "%Y-%m-%d")
-                event_date = parsed_date.strftime(self.DATE_FORMAT)
-            except ValueError:
-                pass
-        
+
         self.date_tf = ft.TextField(
             label="Datum﹡ (TT.MM.JJJJ)",
-            value=event_date,
+            value=self._format_date(self.post.get("event_date", "")),
             width=180,
             border_radius=8,
         )
-    
-    def _on_species_change(self, e):
-        """Handler für Tierart-Änderung."""
-        self._update_breeds()
-        self.page.update()
-    
-    def _update_breeds(self):
-        """Aktualisiert das Rassen-Dropdown."""
+
+    # ══════════════════════════════════════════════════════════════════════
+    # HILFSMETHODEN
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _format_date(self, date_str: str) -> str:
+        """Konvertiert DB-Datum (YYYY-MM-DD) ins Anzeigeformat (TT.MM.JJJJ)."""
+        if not date_str:
+            return ""
         try:
-            self.breed_dd.options = [
-                ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
-            ]
-            sid = int(self.species_dd.value) if self.species_dd.value else None
-            if sid and sid in self.breeds_by_species:
-                self.breed_dd.options += [
-                    ft.dropdown.Option(str(b["id"]), b["name"])
-                    for b in self.breeds_by_species[sid]
-                ]
-            self.breed_dd.value = self.NO_SELECTION_VALUE
-        except Exception as ex:
-            print(f"Fehler beim Aktualisieren der Rassen: {ex}")
-    
-    def _on_color_change(self, color_id: int, is_selected: bool):
-        """Handler für Farbänderungen."""
-        if is_selected:
-            if color_id not in self.selected_farben:
-                self.selected_farben.append(color_id)
-        else:
-            if color_id in self.selected_farben:
-                self.selected_farben.remove(color_id)
-    
-    def _load_refs(self):
-        """Lädt alle Referenzdaten."""
+            return datetime.strptime(date_str[:10], self.DATE_FORMAT_DB).strftime(self.DATE_FORMAT)
+        except ValueError:
+            return ""
+
+    def _parse_date(self, date_str: str) -> Optional[datetime]:
+        """Parst ein Datum im Anzeigeformat. Gibt None bei Fehler zurück."""
         try:
-            # Meldungsarten laden
-            all_statuses = self.ref_service.get_post_statuses()
-            self.post_statuses = [
-                s for s in all_statuses
-                if s["name"].lower() in self.ALLOWED_POST_STATUSES
-            ]
-            self.meldungsart.segments = [
-                ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
-                for s in self.post_statuses
-            ]
-            
-            # Aktuellen Status setzen
-            current_status_id = None
-            post_status = self.post.get("post_status")
-            if isinstance(post_status, dict):
-                current_status_id = post_status.get("id")
-            
-            if current_status_id:
-                self.meldungsart.selected = {str(current_status_id)}
-            elif self.post_statuses:
-                self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
-            
-            # Andere Referenzdaten laden
-            self.species_list = self.ref_service.get_species()
-            self.breeds_by_species = self.ref_service.get_breeds_by_species()
-            self.colors_list = self.ref_service.get_colors()
-            self.sex_list = self.ref_service.get_sex()
-            
-            # Species Dropdown füllen
-            self.species_dd.options = [
-                ft.dropdown.Option(str(s["id"]), s["name"])
-                for s in self.species_list
-            ]
-            
-            # Aktuelle Tierart setzen
-            current_species = self.post.get("species")
-            if isinstance(current_species, dict) and current_species.get("id"):
-                self.species_dd.value = str(current_species["id"])
-            elif self.species_list:
-                self.species_dd.value = str(self.species_list[0]["id"])
-            
-            # Rassen laden und setzen
-            self._update_breeds()
-            current_breed = self.post.get("breed")
-            if isinstance(current_breed, dict) and current_breed.get("id"):
-                self.breed_dd.value = str(current_breed["id"])
-            
-            # Geschlecht Dropdown füllen
-            self.sex_dd.options = [
-                ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
-            ]
-            self.sex_dd.options += [
-                ft.dropdown.Option(str(s["id"]), s["name"])
-                for s in self.sex_list
-            ]
-            current_sex = self.post.get("sex")
-            if isinstance(current_sex, dict) and current_sex.get("id"):
-                self.sex_dd.value = str(current_sex["id"])
-            else:
-                self.sex_dd.value = self.NO_SELECTION_VALUE
-            
-            # Aktuelle Farben laden
-            post_colors = self.post.get("post_color") or []
-            self.selected_farben = [
-                pc.get("color", {}).get("id")
-                for pc in post_colors
-                if pc.get("color") and pc.get("color").get("id")
-            ]
-            
-            # Farben-Checkboxes erstellen
-            self.farben_container.controls = []
-            for color in self.colors_list:
-                is_selected = color["id"] in self.selected_farben
-                
-                def on_color_change(e, c_id=color["id"]):
-                    self._on_color_change(c_id, e.control.value)
-                
-                cb = ft.Checkbox(
-                    label=color["name"],
-                    value=is_selected,
-                    on_change=on_color_change,
-                )
-                self.farben_checkboxes[color["id"]] = cb
-                self.farben_container.controls.append(
-                    ft.Container(cb, col={"xs": 6, "sm": 4})
-                )
-            
-        except Exception as ex:
-            print(f"Fehler beim Laden der Referenzdaten: {ex}")
-    
-    def _validate(self) -> List[str]:
-        """Validiert die Eingaben und gibt Fehlermeldungen zurück."""
-        errors = []
-        
-        if not self.name_tf.value or not self.name_tf.value.strip():
-            errors.append("• Name/Überschrift")
-        if not self.species_dd.value:
-            errors.append("• Tierart")
-        if not self.selected_farben:
-            errors.append("• Mindestens eine Farbe")
-        if not self.info_tf.value or not self.info_tf.value.strip():
-            errors.append("• Beschreibung")
-        if not self.location_tf.value or not self.location_tf.value.strip():
-            errors.append("• Ort")
-        if not self.date_tf.value or not self.date_tf.value.strip():
-            errors.append("• Datum")
-        
-        return errors
-    
+            return datetime.strptime(date_str.strip(), self.DATE_FORMAT).date()
+        except ValueError:
+            return None
+
     def _get_nested_id(self, key: str) -> Optional[int]:
         """Extrahiert die ID aus einem verschachtelten Dict-Feld."""
         value = self.post.get(key)
@@ -294,28 +161,154 @@ class EditPostDialog:
     def _get_dropdown_id(self, dropdown: ft.Dropdown) -> Optional[int]:
         """Extrahiert die ID aus einem Dropdown, None bei 'Keine Angabe'."""
         val = dropdown.value
-        if val and val != self.NO_SELECTION_VALUE:
-            return int(val)
-        return None
-
-    def _get_original_date_str(self) -> str:
-        """Konvertiert das ursprüngliche Datum ins Anzeigeformat."""
-        event_date = self.post.get("event_date", "")
-        if event_date:
-            try:
-                return datetime.strptime(event_date[:10], "%Y-%m-%d").strftime(self.DATE_FORMAT)
-            except ValueError:
-                pass
-        return ""
+        return int(val) if val and val != self.NO_SELECTION_VALUE else None
 
     def _get_original_color_ids(self) -> List[int]:
         """Extrahiert die ursprünglichen Farb-IDs."""
-        post_colors = self.post.get("post_color") or []
         return sorted([
             pc["color"]["id"]
-            for pc in post_colors
+            for pc in (self.post.get("post_color") or [])
             if pc.get("color") and pc["color"].get("id")
         ])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # EVENT HANDLER
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _on_species_change(self):
+        """Handler für Tierart-Änderung."""
+        self._update_breeds()
+        self.page.update()
+
+    def _on_color_change(self, color_id: int, is_selected: bool):
+        """Handler für Farbänderungen."""
+        if is_selected and color_id not in self.selected_farben:
+            self.selected_farben.append(color_id)
+        elif not is_selected and color_id in self.selected_farben:
+            self.selected_farben.remove(color_id)
+
+    def _update_breeds(self):
+        """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
+        self.breed_dd.options = [
+            ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
+        ]
+        try:
+            species_id = int(self.species_dd.value) if self.species_dd.value else None
+            if species_id and species_id in self.breeds_by_species:
+                self.breed_dd.options += [
+                    ft.dropdown.Option(str(b["id"]), b["name"])
+                    for b in self.breeds_by_species[species_id]
+                ]
+        except (ValueError, TypeError):
+            pass
+        self.breed_dd.value = self.NO_SELECTION_VALUE
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DATEN LADEN
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _load_refs(self):
+        """Lädt alle Referenzdaten und initialisiert die Formularfelder."""
+        try:
+            self._load_post_statuses()
+            self._load_dropdowns()
+            self._load_colors()
+        except Exception as ex:
+            logger.error(f"Fehler beim Laden der Referenzdaten: {ex}", exc_info=True)
+
+    def _load_post_statuses(self):
+        """Lädt und setzt die Meldungsarten."""
+        all_statuses = self.ref_service.get_post_statuses()
+        self.post_statuses = [
+            s for s in all_statuses
+            if s["name"].lower() in self.ALLOWED_POST_STATUSES
+        ]
+        self.meldungsart.segments = [
+            ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
+            for s in self.post_statuses
+        ]
+
+        current_id = self._get_nested_id("post_status")
+        if current_id:
+            self.meldungsart.selected = {str(current_id)}
+        elif self.post_statuses:
+            self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
+
+    def _load_dropdowns(self):
+        """Lädt Tierart, Rasse und Geschlecht."""
+        self.species_list = self.ref_service.get_species()
+        self.breeds_by_species = self.ref_service.get_breeds_by_species()
+        self.sex_list = self.ref_service.get_sex()
+
+        # Tierart
+        self.species_dd.options = [
+            ft.dropdown.Option(str(s["id"]), s["name"])
+            for s in self.species_list
+        ]
+        current_species = self._get_nested_id("species")
+        if current_species:
+            self.species_dd.value = str(current_species)
+        elif self.species_list:
+            self.species_dd.value = str(self.species_list[0]["id"])
+
+        # Rasse
+        self._update_breeds()
+        current_breed = self._get_nested_id("breed")
+        if current_breed:
+            self.breed_dd.value = str(current_breed)
+
+        # Geschlecht
+        self.sex_dd.options = [
+            ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
+        ] + [
+            ft.dropdown.Option(str(s["id"]), s["name"])
+            for s in self.sex_list
+        ]
+        current_sex = self._get_nested_id("sex")
+        self.sex_dd.value = str(current_sex) if current_sex else self.NO_SELECTION_VALUE
+
+    def _load_colors(self):
+        """Lädt die Farben und erstellt Checkboxen."""
+        self.colors_list = self.ref_service.get_colors()
+
+        # Aktuelle Farben aus Post
+        self.selected_farben = [
+            pc["color"]["id"]
+            for pc in (self.post.get("post_color") or [])
+            if pc.get("color") and pc["color"].get("id")
+        ]
+
+        # Checkboxen erstellen
+        self.farben_container.controls = [
+            ft.Container(
+                ft.Checkbox(
+                    label=color["name"],
+                    value=color["id"] in self.selected_farben,
+                    on_change=lambda e, cid=color["id"]: self._on_color_change(cid, e.control.value),
+                ),
+                col={"xs": 6, "sm": 4},
+            )
+            for color in self.colors_list
+        ]
+
+    # ══════════════════════════════════════════════════════════════════════
+    # VALIDIERUNG & ÄNDERUNGSPRÜFUNG
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _validate(self) -> List[str]:
+        """Validiert die Eingaben und gibt fehlende Pflichtfelder zurück."""
+        checks = [
+            (self.name_tf.value, "Name/Überschrift"),
+            (self.species_dd.value, "Tierart"),
+            (self.selected_farben, "Mindestens eine Farbe"),
+            (self.info_tf.value, "Beschreibung"),
+            (self.location_tf.value, "Ort"),
+            (self.date_tf.value, "Datum"),
+        ]
+        return [
+            f"• {name}" for value, name in checks
+            if not value or (isinstance(value, str) and not value.strip())
+        ]
 
     def _has_changes(self) -> bool:
         """Prüft, ob Änderungen vorgenommen wurden."""
@@ -326,13 +319,17 @@ class EditPostDialog:
                 return True
 
             # Textfelder
-            if self.name_tf.value.strip() != self.post.get("headline", ""):
-                return True
-            if self.info_tf.value.strip() != self.post.get("description", ""):
-                return True
-            if self.location_tf.value.strip() != self.post.get("location_text", ""):
-                return True
-            if self.date_tf.value.strip() != self._get_original_date_str():
+            text_checks = [
+                (self.name_tf.value, "headline"),
+                (self.info_tf.value, "description"),
+                (self.location_tf.value, "location_text"),
+            ]
+            for field_value, post_key in text_checks:
+                if field_value.strip() != self.post.get(post_key, ""):
+                    return True
+
+            # Datum
+            if self.date_tf.value.strip() != self._format_date(self.post.get("event_date", "")):
                 return True
 
             # Dropdowns
@@ -350,28 +347,34 @@ class EditPostDialog:
             return False
 
         except Exception as ex:
-            print(f"Fehler beim Prüfen auf Änderungen: {ex}")
+            logger.error(f"Fehler beim Prüfen auf Änderungen: {ex}", exc_info=True)
             return True
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SPEICHERN
+    # ══════════════════════════════════════════════════════════════════════
 
     def _save(self, _):
         """Speichert die Änderungen."""
+        # Validierung
         errors = self._validate()
         if errors:
             self._show_error("Pflichtfelder fehlen:\n" + "\n".join(errors))
             return
 
+        # Änderungsprüfung
         if not self._has_changes():
             self._show_info_dialog("Keine Änderungen", "Es wurden keine Änderungen vorgenommen.")
             return
 
-        try:
-            event_date = datetime.strptime(self.date_tf.value.strip(), self.DATE_FORMAT).date()
-        except ValueError:
+        # Datum parsen
+        event_date = self._parse_date(self.date_tf.value)
+        if not event_date:
             self._show_error("Ungültiges Datumsformat.\nBitte verwende: TT.MM.YYYY")
             return
 
+        # Speichern
         try:
-            post_id = self.post.get("id")
             post_data = {
                 "post_status_id": int(list(self.meldungsart.selected)[0]),
                 "headline": self.name_tf.value.strip(),
@@ -383,8 +386,8 @@ class EditPostDialog:
                 "location_text": self.location_tf.value.strip(),
             }
 
-            self.post_service.update(post_id, post_data)
-            self.post_service.update_colors(post_id, self.selected_farben)
+            self.post_service.update(self.post["id"], post_data)
+            self.post_service.update_colors(self.post["id"], self.selected_farben)
             self.page.close(self.dialog)
 
             self._show_success_dialog("Erfolgreich gespeichert", "Die Meldung wurde erfolgreich aktualisiert.")
@@ -394,18 +397,18 @@ class EditPostDialog:
 
         except Exception as ex:
             self._show_error(f"Fehler beim Speichern: {ex}")
-    
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DIALOGE & MELDUNGEN
+    # ══════════════════════════════════════════════════════════════════════
+
     def _show_error(self, message: str):
         """Zeigt einen Fehler-Banner im Dialog an und scrollt nach oben."""
-        self.error_banner.content.controls[1].value = message
+        self._error_text.value = message
         self.error_banner.visible = True
         if self.content_column:
             self.content_column.scroll_to(offset=0, duration=300)
         self.page.update()
-
-    def _hide_error(self):
-        """Versteckt das Fehler-Banner."""
-        self.error_banner.visible = False
 
     def _show_info_dialog(self, title: str, message: str):
         """Zeigt einen Info-Dialog an."""
@@ -424,10 +427,7 @@ class EditPostDialog:
         dlg = ft.AlertDialog(
             modal=True,
             title=ft.Row(
-                [
-                    ft.Icon(icon, color=icon_color, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
+                [ft.Icon(icon, color=icon_color, size=24), ft.Text(title, size=16, weight=ft.FontWeight.W_600)],
                 spacing=8,
             ),
             content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
@@ -437,89 +437,51 @@ class EditPostDialog:
         self.page.overlay.append(dlg)
         dlg.open = True
         self.page.update()
-    
+
     def _close(self, _):
         """Schließt den Dialog."""
         self.page.close(self.dialog)
-    
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DIALOG ANZEIGEN
+    # ══════════════════════════════════════════════════════════════════════
+
     def show(self):
         """Zeigt den Bearbeitungsdialog an."""
-        # Referenzdaten laden
         self._load_refs()
-        
-        # Fehler-Banner zurücksetzen
         self.error_banner.visible = False
 
-        # Dialog-Inhalt
         self.content_column = ft.Column(
             [
-                # Fehler-Banner (oben)
                 self.error_banner,
-
-                # Meldungsart
                 ft.Text("Meldungsart", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
                 self.meldungsart,
-
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
-
-                # Name/Überschrift
                 self.name_tf,
-
-                # Tierart, Rasse, Geschlecht
-                ft.Row(
-                    [self.species_dd, self.breed_dd, self.sex_dd],
-                    spacing=12,
-                    wrap=True,
-                ),
-
+                ft.Row([self.species_dd, self.breed_dd, self.sex_dd], spacing=12, wrap=True),
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
-
-                # Farben
                 ft.Text("Farben﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
                 self.farben_container,
-
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
-
-                # Beschreibung
                 self.info_tf,
-
-                # Ort und Datum
-                ft.Row(
-                    [
-                        ft.Container(self.location_tf, expand=True),
-                        self.date_tf,
-                    ],
-                    spacing=12,
-                ),
+                ft.Row([ft.Container(self.location_tf, expand=True), self.date_tf], spacing=12),
             ],
             spacing=12,
             scroll=ft.ScrollMode.AUTO,
         )
 
-        content = ft.Container(
-            content=self.content_column,
-            width=500,
-            height=500,
-        )
-        
         self.dialog = ft.AlertDialog(
             modal=True,
             title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.EDIT, color=PRIMARY_COLOR, size=24),
-                    ft.Text("Meldung bearbeiten", size=18, weight=ft.FontWeight.W_600),
-                ],
+                [ft.Icon(ft.Icons.EDIT, color=PRIMARY_COLOR, size=24), ft.Text("Meldung bearbeiten", size=18, weight=ft.FontWeight.W_600)],
                 spacing=8,
             ),
-            content=content,
+            content=ft.Container(content=self.content_column, width=500, height=500),
             actions=[
                 ft.TextButton("Abbrechen", on_click=self._close),
-                ft.FilledButton(
-                    "Speichern",
-                    on_click=self._save,
-                ),
+                ft.FilledButton("Speichern", on_click=self._save),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        
+
         self.page.open(self.dialog)

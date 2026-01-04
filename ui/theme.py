@@ -11,6 +11,9 @@ Es definiert:
 """
 
 import flet as ft
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -102,7 +105,7 @@ class ThemeManager:
     def apply_theme(self, mode: str = THEME_LIGHT) -> None:
         """Wendet ein Theme auf die Seite an und setzt den Modus."""
         if mode not in (THEME_LIGHT, THEME_DARK):
-            print(f"Warnung: Ungültiger Theme-Modus '{mode}'. Verwende '{THEME_LIGHT}'.")
+            logger.warning(f"Ungültiger Theme-Modus '{mode}'. Verwende '{THEME_LIGHT}'.")
             mode = THEME_LIGHT
         
         self.page.theme = self.build_theme_light()

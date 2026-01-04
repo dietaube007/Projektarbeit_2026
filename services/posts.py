@@ -10,6 +10,9 @@ Dieses Modul verwaltet alle Datenbankoperationen für Posts/Tier-Meldungen:
 
 from supabase import Client
 from typing import Dict, Any, List, Optional
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PostService:
@@ -77,7 +80,7 @@ class PostService:
             res = self.sb.table("post").select("*, post_image(url)").eq("id", post_id).execute()
             return res.data[0] if res.data else None
         except Exception as ex:
-            print(f"Fehler beim Laden des Posts: {ex}")
+            logger.error(f"Fehler beim Laden des Posts {post_id}: {ex}", exc_info=True)
             return None
     
     def get_all(self, limit: int = 200) -> List[Dict[str, Any]]:
@@ -93,7 +96,7 @@ class PostService:
             """).limit(limit).execute()
             return res.data or []
         except Exception as ex:
-            print(f"Fehler beim Laden der Posts: {ex}")
+            logger.error(f"Fehler beim Laden der Posts (Limit: {limit}): {ex}", exc_info=True)
             return []
     
     def add_color(self, post_id: str, color_id: int) -> None:
@@ -104,7 +107,7 @@ class PostService:
                 "color_id": color_id,
             }).execute()
         except Exception as ex:
-            print(f"Fehler beim Hinzufügen der Farbe {color_id} zu Post {post_id}: {ex}")
+            logger.error(f"Fehler beim Hinzufügen der Farbe {color_id} zu Post {post_id}: {ex}", exc_info=True)
     
     def update_colors(self, post_id: str, color_ids: List[int]) -> None:
         """Aktualisiert die Farben eines Posts (löscht alte, fügt neue hinzu)."""
@@ -119,7 +122,7 @@ class PostService:
                     "color_id": color_id,
                 }).execute()
         except Exception as ex:
-            print(f"Fehler beim Aktualisieren der Farben für Post {post_id}: {ex}")
+            logger.error(f"Fehler beim Aktualisieren der Farben für Post {post_id}: {ex}", exc_info=True)
     
     def add_photo(self, post_id: str, photo_url: str) -> None:
         # Speichert eine Foto-URL für einen Post.
@@ -129,5 +132,5 @@ class PostService:
                 "url": photo_url,
             }).execute()
         except Exception as ex:
-            print(f"Fehler beim Speichern der Foto-URL: {ex}")
+            logger.error(f"Fehler beim Speichern der Foto-URL für Post {post_id}: {ex}", exc_info=True)
 
