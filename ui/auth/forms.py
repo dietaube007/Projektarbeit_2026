@@ -63,6 +63,17 @@ def create_register_password_field() -> ft.TextField:
     )
 
 
+def create_register_password_confirm_field() -> ft.TextField:
+    """Erstellt das Passwort-Bestätigungs-Feld für Registrierung."""
+    return ft.TextField(
+        label="Passwort wiederholen",
+        hint_text="Passwort bestätigen",
+        password=True,
+        can_reveal_password=True,
+        border_radius=12,
+    )
+
+
 def create_register_username_field() -> ft.TextField:
     """Erstellt das Anzeigename-Feld für Registrierung."""
     return ft.TextField(
@@ -129,6 +140,7 @@ def create_theme_toggle(is_dark: bool, on_click: Callable) -> ft.IconButton:
 def create_registration_modal(
     email_field: ft.TextField,
     password_field: ft.TextField,
+    password_confirm_field: ft.TextField,
     username_field: ft.TextField,
     info_text: ft.Text,
     on_register: Callable,
@@ -146,6 +158,8 @@ def create_registration_modal(
             email_field,
             ft.Container(height=8),
             password_field,
+            ft.Container(height=8),
+            password_confirm_field,
             ft.Container(height=8),
             username_field,
             ft.Container(height=12),

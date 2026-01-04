@@ -325,13 +325,22 @@ class PetBuddyApp:
         if not self.initialize():
             return
         
+        # Prüfen ob User von E-Mail-Bestätigung kommt (URL enthält #/login)
+        route = self.page.route or ""
+        from_email_confirmation = "/login" in route or "type=signup" in route
+        
         # Prüfen ob bereits eingeloggt
         try:
             user = self.sb.auth.get_user()
-            if user and user.user:
+            if user and user.user and not from_email_confirmation:
                 self.is_logged_in = True
         except Exception:
             self.is_logged_in = False
         
-        # Hauptapp zeigen
-        self._show_main_app()
+        # Bei E-Mail-Bestätigung: zur Login-Seite
+        if from_email_confirmation:
+            self.is_logged_in = False
+            self._show_login()
+        else:
+            # Hauptapp zeigen
+            self._show_main_app()

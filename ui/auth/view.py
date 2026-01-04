@@ -21,6 +21,7 @@ from .forms import (
     create_login_password_field,
     create_register_email_field,
     create_register_password_field,
+    create_register_password_confirm_field,
     create_register_username_field,
     create_login_button,
     create_register_button,
@@ -54,6 +55,7 @@ class AuthView:
         self._login_info: Optional[ft.Text] = None
         self._reg_email: Optional[ft.TextField] = None
         self._reg_pwd: Optional[ft.TextField] = None
+        self._reg_pwd_confirm: Optional[ft.TextField] = None
         self._reg_username: Optional[ft.TextField] = None
         self._reg_info: Optional[ft.Text] = None
         self._form_card: Optional[ft.Container] = None
@@ -102,7 +104,13 @@ class AuthView:
         """Führt die Registrierung durch."""
         email = (self._reg_email.value or "").strip()
         password = (self._reg_pwd.value or "").strip()
+        password_confirm = (self._reg_pwd_confirm.value or "").strip()
         username = (self._reg_username.value or "").strip()
+        
+        # Passwörter vergleichen
+        if password != password_confirm:
+            self._show_reg_message("❌ Passwörter stimmen nicht überein.", ft.Colors.RED)
+            return
         
         # Validierung
         error = validate_register_form(email, password, username)
@@ -113,13 +121,17 @@ class AuthView:
         try:
             self._show_reg_message("📝 Registrierung läuft...", ft.Colors.BLUE)
             
+            # Redirect URL für E-Mail-Bestätigung
+            redirect_url = "https://petbuddy.fly.dev/#/login"
+            
             res = self.sb.auth.sign_up({
                 "email": email, 
                 "password": password,
                 "options": {
                     "data": {
                         "display_name": username
-                    }
+                    },
+                    "email_redirect_to": redirect_url
                 }
             })
             
@@ -129,16 +141,12 @@ class AuthView:
                     self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
                     return
                 
-                print(f"✅ User registriert: {res.user.id}")
-                
                 # Prüfen ob E-Mail-Bestätigung erforderlich ist
                 if res.user.confirmed_at is None:
-                    self._show_reg_message(
-                        "✅ Bestätigungs-E-Mail gesendet! Bitte prüfe dein Postfach.",
-                        ft.Colors.GREEN
+                    self._show_success_dialog(
+                        "Bestätigungs-E-Mail gesendet! Bitte prüfe dein Postfach."
                     )
-                    await asyncio.sleep(3)
-                    self._close_modal()
+                    return
             else:
                 self._show_reg_message("❌ Fehler!", ft.Colors.RED)
                 
@@ -189,6 +197,26 @@ class AuthView:
         """Zeigt eine Nachricht im Registrierungs-Bereich."""
         self._reg_info.value = message
         self._reg_info.color = color
+        self.page.update()
+
+    def _show_success_dialog(self, message: str):
+        """Zeigt einen Erfolgs-Dialog."""
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+            self._close_modal()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("✅ Erfolg", size=18, weight=ft.FontWeight.BOLD),
+            content=ft.Text(message, size=14),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.overlay.append(dialog)
+        dialog.open = True
         self.page.update()
 
     def _toggle_theme(self, e):
@@ -275,6 +303,7 @@ class AuthView:
         # Registrierungs-Formular Felder
         self._reg_email = create_register_email_field()
         self._reg_pwd = create_register_password_field()
+        self._reg_pwd_confirm = create_register_password_confirm_field()
         self._reg_username = create_register_username_field()
         self._reg_info = ft.Text("", size=12, weight=ft.FontWeight.W_500)
         
@@ -285,6 +314,7 @@ class AuthView:
         self._reg_modal_card = create_registration_modal(
             email_field=self._reg_email,
             password_field=self._reg_pwd,
+            password_confirm_field=self._reg_pwd_confirm,
             username_field=self._reg_username,
             info_text=self._reg_info,
             on_register=lambda e: self.page.run_task(self._register),
