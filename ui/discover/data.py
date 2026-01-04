@@ -12,16 +12,24 @@ from ui.constants import MAX_SEARCH_QUERY_LENGTH
 logger = get_logger(__name__)
 
 
-def build_query(sb, filters: Dict[str, Any]):
+def build_query(
+    sb,
+    filters: Dict[str, Any],
+    user_id: Optional[str] = None
+) -> Any:
     """Baut die Supabase-Abfrage mit den aktiven Filtern.
 
     Args:
         sb: Supabase Client-Instanz
         filters: Dictionary mit Filterwerten (typ, art, geschlecht, rasse)
+        user_id: Optional User-ID für optimierte Favoriten-Abfrage
 
     Returns:
         Supabase Query-Objekt mit angewendeten Filtern
     """
+    # Basis-Select mit allen benötigten Relationen
+    # Hinweis: Favoriten werden separat geladen, da Supabase PostgREST
+    # keine direkten Joins auf Tabellen ohne Foreign Key unterstützt
     query = (
         sb.table("post")
         .select(
@@ -145,6 +153,8 @@ def filter_by_colors(items: List[Dict[str, Any]], selected_color_ids: Set[int]) 
 
 def get_favorite_ids(sb, user_id: Optional[str]) -> Set[int]:
     """Holt die Favoriten-IDs eines Benutzers.
+    
+    Optimiert: Lädt alle Favoriten in einer einzigen Query statt N+1 Queries.
 
     Args:
         sb: Supabase Client-Instanz
@@ -157,14 +167,17 @@ def get_favorite_ids(sb, user_id: Optional[str]) -> Set[int]:
         return set()
     
     try:
+        # Optimierte Query: Nur post_id selektieren, keine unnötigen Daten
         fav_res = (
             sb.table("favorite")
             .select("post_id")
             .eq("user_id", user_id)
             .execute()
         )
+        # Set-Comprehension für schnellen Lookup
         return {row["post_id"] for row in (fav_res.data or []) if "post_id" in row}
-    except Exception:
+    except Exception as ex:
+        logger.error(f"Fehler beim Laden der Favoriten für User {user_id}: {ex}", exc_info=True)
         return set()
 
 

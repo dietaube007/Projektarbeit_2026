@@ -182,6 +182,8 @@ class PostService:
     
     def get_all(self, limit: int = DEFAULT_POSTS_LIMIT) -> List[Dict[str, Any]]:
         """Holt alle Posts mit Relationen.
+        
+        Optimiert: Lädt alle Relationen in einer einzigen Query (kein N+1 Problem).
 
         Args:
             limit: Maximale Anzahl zu ladender Posts
@@ -190,6 +192,8 @@ class PostService:
             Liste von Posts als Dictionaries, leere Liste bei Fehler
         """
         try:
+            # Optimierte Query: Alle Relationen in einem Select (kein N+1 Problem)
+            # Supabase PostgREST unterstützt verschachtelte Selects für Relationen
             res = self.sb.table("post").select("""
                 *,
                 post_status(id, name),

@@ -356,7 +356,8 @@ class DiscoverView:
             }
 
             # Query bauen und ausführen
-            query = build_query(self.sb, filters)
+            # Optimierung: user_id wird übergeben für zukünftige Join-Optimierung
+            query = build_query(self.sb, filters, user_id=self.current_user_id)
             result = query.limit(MAX_POSTS_LIMIT).execute()
             items = result.data or []
 
@@ -367,6 +368,7 @@ class DiscoverView:
             items = filter_by_colors(items, set(self.selected_farben))
 
             # Favoritenstatus markieren
+            # Optimierung: Favoriten werden in einer einzigen Query geladen (kein N+1 Problem)
             favorite_ids = get_favorite_ids(self.sb, self.current_user_id)
             items = mark_favorites(items, favorite_ids)
 
