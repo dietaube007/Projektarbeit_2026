@@ -300,6 +300,123 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         else:
             show_error_dialog(self.page, "Fehler", error_msg or "Unbekannter Fehler.")
 
+    def _show_change_password_dialog(self):
+        """Zeigt einen Dialog zum Ändern des Passworts."""
+        current_password_field = ft.TextField(
+            label="Aktuelles Passwort",
+            password=True,
+            can_reveal_password=True,
+            prefix_icon=ft.Icons.LOCK_OUTLINE,
+            width=300,
+        )
+        
+        new_password_field = ft.TextField(
+            label="Neues Passwort",
+            password=True,
+            can_reveal_password=True,
+            prefix_icon=ft.Icons.LOCK,
+            hint_text="Min. 8 Zeichen, Groß/Klein, Zahl, Sonderzeichen",
+            width=300,
+        )
+        
+        confirm_password_field = ft.TextField(
+            label="Neues Passwort bestätigen",
+            password=True,
+            can_reveal_password=True,
+            prefix_icon=ft.Icons.LOCK,
+            width=300,
+        )
+        
+        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+        
+        def on_save(e):
+            current_pw = current_password_field.value
+            new_pw = new_password_field.value
+            confirm_pw = confirm_password_field.value
+            
+            # Validierung
+            if not current_pw:
+                error_text.value = "Bitte aktuelles Passwort eingeben."
+                error_text.visible = True
+                self.page.update()
+                return
+
+            # Passwort-Anforderungen prüfen
+            is_valid, pw_error = self.profile_service.validate_password(new_pw)
+            if not is_valid:
+                error_text.value = pw_error
+                error_text.visible = True
+                self.page.update()
+                return
+
+            if new_pw != confirm_pw:
+                error_text.value = "Passwörter stimmen nicht überein."
+                error_text.visible = True
+                self.page.update()
+                return
+            
+            # Erst mit aktuellem Passwort authentifizieren
+            try:
+                email = self.profile_service.get_email()
+                if not email:
+                    error_text.value = "E-Mail nicht gefunden."
+                    error_text.visible = True
+                    self.page.update()
+                    return
+                
+                # Re-Authentifizierung mit aktuellem Passwort
+                auth_result = self.sb.auth.sign_in_with_password({
+                    "email": email,
+                    "password": current_pw
+                })
+                
+                if not auth_result or not auth_result.user:
+                    error_text.value = "Aktuelles Passwort ist falsch."
+                    error_text.visible = True
+                    self.page.update()
+                    return
+
+                # Neues Passwort setzen
+                success, error_msg = self.profile_service.update_password(new_pw)
+                
+                if success:
+                    self.page.close(dialog)
+                    show_success_dialog(self.page, "Erfolg", "Passwort wurde geändert!")
+                else:
+                    error_text.value = error_msg or "Fehler beim Ändern."
+                    error_text.visible = True
+                    self.page.update()
+
+            except Exception as ex:
+                logger.error(f"Fehler beim Passwort ändern: {ex}", exc_info=True)
+                error_text.value = "Aktuelles Passwort ist falsch."
+                error_text.visible = True
+                self.page.update()
+
+        def on_cancel(e):
+            self.page.close(dialog)
+        
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Passwort ändern", weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=ft.Column([
+                    current_password_field,
+                    ft.Divider(height=16),
+                    new_password_field,
+                    confirm_password_field,
+                    error_text,
+                ], spacing=8, tight=True),
+                width=320,
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel),
+                ft.ElevatedButton("Speichern", icon=ft.Icons.SAVE, on_click=on_save),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
     async def _handle_profile_image_upload(self, e: ft.FilePickerResultEvent):
         """Behandelt den Upload eines Profilbilds."""
         logger.info(f"_handle_profile_image_upload aufgerufen, files: {e.files}")
@@ -430,7 +547,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         profile_header = soft_card(
             ft.Column([
                 ft.Row([
-                    self.avatar,
+                            self.avatar,
                     ft.Column([self.display_name, self.email_text], spacing=4, expand=True),
                 ], spacing=20),
             ], spacing=16),
@@ -441,11 +558,11 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         menu_list = soft_card(
             ft.Column([
                 _build_menu_item(ft.Icons.EDIT_OUTLINED, "Profil bearbeiten", on_click=lambda _: self._show_edit_profile()),
-                ft.Divider(height=1),
+                    ft.Divider(height=1),
                 _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Deine erstellten Meldungen", lambda _: self._show_my_posts()),
-                ft.Divider(height=1),
+                    ft.Divider(height=1),
                 _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit ❤️", lambda _: self._show_favorites()),
-                ft.Divider(height=1),
+                    ft.Divider(height=1),
                 _build_menu_item(ft.Icons.SETTINGS_OUTLINED, "Einstellungen", on_click=lambda _: self._show_settings()),
             ], spacing=0),
             pad=12,
@@ -504,7 +621,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
                 _build_section_title("Profilbild"),
                 ft.Container(height=8),
                 ft.Row([
-                    self.avatar,
+            self.avatar,
                     ft.Column([
                         ft.Row(image_buttons, spacing=8, wrap=True),
                         ft.Text("JPG, PNG oder WebP\nMax. 5 MB", size=12, color=ft.Colors.GREY_600),
@@ -539,14 +656,17 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         )
 
         # Passwort-Section
-        user_email = self.profile_service.get_email() or ""
         password_section = soft_card(
             ft.Column([
                 _build_section_title("Passwort"),
                 ft.Container(height=8),
-                ft.Text("Setze dein Passwort zurück", size=14, color=ft.Colors.GREY_600),
+                ft.Text("Ändere dein Passwort", size=14, color=ft.Colors.GREY_600),
                 ft.Container(height=8),
-                ft.OutlinedButton("Passwort zurücksetzen", icon=ft.Icons.LOCK_RESET, on_click=lambda _: self.page.run_task(self._handle_password_reset, user_email)),
+                ft.FilledButton(
+                    "Passwort ändern",
+                    icon=ft.Icons.LOCK,
+                    on_click=lambda _: self._show_change_password_dialog(),
+                ),
             ], spacing=8),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,

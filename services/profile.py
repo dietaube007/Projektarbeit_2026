@@ -175,6 +175,67 @@ class ProfileService:
             logger.error(f"Fehler beim Senden der Passwort-Reset E-Mail: {e}", exc_info=True)
             return False, str(e)
 
+    def validate_password(self, password: str) -> Tuple[bool, str]:
+        """Validiert ein Passwort nach den Sicherheitsanforderungen.
+
+        Anforderungen:
+        - Mindestens 8 Zeichen
+        - Mindestens ein Großbuchstabe
+        - Mindestens ein Kleinbuchstabe
+        - Mindestens eine Zahl
+        - Mindestens ein Sonderzeichen
+
+        Args:
+            password: Zu validierendes Passwort
+
+        Returns:
+            Tuple (Gültig, Fehlermeldung oder leerer String)
+        """
+        import re
+        
+        if not password:
+            return False, "Passwort darf nicht leer sein."
+        
+        if len(password) < 8:
+            return False, "Passwort muss mindestens 8 Zeichen haben."
+        
+        if not re.search(r"[A-Z]", password):
+            return False, "Passwort muss mindestens einen Großbuchstaben enthalten."
+        
+        if not re.search(r"[a-z]", password):
+            return False, "Passwort muss mindestens einen Kleinbuchstaben enthalten."
+        
+        if not re.search(r"[0-9]", password):
+            return False, "Passwort muss mindestens eine Zahl enthalten."
+        
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", password):
+            return False, "Passwort muss mindestens ein Sonderzeichen enthalten."
+        
+        return True, ""
+
+    def update_password(self, new_password: str) -> Tuple[bool, str]:
+        """Aktualisiert das Passwort des aktuellen Benutzers.
+
+        Args:
+            new_password: Neues Passwort
+
+        Returns:
+            Tuple (Erfolg, Fehlermeldung oder leerer String)
+        """
+        # Passwort validieren
+        is_valid, error_msg = self.validate_password(new_password)
+        if not is_valid:
+            return False, error_msg
+
+        try:
+            self.sb.auth.update_user({"password": new_password})
+            logger.info("Passwort erfolgreich aktualisiert")
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Fehler beim Aktualisieren des Passworts: {e}", exc_info=True)
+            return False, str(e)
+
     # ════════════════════════════════════════════════════════════════════
     # PROFILBILD
     # ════════════════════════════════════════════════════════════════════
