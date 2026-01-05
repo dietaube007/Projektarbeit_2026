@@ -6,53 +6,120 @@ Dieses Modul implementiert die Profilseite der PetBuddy-Anwendung.
 Benutzer können ihre Profildaten einsehen, bearbeiten, Favoriten ansehen und sich abmelden.
 """
 
+from __future__ import annotations
+
+import os
+import time
+import uuid
+import asyncio
 from typing import Callable, Optional, List
+
 import flet as ft
 
 from ui.theme import soft_card
+from ui.constants import PRIMARY_COLOR, MAX_DISPLAY_NAME_LENGTH
 from utils.logging_config import get_logger
-from ui.components import (
-    show_success_dialog,
-    show_error_dialog,
+from ui.components import show_success_dialog, show_error_dialog
+
+from services.profile import ProfileService
+
+from .favorites import (
+    render_favorites_list,
+    ProfileFavoritesMixin,
+)
+from .my_posts import (
+    render_my_posts_list,
+    ProfileMyPostsMixin,
 )
 
 logger = get_logger(__name__)
 
-from .components import (
-    PRIMARY_COLOR,
-    SECTION_PADDING,
-    CARD_ELEVATION,
-    build_back_button,
-    build_section_title,
-    build_menu_item,
-    build_logout_button,
-    loading_indicator,
-)
-from .favorites import (
-    load_favorites,
-    remove_favorite,
-    render_favorites_list,
-)
-from .my_posts import (
-    load_my_posts,
-    delete_post,
-    render_my_posts_list,
-)
-from .edit_post import EditPostDialog
-from .edit_profile import (
-    build_change_image_section,
-    build_change_name_section,
-    build_password_section,
-    update_display_name,
-    send_password_reset,
-)
-from .settings import build_notifications_section
+# ════════════════════════════════════════════════════════════════════════════════
+# KONSTANTEN
+# ════════════════════════════════════════════════════════════════════════════════
+
+SECTION_PADDING: int = 20
+CARD_ELEVATION: int = 2
 
 
-class ProfileView:
+# ════════════════════════════════════════════════════════════════════════════════
+# UI-KOMPONENTEN (Hilfsfunktionen)
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _build_back_button(on_click: Callable) -> ft.Container:
+    """Erstellt einen Zurück-Button."""
+    return ft.Container(
+        content=ft.TextButton("← Zurück", on_click=on_click),
+        padding=ft.padding.only(bottom=8),
+    )
+
+
+def _build_section_title(title: str) -> ft.Text:
+    """Erstellt einen Abschnitts-Titel."""
+    return ft.Text(title, size=18, weight=ft.FontWeight.W_600)
+
+
+def _build_menu_item(
+    icon: str,
+    title: str,
+    subtitle: str = "",
+    on_click: Optional[Callable] = None,
+) -> ft.Container:
+    """Erstellt einen Menüpunkt."""
+    return ft.Container(
+        content=ft.Row(
+            [
+                ft.Container(
+                    content=ft.Icon(icon, size=24, color=PRIMARY_COLOR),
+                    padding=12,
+                    border_radius=12,
+                    bgcolor=ft.Colors.with_opacity(0.1, PRIMARY_COLOR),
+                ),
+                ft.Column(
+                    [
+                        ft.Text(title, size=16, weight=ft.FontWeight.W_500),
+                        ft.Text(subtitle, size=12, color=ft.Colors.GREY_600) if subtitle else ft.Container(),
+                    ],
+                    spacing=2,
+                    expand=True,
+                ),
+                ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ft.Colors.GREY_400),
+            ],
+            spacing=16,
+        ),
+        padding=12,
+        border_radius=12,
+        on_click=on_click,
+        ink=True,
+    )
+
+
+def _build_setting_row(icon: str, title: str, subtitle: str, control: ft.Control) -> ft.Row:
+    """Erstellt eine Einstellungs-Zeile."""
+    return ft.Row(
+        [
+            ft.Icon(icon, color=PRIMARY_COLOR),
+            ft.Column(
+                [
+                    ft.Text(title, size=14),
+                    ft.Text(subtitle, size=12, color=ft.Colors.GREY_600),
+                ],
+                spacing=2,
+                expand=True,
+            ),
+            control,
+        ],
+        spacing=12,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# PROFILE VIEW KLASSE
+# ════════════════════════════════════════════════════════════════════════════════
+
+class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
     """Benutzer-Profilbereich mit Einstellungen und Profilverwaltung."""
 
-    # View-Namen als Konstanten
     VIEW_MAIN: str = "main"
     VIEW_EDIT_PROFILE: str = "edit_profile"
     VIEW_SETTINGS: str = "settings"
@@ -74,34 +141,38 @@ class ProfileView:
         self.on_favorites_changed = on_favorites_changed
         self.on_posts_changed = on_posts_changed
 
-        # Benutzerdaten
-        self.user_data = None
-        self.user_profile = None
+        # ProfileService initialisieren
+        self.profile_service = ProfileService(sb)
 
-        # Aktueller Bereich
+        self.user_data = None
         self.current_view = self.VIEW_MAIN
+
         self.main_container = ft.Column(
             spacing=16,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
         )
 
-        # Favoriten-Ansicht
+        # Favoriten
         self.favorites_list = ft.Column(spacing=14)
         self.favorites_items: List[dict] = []
 
-        # Meine Meldungen Ansicht
+        # Meine Meldungen
         self.my_posts_list = ft.Column(spacing=14)
         self.my_posts_items: List[dict] = []
 
-        # UI-Elemente initialisieren
+        # UI-Elemente
         self._init_ui_elements()
+
+        # FilePicker zum Overlay hinzufügen
+        if self.profile_image_picker not in self.page.overlay:
+            self.page.overlay.append(self.profile_image_picker)
 
         # Daten laden
         self.page.run_task(self._load_user_data)
 
     # ════════════════════════════════════════════════════════════════════
-    # INIT UI
+    # INIT
     # ════════════════════════════════════════════════════════════════════
 
     def _init_ui_elements(self):
@@ -109,71 +180,35 @@ class ProfileView:
         self.avatar = ft.CircleAvatar(
             radius=50,
             bgcolor=PRIMARY_COLOR,
-            content=ft.Icon(
-                ft.Icons.PERSON,
-                size=50,
-                color=ft.Colors.WHITE,
-            ),
+            content=ft.Icon(ft.Icons.PERSON, size=50, color=ft.Colors.WHITE),
         )
 
-        self.display_name = ft.Text(
-            "Lädt...",
-            size=24,
-            weight=ft.FontWeight.W_600,
+        self.profile_image_picker = ft.FilePicker(
+            on_result=lambda e: self.page.run_task(self._handle_profile_image_upload, e),
         )
 
-        self.email_text = ft.Text(
-            "",
-            size=14,
-            color=ft.Colors.GREY_600,
-        )
+        self.display_name = ft.Text("Lädt...", size=24, weight=ft.FontWeight.W_600)
+        self.email_text = ft.Text("", size=14, color=ft.Colors.GREY_600)
 
     # ════════════════════════════════════════════════════════════════════
     # DATEN LADEN
     # ════════════════════════════════════════════════════════════════════
 
     async def _load_user_data(self):
-        """Lädt den aktuell eingeloggten Benutzer und Profildaten."""
+        """Lädt den aktuell eingeloggten Benutzer."""
         try:
-            user_response = self.sb.auth.get_user()
-            if user_response and user_response.user:
-                self.user_data = user_response.user
-                self.email_text.value = self.user_data.email or ""
+            self.user_data = self.profile_service.get_current_user()
 
-                # display_name aus auth.users.user_metadata laden
-                # Hinweis: display_name wird nur in auth.users gespeichert, nicht in user Tabelle
-                display_name = "Benutzer"
-                if self.user_data.user_metadata and self.user_data.user_metadata.get("display_name"):
-                    display_name = self.user_data.user_metadata.get("display_name")
-                elif hasattr(self.user_data, 'raw_user_meta_data') and self.user_data.raw_user_meta_data:
-                    # Fallback: Prüfe auch raw_user_meta_data
-                    display_name = self.user_data.raw_user_meta_data.get("display_name", "Benutzer")
-                
-                self.display_name.value = display_name
+            if self.user_data:
+                self.email_text.value = self.profile_service.get_email() or ""
+                self.display_name.value = self.profile_service.get_display_name()
 
-                # Optional: User-Profil aus user Tabelle laden (falls andere Daten benötigt werden)
-                # Hinweis: Dies ist optional und wird nur ausgeführt, wenn die user Tabelle existiert
-                # und der Benutzer Zugriff darauf hat. Fehler werden ignoriert.
-                try:
-                    # Versuche nur spezifische Spalten zu laden (nicht *), um Fehler zu vermeiden
-                    # wenn Spalten fehlen (z.B. display_name wurde gelöscht)
-                    profile = (
-                        self.sb.table("user")
-                        .select("id,created_at,updated_at")
-                        .eq("id", self.user_data.id)
-                        .maybe_single()
-                        .execute()
-                    )
-                    if profile.data:
-                        self.user_profile = profile.data
-                    else:
-                        self.user_profile = None
-                except Exception as profile_error:
-                    # Fehler beim Laden der user Tabelle ist nicht kritisch
-                    # da display_name jetzt aus user_metadata kommt
-                    logger.debug(f"User-Profil konnte nicht geladen werden (optional): {profile_error}")
-                    self.user_profile = None
+                profile_image_url = self.profile_service.get_profile_image_url()
+                self._update_avatar_image(profile_image_url)
 
+                self.page.update()
+            else:
+                self.display_name.value = "Nicht eingeloggt"
                 self.page.update()
 
         except Exception as e:
@@ -185,48 +220,24 @@ class ProfileView:
     # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
 
-    def _show_success_dialog(self, title: str, message: str):
-        """Zeigt einen Erfolgs-Dialog an."""
-        show_success_dialog(self.page, title, message)
-    
-    def _show_error_dialog(self, title: str, message: str):
-        """Zeigt einen Fehler-Dialog an."""
-        show_error_dialog(self.page, title, message)
-
     def _show_main_menu(self):
-        """Zeigt das Hauptmenü."""
         self.current_view = self.VIEW_MAIN
         self._rebuild()
 
     def _show_edit_profile(self):
-        """Zeigt das Profil-Bearbeiten-Menü."""
-        try:
-            logger.info("_show_edit_profile aufgerufen")
-            self.current_view = self.VIEW_EDIT_PROFILE
-            logger.info(f"Current view gesetzt auf: {self.current_view}")
-            self._rebuild()
-            logger.info("_rebuild erfolgreich aufgerufen")
-        except Exception as e:
-            logger.error(f"Fehler beim Anzeigen der Profil-Bearbeiten-Ansicht: {e}", exc_info=True)
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                f"Die Profil-Bearbeiten-Ansicht konnte nicht geladen werden: {str(e)}"
-            )
+        self.current_view = self.VIEW_EDIT_PROFILE
+        self._rebuild()
 
     def _show_settings(self):
-        """Zeigt die Einstellungen."""
         self.current_view = self.VIEW_SETTINGS
         self._rebuild()
 
     def _show_favorites(self):
-        """Zeigt die Favoriten-Ansicht."""
         self.current_view = self.VIEW_FAVORITES
         self._rebuild()
         self.page.run_task(self._load_favorites)
 
     def _show_my_posts(self):
-        """Zeigt die Meine Meldungen Ansicht."""
         self.current_view = self.VIEW_MY_POSTS
         self._rebuild()
         self.page.run_task(self._load_my_posts)
@@ -245,280 +256,137 @@ class ProfileView:
             }
 
             builder = view_builders.get(self.current_view, self._build_main_menu)
-            controls = builder()
-            self.main_container.controls = controls
+            self.main_container.controls = builder()
             self.page.update()
         except Exception as e:
-            logger.error(f"Fehler beim Rebuild der Ansicht ({self.current_view}): {e}", exc_info=True)
-            # Fallback: Zeige Hauptmenü
-            try:
-                self.current_view = self.VIEW_MAIN
-                self.main_container.controls = self._build_main_menu()
-                self.page.update()
-            except Exception as fallback_error:
-                logger.error(f"Fehler beim Fallback: {fallback_error}", exc_info=True)
+            logger.error(f"Fehler beim Rebuild: {e}", exc_info=True)
 
     # ════════════════════════════════════════════════════════════════════
-    # AKTIONEN
+    # AKTIONEN (über ProfileService)
     # ════════════════════════════════════════════════════════════════════
 
     def _logout(self):
         """Meldet den Benutzer ab."""
-        try:
-            self.sb.auth.sign_out()
+        if self.profile_service.logout():
             if self.on_logout:
                 self.on_logout()
-        except Exception as e:
-            logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
-    
-    # ════════════════════════════════════════════════════════════════════
-    # PROFIL BEARBEITEN
-    # ════════════════════════════════════════════════════════════════════
-    
+
     async def _save_display_name(self, name_field: ft.TextField):
-        """Speichert den neuen Anzeigenamen.
-        
-        Args:
-            name_field: TextField mit dem neuen Anzeigenamen
-        """
+        """Speichert den neuen Anzeigenamen."""
         new_name = name_field.value
-        
         if not new_name or not new_name.strip():
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                "Der Anzeigename darf nicht leer sein."
-            )
+            show_error_dialog(self.page, "Fehler", "Der Anzeigename darf nicht leer sein.")
             return
-        
-        try:
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
-                show_error_dialog(
-                    self.page,
-                    "Fehler",
-                    "Nicht eingeloggt. Bitte melde dich an."
-                )
-                return
-            
-            user_id = user_resp.user.id
-            
-            # Anzeigenamen aktualisieren
-            success = await update_display_name(self.sb, user_id, new_name)
-            
-            if success:
-                # Lokale Daten aktualisieren
-                self.display_name.value = new_name
-                self.page.update()
-                
-                show_success_dialog(
-                    self.page,
-                    "Erfolg",
-                    "Der Anzeigename wurde erfolgreich aktualisiert."
-                )
-            else:
-                show_error_dialog(
-                    self.page,
-                    "Fehler",
-                    "Der Anzeigename konnte nicht aktualisiert werden. Bitte überprüfe die Eingabe."
-                )
-        
-        except Exception as e:
-            logger.error(f"Fehler beim Speichern des Anzeigenamens: {e}", exc_info=True)
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                f"Ein Fehler ist aufgetreten: {str(e)}"
-            )
-    
+
+        success, error_msg = self.profile_service.update_display_name(new_name)
+
+        if success:
+            self.display_name.value = new_name.strip()
+            self.page.update()
+            show_success_dialog(self.page, "Erfolg", "Der Anzeigename wurde aktualisiert.")
+        else:
+            show_error_dialog(self.page, "Fehler", error_msg or "Unbekannter Fehler.")
+
     async def _handle_password_reset(self, email: str):
-        """Sendet eine Passwort-Zurücksetzen-E-Mail.
-        
-        Args:
-            email: E-Mail-Adresse des Benutzers
-        """
+        """Sendet eine Passwort-Zurücksetzen-E-Mail."""
         if not email:
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                "Keine E-Mail-Adresse gefunden."
-            )
+            show_error_dialog(self.page, "Fehler", "Keine E-Mail-Adresse gefunden.")
             return
-        
+
+        success, error_msg = self.profile_service.send_password_reset(email)
+
+        if success:
+            show_success_dialog(self.page, "E-Mail gesendet", f"Passwort-Reset-E-Mail wurde an {email} gesendet.")
+        else:
+            show_error_dialog(self.page, "Fehler", error_msg or "Unbekannter Fehler.")
+
+    async def _handle_profile_image_upload(self, e: ft.FilePickerResultEvent):
+        """Behandelt den Upload eines Profilbilds."""
+        logger.info(f"_handle_profile_image_upload aufgerufen, files: {e.files}")
+
+        if not e.files:
+            logger.info("Keine Dateien ausgewählt")
+            return
+
         try:
-            success = await send_password_reset(self.sb, email)
-            
-            if success:
-                show_success_dialog(
-                    self.page,
-                    "E-Mail gesendet",
-                    f"Eine Passwort-Zurücksetzen-E-Mail wurde an {email} gesendet."
-                )
+            selected_file = e.files[0]
+            logger.info(f"Datei: name={selected_file.name}, path={selected_file.path}, size={selected_file.size}")
+
+            if selected_file.path:
+                # Desktop-Modus
+                await self._process_profile_image(selected_file.path)
             else:
-                show_error_dialog(
-                    self.page,
-                    "Fehler",
-                    "Die E-Mail konnte nicht gesendet werden. Bitte überprüfe die E-Mail-Adresse."
-                )
-        
-        except Exception as e:
-            logger.error(f"Fehler beim Senden der Passwort-Reset-E-Mail: {e}", exc_info=True)
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                f"Ein Fehler ist aufgetreten: {str(e)}"
-            )
+                # Web-Modus
+                if selected_file.size and selected_file.size > 5 * 1024 * 1024:
+                    show_error_dialog(self.page, "Fehler", "Die Datei ist zu groß. Max. 5 MB.")
+                    return
 
-    # ════════════════════════════════════════════════════════════════════
-    # FAVORITEN
-    # ════════════════════════════════════════════════════════════════════
+                upload_name = f"profile_{uuid.uuid4().hex}_{selected_file.name}"
+                self.profile_image_picker.upload([
+                    ft.FilePickerUploadFile(
+                        selected_file.name,
+                        upload_url=self.page.get_upload_url(upload_name, 600),
+                    )
+                ])
 
-    async def _load_favorites(self):
-        """Lädt alle favorisierten Meldungen des aktuellen Benutzers."""
-        try:
-            self.favorites_list.controls = [loading_indicator("Favoriten werden geladen...")]
-            self.page.update()
+                await asyncio.sleep(1)
+                upload_dir = os.path.join(os.getcwd(), "image_uploads")
+                file_path = os.path.join(upload_dir, upload_name)
 
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
-                self.favorites_items = []
-                render_favorites_list(
-                    self.favorites_list,
-                    self.favorites_items,
-                    self._remove_favorite,
-                    not_logged_in=True,
-                )
-                self.page.update()
-                return
+                for _ in range(20):
+                    if os.path.exists(file_path):
+                        break
+                    await asyncio.sleep(0.5)
 
-            user_id = user_resp.user.id
-            self.favorites_items = await load_favorites(self.sb, user_id)
-            render_favorites_list(
-                self.favorites_list,
-                self.favorites_items,
-                self._remove_favorite,
-            )
-            self.page.update()
+                if os.path.exists(file_path):
+                    await self._process_profile_image(file_path)
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
+                else:
+                    show_error_dialog(self.page, "Fehler", "Upload fehlgeschlagen. Bitte erneut versuchen.")
 
-        except Exception as e:
-            logger.error(f"Fehler beim Laden der Favoriten: {e}", exc_info=True)
-            self.favorites_items = []
-            render_favorites_list(
-                self.favorites_list,
-                self.favorites_items,
-                self._remove_favorite,
-            )
-            self.page.update()
+        except Exception as ex:
+            logger.error(f"Fehler beim Upload: {ex}", exc_info=True)
+            show_error_dialog(self.page, "Fehler", f"Fehler: {str(ex)}")
 
-    def _remove_favorite(self, post_id: int):
-        """Entfernt einen Post aus den Favoriten."""
-        try:
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
-                return
+    async def _process_profile_image(self, file_path: str):
+        """Verarbeitet und lädt ein Profilbild hoch."""
+        success, image_url, error_msg = self.profile_service.upload_profile_image(file_path)
 
-            user_id = user_resp.user.id
+        if success and image_url:
+            self._update_avatar_image(image_url)
+            await self._load_user_data()
+            show_success_dialog(self.page, "Erfolg", "Profilbild aktualisiert.")
+        else:
+            show_error_dialog(self.page, "Fehler", error_msg or "Upload fehlgeschlagen.")
 
-            # Aus Datenbank löschen
-            if remove_favorite(self.sb, user_id, post_id):
-                # Lokal entfernen
-                self.favorites_items = [
-                    p for p in self.favorites_items if p.get("id") != post_id
-                ]
-                render_favorites_list(
-                    self.favorites_list,
-                    self.favorites_items,
-                    self._remove_favorite,
-                )
-                self.page.update()
+    def _update_avatar_image(self, image_url: Optional[str]):
+        """Aktualisiert den Avatar."""
+        if image_url:
+            # Cache-Busting: Timestamp anhängen um Browser-Caching zu vermeiden
+            cache_buster = f"?t={int(time.time() * 1000)}"
+            self.avatar.foreground_image_src = image_url + cache_buster
+            self.avatar.content = None
+        else:
+            self.avatar.foreground_image_src = None
+            self.avatar.content = ft.Icon(ft.Icons.PERSON, size=50, color=ft.Colors.WHITE)
+        self.page.update()
 
-                # Startseite informieren
-                if self.on_favorites_changed:
-                    self.on_favorites_changed()
-
-        except Exception as e:
-            logger.error(f"Fehler beim Entfernen aus Favoriten (Post {post_id}): {e}", exc_info=True)
-
-    # ════════════════════════════════════════════════════════════════════
-    # MEINE MELDUNGEN
-    # ════════════════════════════════════════════════════════════════════
-
-    async def _load_my_posts(self):
-        """Lädt alle eigenen Meldungen des aktuellen Benutzers."""
-        try:
-            self.my_posts_list.controls = [loading_indicator("Meldungen werden geladen...")]
-            self.page.update()
-
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
-                self.my_posts_items = []
-                render_my_posts_list(
-                    self.my_posts_list,
-                    self.my_posts_items,
-                    page=self.page,
-                    on_edit=self._edit_post,
-                    on_delete=self._confirm_delete_post,
-                    not_logged_in=True,
-                )
-                self.page.update()
-                return
-
-            user_id = user_resp.user.id
-            self.my_posts_items = await load_my_posts(self.sb, user_id)
-            render_my_posts_list(
-                self.my_posts_list,
-                self.my_posts_items,
-                page=self.page,
-                on_edit=self._edit_post,
-                on_delete=self._confirm_delete_post,
-            )
-            self.page.update()
-
-        except Exception as e:
-            logger.error(f"Fehler beim Laden der eigenen Meldungen: {e}", exc_info=True)
-            self.my_posts_items = []
-            render_my_posts_list(
-                self.my_posts_list,
-                self.my_posts_items,
-                page=self.page,
-                on_edit=self._edit_post,
-                on_delete=self._confirm_delete_post,
-            )
-            self.page.update()
-
-    def _edit_post(self, post: dict):
-        """Bearbeiten einer Meldung."""
-        def on_save():
-            # Meldungen neu laden
-            self.page.run_task(self._load_my_posts)
-            # Startseite aktualisieren
-            if self.on_posts_changed:
-                self.on_posts_changed()
-        
-        # Bearbeitungsdialog öffnen
-        dialog = EditPostDialog(
-            page=self.page,
-            sb=self.sb,
-            post=post,
-            on_save_callback=on_save,
-        )
-        dialog.show()
-
-    def _confirm_delete_post(self, post_id: int):
-        """Zeigt Bestätigungsdialog zum Löschen."""
+    def _confirm_delete_profile_image(self):
+        """Zeigt Bestätigungsdialog zum Löschen des Profilbilds."""
         def on_confirm(e):
             self.page.close(dialog)
-            self._delete_post(post_id)
+            self.page.run_task(self._delete_profile_image)
 
         def on_cancel(e):
             self.page.close(dialog)
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Meldung löschen?"),
-            content=ft.Text(
-                "Möchtest du diese Meldung wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
-            ),
+            title=ft.Text("Profilbild löschen?"),
+            content=ft.Text("Möchtest du dein Profilbild wirklich löschen?"),
             actions=[
                 ft.TextButton("Abbrechen", on_click=on_cancel),
                 ft.ElevatedButton(
@@ -532,233 +400,239 @@ class ProfileView:
         )
         self.page.open(dialog)
 
-    def _delete_post(self, post_id: int):
-        """Löscht einen Post."""
+    async def _delete_profile_image(self):
+        """Löscht das Profilbild des Benutzers."""
         try:
-            if delete_post(self.sb, post_id):
-                # Lokal entfernen
-                self.my_posts_items = [
-                    p for p in self.my_posts_items if p.get("id") != post_id
-                ]
-                render_my_posts_list(
-                    self.my_posts_list,
-                    self.my_posts_items,
-                    page=self.page,
-                    on_edit=self._edit_post,
-                    on_delete=self._confirm_delete_post,
-                )
-                self._show_success_dialog("Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
-                self.page.update()
+            # Bild aus Storage löschen
+            if self.profile_service.delete_profile_image():
+                # URL aus user_metadata entfernen
+                self.profile_service._update_profile_image_url(None)
 
-                # Startseite aktualisieren
-                if self.on_posts_changed:
-                    self.on_posts_changed()
+                # Avatar zurücksetzen
+                self._update_avatar_image(None)
+
+                # View neu laden um Button zu aktualisieren
+                self._rebuild()
+
+                show_success_dialog(self.page, "Erfolg", "Profilbild wurde gelöscht.")
             else:
-                self._show_error_dialog("Löschen fehlgeschlagen", "Die Meldung konnte nicht gelöscht werden.")
-                self.page.update()
-
+                show_error_dialog(self.page, "Fehler", "Profilbild konnte nicht gelöscht werden.")
         except Exception as e:
-            logger.error(f"Fehler beim Löschen des Posts {post_id}: {e}", exc_info=True)
+            logger.error(f"Fehler beim Löschen des Profilbilds: {e}", exc_info=True)
+            show_error_dialog(self.page, "Fehler", f"Fehler: {str(e)}")
 
-    def _build_my_posts(self) -> list:
-        """Baut die Meine Meldungen Ansicht."""
-        back_button = build_back_button(lambda _: self._show_main_menu())
+    # ════════════════════════════════════════════════════════════════════
+    # VIEW BUILDER
+    # ════════════════════════════════════════════════════════════════════
 
-        # Anzahl der Meldungen
-        count_text = f"{len(self.my_posts_items)} Meldung(en)" if self.my_posts_items else ""
-
-        my_posts_card = soft_card(
-            ft.Column(
-                [
-                    ft.Row(
-                        [
-                            build_section_title("Meine Meldungen"),
-                            ft.Container(expand=True),
-                            ft.Text(count_text, size=12, color=ft.Colors.GREY_600),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    ),
-                    ft.Container(height=8),
-                    self.my_posts_list,
-                ],
-                spacing=12,
-            ),
+    def _build_main_menu(self) -> list:
+        """Baut das Hauptmenü."""
+        profile_header = soft_card(
+            ft.Column([
+                ft.Row([
+                    self.avatar,
+                    ft.Column([self.display_name, self.email_text], spacing=4, expand=True),
+                ], spacing=20),
+            ], spacing=16),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,
         )
 
-        return [back_button, my_posts_card]
+        menu_list = soft_card(
+            ft.Column([
+                _build_menu_item(ft.Icons.EDIT_OUTLINED, "Profil bearbeiten", on_click=lambda _: self._show_edit_profile()),
+                ft.Divider(height=1),
+                _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Deine erstellten Meldungen", lambda _: self._show_my_posts()),
+                ft.Divider(height=1),
+                _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit ❤️", lambda _: self._show_favorites()),
+                ft.Divider(height=1),
+                _build_menu_item(ft.Icons.SETTINGS_OUTLINED, "Einstellungen", on_click=lambda _: self._show_settings()),
+            ], spacing=0),
+            pad=12,
+            elev=2,
+        )
+
+        logout_button = ft.Container(
+            content=ft.OutlinedButton(
+                "Abmelden",
+                icon=ft.Icons.LOGOUT,
+                on_click=lambda _: self._logout(),
+                style=ft.ButtonStyle(color=ft.Colors.RED, side=ft.BorderSide(1, ft.Colors.RED)),
+                width=200,
+            ),
+            alignment=ft.alignment.center,
+            padding=ft.padding.only(top=8, bottom=24),
+        )
+
+        return [profile_header, menu_list, logout_button]
+
+    def _build_edit_profile(self) -> list:
+        """Baut die Profil-Bearbeiten-Ansicht."""
+        back_button = _build_back_button(lambda _: self._show_main_menu())
+
+        # Profilbild-Section
+        def handle_file_pick(_):
+            logger.info("Bild ändern geklickt - öffne FilePicker")
+            self.profile_image_picker.pick_files(
+                dialog_title="Profilbild auswählen",
+                allowed_extensions=["jpg", "jpeg", "png", "webp"],
+                file_type=ft.FilePickerFileType.CUSTOM,
+            )
+
+        def handle_delete_image(_):
+            self._confirm_delete_profile_image()
+
+        # Prüfen ob ein Profilbild vorhanden ist
+        has_profile_image = self.profile_service.get_profile_image_url() is not None
+
+        # Buttons für Profilbild
+        image_buttons = [
+            ft.FilledButton("Bild ändern", icon=ft.Icons.CAMERA_ALT, on_click=handle_file_pick),
+        ]
+        if has_profile_image:
+            image_buttons.append(
+                ft.OutlinedButton(
+                    "Bild löschen",
+                    icon=ft.Icons.DELETE_OUTLINE,
+                    on_click=handle_delete_image,
+                    style=ft.ButtonStyle(color=ft.Colors.RED, side=ft.BorderSide(1, ft.Colors.RED)),
+                )
+            )
+
+        change_image_section = soft_card(
+            ft.Column([
+                _build_section_title("Profilbild"),
+                ft.Container(height=8),
+                ft.Row([
+                    self.avatar,
+                    ft.Column([
+                        ft.Row(image_buttons, spacing=8, wrap=True),
+                        ft.Text("JPG, PNG oder WebP\nMax. 5 MB", size=12, color=ft.Colors.GREY_600),
+                    ], spacing=8),
+                ], spacing=20),
+            ], spacing=8),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        # Name-Section
+        current_name = self.display_name.value or "Benutzer"
+        name_field = ft.TextField(
+            value=current_name,
+            width=300,
+            prefix_icon=ft.Icons.PERSON_OUTLINE,
+            label="Anzeigename",
+            hint_text=f"Max. {MAX_DISPLAY_NAME_LENGTH} Zeichen",
+            max_length=MAX_DISPLAY_NAME_LENGTH,
+        )
+
+        change_name_section = soft_card(
+            ft.Column([
+                _build_section_title("Anzeigename"),
+                ft.Container(height=8),
+                name_field,
+                ft.Container(height=8),
+                ft.FilledButton("Speichern", icon=ft.Icons.SAVE, on_click=lambda _: self.page.run_task(self._save_display_name, name_field)),
+            ], spacing=8),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        # Passwort-Section
+        user_email = self.profile_service.get_email() or ""
+        password_section = soft_card(
+            ft.Column([
+                _build_section_title("Passwort"),
+                ft.Container(height=8),
+                ft.Text("Setze dein Passwort zurück", size=14, color=ft.Colors.GREY_600),
+                ft.Container(height=8),
+                ft.OutlinedButton("Passwort zurücksetzen", icon=ft.Icons.LOCK_RESET, on_click=lambda _: self.page.run_task(self._handle_password_reset, user_email)),
+            ], spacing=8),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        return [back_button, change_image_section, change_name_section, password_section]
+
+    def _build_settings(self) -> list:
+        """Baut die Einstellungen-Ansicht."""
+        back_button = _build_back_button(lambda _: self._show_main_menu())
+
+        notifications_section = soft_card(
+            ft.Column([
+                _build_section_title("Benachrichtigungen"),
+                ft.Container(height=12),
+                _build_setting_row(
+                    ft.Icons.NOTIFICATIONS_OUTLINED,
+                    "Push-Benachrichtigungen",
+                    "Erhalte Updates zu deinen Meldungen",
+                    ft.Switch(value=True),
+                ),
+                ft.Divider(height=20),
+                _build_setting_row(
+                    ft.Icons.EMAIL_OUTLINED,
+                    "E-Mail-Benachrichtigungen",
+                    "Erhalte wichtige Updates per E-Mail",
+                    ft.Switch(value=False),
+                ),
+            ], spacing=8),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        return [back_button, notifications_section]
 
     def _build_favorites(self) -> list:
         """Baut die Favoriten-Ansicht."""
-        back_button = build_back_button(lambda _: self._show_main_menu())
+        back_button = _build_back_button(lambda _: self._show_main_menu())
 
         favorites_card = soft_card(
-            ft.Column(
-                [
-                    build_section_title("Favorisierte Meldungen"),
-                    ft.Container(height=8),
-                    self.favorites_list,
-                ],
-                spacing=12,
-            ),
+            ft.Column([
+                _build_section_title("Favorisierte Meldungen"),
+                ft.Container(height=8),
+                self.favorites_list,
+            ], spacing=12),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,
         )
 
         return [back_button, favorites_card]
 
-    # ════════════════════════════════════════════════════════════════════
-    # BUILD - HAUPTMENÜ
-    # ════════════════════════════════════════════════════════════════════
+    def _build_my_posts(self) -> list:
+        """Baut die Meine Posts-Ansicht."""
+        back_button = _build_back_button(lambda _: self._show_main_menu())
+        count_text = f"{len(self.my_posts_items)} Meldung(en)" if self.my_posts_items else ""
 
-    def _build_main_menu(self) -> list:
-        """Baut das Hauptmenü."""
-        profile_header = soft_card(
-            ft.Column(
-                [
-                    ft.Row(
-                        [
-                            self.avatar,
-                            ft.Column(
-                                [self.display_name, self.email_text],
-                                spacing=4,
-                                expand=True,
-                            ),
-                        ],
-                        spacing=20,
-                    ),
-                ],
-                spacing=16,
-            ),
+        my_posts_card = soft_card(
+            ft.Column([
+                ft.Row([
+                    _build_section_title("Meine Meldungen"),
+                    ft.Container(expand=True),
+                    ft.Text(count_text, size=12, color=ft.Colors.GREY_600),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Container(height=8),
+                self.my_posts_list,
+            ], spacing=12),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,
         )
 
-        menu_list = soft_card(
-            ft.Column(
-                [
-                    build_menu_item(
-                        ft.Icons.EDIT_OUTLINED,
-                        "Profil bearbeiten",
-                        on_click=lambda e: self._show_edit_profile(),
-                    ),
-                    ft.Divider(height=1),
-                    build_menu_item(
-                        ft.Icons.ARTICLE_OUTLINED,
-                        "Meine Meldungen",
-                        subtitle="Deine erstellten Meldungen",
-                        on_click=lambda _: self._show_my_posts(),
-                    ),
-                    ft.Divider(height=1),
-                    build_menu_item(
-                        ft.Icons.FAVORITE_BORDER,
-                        "Favorisierte Meldungen",
-                        subtitle="Meldungen, die du mit ❤️ markiert hast",
-                        on_click=lambda _: self._show_favorites(),
-                    ),
-                    ft.Divider(height=1),
-                    build_menu_item(
-                        ft.Icons.SETTINGS_OUTLINED,
-                        "Einstellungen",
-                        on_click=lambda _: self._show_settings(),
-                    ),
-                    ft.Divider(height=1),
-                    build_menu_item(
-                        ft.Icons.HELP_OUTLINE,
-                        "Hilfe & Support",
-                        on_click=lambda _: print("Hilfe & Support"),
-                    ),
-                    ft.Divider(height=1),
-                    build_menu_item(
-                        ft.Icons.INFO_OUTLINE,
-                        "Über PetBuddy",
-                        on_click=lambda _: print("Über PetBuddy"),
-                    ),
-                ],
-                spacing=0,
-            ),
-            pad=12,
-            elev=2,
-        )
-
-        logout_button = build_logout_button(lambda _: self._logout())
-
-        return [profile_header, menu_list, logout_button]
+        return [back_button, my_posts_card]
 
     # ════════════════════════════════════════════════════════════════════
-    # BUILD - PROFIL BEARBEITEN
+    # HELPER für Mixins
     # ════════════════════════════════════════════════════════════════════
 
-    def _build_edit_profile(self) -> list:
-        """Baut die Profil-Bearbeiten-Ansicht."""
-        try:
-            back_button = build_back_button(lambda _: self._show_main_menu())
-            
-            change_image_section = build_change_image_section(
-                self.avatar,
-                on_change_image=lambda _: logger.info("Bild ändern (noch nicht implementiert)"),
-            )
-            
-            # Name-Section mit TextField-Referenz für Zugriff
-            # Sicherstellen dass display_name initialisiert ist
-            # display_name kommt jetzt aus auth.users.user_metadata
-            current_name = "Benutzer"
-            if hasattr(self, 'display_name') and self.display_name and self.display_name.value:
-                current_name = self.display_name.value
-            elif self.user_data and self.user_data.user_metadata and self.user_data.user_metadata.get("display_name"):
-                current_name = self.user_data.user_metadata.get("display_name")
-            
-            change_name_section, name_field = build_change_name_section(
-                current_name,
-                on_save=lambda field: self.page.run_task(self._save_display_name, field),
-            )
-            
-            # Passwort-Section mit E-Mail aus User-Daten
-            user_email = ""
-            if self.user_data:
-                # user_data kann ein User-Objekt sein, prüfe verschiedene Attribute
-                if hasattr(self.user_data, 'email'):
-                    user_email = self.user_data.email
-                elif isinstance(self.user_data, dict) and self.user_data.get("email"):
-                    user_email = self.user_data.get("email")
-            
-            password_section = build_password_section(
-                on_reset=lambda _: self.page.run_task(self._handle_password_reset, user_email),
-            )
+    def _show_success_dialog(self, title: str, message: str):
+        """Zeigt einen Erfolgs-Dialog."""
+        show_success_dialog(self.page, title, message)
 
-            return [back_button, change_image_section, change_name_section, password_section]
-        except Exception as e:
-            logger.error(f"Fehler beim Aufbau der Profil-Bearbeiten-Ansicht: {e}", exc_info=True)
-            # Fallback: Zeige nur Back-Button und Fehlermeldung
-            return [
-                build_back_button(lambda _: self._show_main_menu()),
-                soft_card(
-                    ft.Text(f"Fehler beim Laden: {str(e)}", color=ft.Colors.RED),
-                    pad=SECTION_PADDING,
-                    elev=CARD_ELEVATION,
-                )
-            ]
+    def _show_error_dialog(self, title: str, message: str):
+        """Zeigt einen Fehler-Dialog."""
+        show_error_dialog(self.page, title, message)
 
     # ════════════════════════════════════════════════════════════════════
-    # BUILD - EINSTELLUNGEN
-    # ════════════════════════════════════════════════════════════════════
-
-    def _build_settings(self) -> list:
-        """Baut die Einstellungen-Ansicht."""
-        back_button = build_back_button(lambda _: self._show_main_menu())
-        
-        notifications_section = build_notifications_section(
-            push_enabled=True,
-            email_enabled=False,
-            on_push_change=lambda _: print("Push geändert"),
-            on_email_change=lambda _: print("E-Mail geändert"),
-        )
-
-        return [back_button, notifications_section]
-
-    # ════════════════════════════════════════════════════════════════════
-    # BUILD
+    # PUBLIC API
     # ════════════════════════════════════════════════════════════════════
 
     def build(self) -> ft.Column:

@@ -337,7 +337,7 @@ def show_validation_dialog(
     on_close: Optional[Callable[[], None]] = None
 ) -> None:
     """Zeigt einen Validierungs-Dialog mit Fehlermeldungen an.
-    
+
     Args:
         page: Flet Page-Instanz
         title: Titel des Dialogs
@@ -349,7 +349,7 @@ def show_validation_dialog(
         page.close(dlg)
         if on_close:
             on_close()
-    
+
     dlg = ft.AlertDialog(
         modal=True,
         title=ft.Row(
@@ -375,5 +375,24 @@ def show_validation_dialog(
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )
-    
+
     page.open(dlg)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# LOADING INDICATOR
+# ══════════════════════════════════════════════════════════════════════
+
+def loading_indicator(text: str = "Lädt...") -> ft.Row:
+    """Erstellt einen Lade-Indikator mit ProgressRing und Text.
+
+    Args:
+        text: Text der neben dem Spinner angezeigt wird
+
+    Returns:
+        Row mit ProgressRing und Text
+    """
+    return ft.Row([
+        ft.ProgressRing(width=24, height=24),
+        ft.Text(text),
+    ], spacing=12)

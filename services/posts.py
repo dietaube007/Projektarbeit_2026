@@ -13,9 +13,11 @@ from __future__ import annotations
 from supabase import Client
 from typing import Dict, Any, List, Optional
 from utils.logging_config import get_logger
-from ui.constants import DEFAULT_POSTS_LIMIT
 
 logger = get_logger(__name__)
+
+# Konstante hier definiert um Circular Import zu vermeiden
+DEFAULT_POSTS_LIMIT: int = 200
 
 
 class PostService:

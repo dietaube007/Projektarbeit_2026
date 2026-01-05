@@ -10,9 +10,7 @@ Enthält Konfigurationswerte für:
 
 from typing import Tuple
 
-# ════════════════════════════════════════════════════════════════════
 # BILDVERARBEITUNG
-# ════════════════════════════════════════════════════════════════════
 
 VALID_IMAGE_TYPES: list[str] = ["jpg", "jpeg", "png", "gif", "webp"]
 """Erlaubte Bildformate für Uploads."""
@@ -26,9 +24,7 @@ IMAGE_QUALITY: int = 85
 PLACEHOLDER_IMAGE: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 """1x1 transparentes Platzhalter-Bild als Base64."""
 
-# ════════════════════════════════════════════════════════════════════
 # SPEICHER-KONFIGURATION
-# ════════════════════════════════════════════════════════════════════
 
 STORAGE_BUCKET: str = "pet-images"
 """Supabase Storage Bucket für Tierbilder."""
@@ -36,9 +32,7 @@ STORAGE_BUCKET: str = "pet-images"
 UPLOAD_DIR: str = "image_uploads"
 """Lokaler Upload-Ordner für temporäre Dateien."""
 
-# ════════════════════════════════════════════════════════════════════
 # FORMULARLAYOUT
-# ════════════════════════════════════════════════════════════════════
 
 FIELD_WIDTH_SMALL: int = 250
 """Breite für kleine Formularfelder (z.B. Dropdowns)."""
@@ -49,16 +43,12 @@ FIELD_WIDTH_MEDIUM: int = 400
 FIELD_WIDTH_LARGE: int = 500
 """Breite für große Formularfelder (z.B. Beschreibung)."""
 
-# ════════════════════════════════════════════════════════════════════
 # MELDUNGSARTEN
-# ════════════════════════════════════════════════════════════════════
 
 ALLOWED_POST_STATUSES: list[str] = ["vermisst", "fundtier"]
 """Erlaubte Meldungsarten (von Post-Statuses in der DB)."""
 
-# ════════════════════════════════════════════════════════════════════
 # FORMULARWERTE
-# ════════════════════════════════════════════════════════════════════
 
 DATE_FORMAT: str = "%d.%m.%Y"
 """Datumsformat für Eingabe (TT.MM.YYYY)."""
