@@ -30,8 +30,10 @@ from .forms import (
     create_theme_toggle,
     create_registration_modal,
     create_login_card,
+    create_password_reset_dialog,
 )
-from ui.components import show_success_dialog
+from ui.components import show_success_dialog, show_error_dialog
+from utils.validators import validate_email
 
 
 class AuthView:
@@ -122,24 +124,20 @@ class AuthView:
         try:
             self._show_reg_message("📝 Registrierung läuft...", ft.Colors.BLUE)
             
-            # Redirect URL für E-Mail-Bestätigung
-            redirect_url = "https://petbuddy.fly.dev/#/login"
-            
             res = self.sb.auth.sign_up({
                 "email": email, 
                 "password": password,
                 "options": {
                     "data": {
                         "display_name": username
-                    },
-                    "email_redirect_to": redirect_url
+                    }
                 }
             })
             
             if res.user:
                 # Prüfen ob E-Mail bereits registriert ist
                 if not res.user.identities or len(res.user.identities) == 0:
-                    self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
+                    self._show_reg_message("❌ E-Mail bereits registriert. Bitte melde dich an!", ft.Colors.RED)
                     return
                 
                 # Prüfen ob E-Mail-Bestätigung erforderlich ist
@@ -183,6 +181,76 @@ class AuthView:
             self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
         else:
             self._show_reg_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+
+    # ─────────────────────────────────────────────────────────────
+    # Passwort vergessen
+    # ─────────────────────────────────────────────────────────────
+
+    def _show_forgot_password_dialog(self, e=None):
+        """Zeigt den Dialog zum Zurücksetzen des Passworts."""
+        import os
+
+        email_field = ft.TextField(
+            label="E-Mail-Adresse",
+            prefix_icon=ft.Icons.EMAIL,
+            keyboard_type=ft.KeyboardType.EMAIL,
+            width=300,
+            hint_text="Deine registrierte E-Mail",
+        )
+
+        # Vorausfüllen mit Login-E-Mail falls vorhanden
+        if self._login_email and self._login_email.value:
+            email_field.value = self._login_email.value
+
+        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+
+        def on_send(e):
+            email = (email_field.value or "").strip()
+
+            # Validierung
+            is_valid, error_msg = validate_email(email)
+            if not is_valid:
+                error_text.value = error_msg or "Bitte gültige E-Mail eingeben."
+                error_text.visible = True
+                self.page.update()
+                return
+
+            # E-Mail senden mit Redirect-URL
+            try:
+                # Ermittle die Redirect-URL basierend auf der Umgebung
+                if os.getenv("FLY_APP_NAME"):
+                    # Produktion
+                    redirect_url = "https://petbuddy.fly.dev/"
+                else:
+                    # Lokal
+                    redirect_url = "http://localhost:8550/"
+
+                self.sb.auth.reset_password_email(
+                    email.lower(),
+                    options={"redirect_to": redirect_url}
+                )
+                self.page.close(dialog)
+                show_success_dialog(
+                    self.page,
+                    "E-Mail gesendet",
+                    f"Eine E-Mail wurde an {email} gesendet.\n\n"
+                    "Bitte prüfe auch deinen Spam-Ordner."
+                )
+            except Exception as ex:
+                error_text.value = f"Fehler: {str(ex)[:50]}"
+                error_text.visible = True
+                self.page.update()
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = create_password_reset_dialog(
+            email_field=email_field,
+            error_text=error_text,
+            on_send=on_send,
+            on_cancel=on_cancel,
+        )
+        self.page.open(dialog)
 
     # ─────────────────────────────────────────────────────────────
     # UI-Hilfsmethoden
@@ -307,6 +375,9 @@ class AuthView:
         # Login-Formular Felder
         self._login_email = create_login_email_field()
         self._login_pwd = create_login_password_field()
+        # Enter-Taste für Login aktivieren
+        self._login_email.on_submit = lambda e: self.page.run_task(self._login)
+        self._login_pwd.on_submit = lambda e: self.page.run_task(self._login)
         self._login_info = ft.Text("", size=13, weight=ft.FontWeight.W_500)
         
         # Registrierungs-Formular Felder
@@ -349,6 +420,11 @@ class AuthView:
             lambda e: self.on_continue_without_account() if self.on_continue_without_account else None
         )
         logout_btn = create_logout_button(lambda e: self.page.run_task(self._logout))
+        forgot_password_btn = ft.TextButton(
+            "Passwort vergessen?",
+            on_click=self._show_forgot_password_dialog,
+            style=ft.ButtonStyle(color=PRIMARY_COLOR),
+        )
         
         # Login-Card
         self._form_card = create_login_card(
@@ -360,6 +436,7 @@ class AuthView:
             continue_btn=continue_btn,
             is_logged_in=self.is_logged_in(),
             logout_btn=logout_btn,
+            forgot_password_btn=forgot_password_btn,
             is_dark=is_dark,
         )
         

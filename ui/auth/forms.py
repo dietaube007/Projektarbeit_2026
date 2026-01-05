@@ -60,7 +60,7 @@ def create_register_email_field() -> ft.TextField:
     """
     return ft.TextField(
         label="E-Mail",
-        hint_text="deine@email.de",
+        hint_text="beispiel@email.de",
         keyboard_type=ft.KeyboardType.EMAIL,
         border_radius=12,
     )
@@ -258,6 +258,56 @@ def create_registration_modal(
     )
 
 
+def create_password_reset_dialog(
+    email_field: ft.TextField,
+    error_text: ft.Text,
+    on_send: Callable[[ft.ControlEvent], None],
+    on_cancel: Callable[[ft.ControlEvent], None],
+) -> ft.AlertDialog:
+    """Erstellt den Dialog zum Zurücksetzen des Passworts.
+    
+    Args:
+        email_field: TextField für E-Mail-Eingabe
+        error_text: Text-Widget für Fehlermeldungen
+        on_send: Callback für "Link senden"-Button
+        on_cancel: Callback für "Abbrechen"-Button
+    
+    Returns:
+        AlertDialog für Passwort-Reset
+    """
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Row([
+            ft.Icon(ft.Icons.LOCK_RESET, color=PRIMARY_COLOR),
+            ft.Text("Passwort vergessen?", weight=ft.FontWeight.BOLD),
+        ], spacing=8),
+        content=ft.Container(
+            content=ft.Column([
+                ft.Text(
+                    "Bitte E-Mail-Adresse eingeben:",
+                    size=14,
+                    color=TEXT_SECONDARY,
+                ),
+                ft.Container(height=8),
+                email_field,
+                error_text,
+            ], spacing=8, tight=True),
+            width=320,
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel),
+            ft.ElevatedButton(
+                "Link senden",
+                icon=ft.Icons.SEND,
+                bgcolor=PRIMARY_COLOR,
+                color=ft.Colors.WHITE,
+                on_click=on_send,
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
 def create_login_card(
     email_field: ft.TextField,
     password_field: ft.TextField,
@@ -267,6 +317,7 @@ def create_login_card(
     continue_btn: ft.TextButton,
     is_logged_in: bool = False,
     logout_btn: Optional[ft.TextButton] = None,
+    forgot_password_btn: Optional[ft.TextButton] = None,
     is_dark: bool = False,
 ) -> ft.Container:
     """Erstellt die Login-Card.
@@ -280,6 +331,7 @@ def create_login_card(
         continue_btn: TextButton für Fortsetzen ohne Account
         is_logged_in: Ob Benutzer eingeloggt ist
         logout_btn: Optionaler TextButton für Logout
+        forgot_password_btn: Optionaler TextButton für Passwort vergessen
         is_dark: Ob Dark-Modus aktiv ist
     
     Returns:
@@ -289,7 +341,18 @@ def create_login_card(
         email_field,
         ft.Container(height=16),
         password_field,
-        ft.Container(height=24),
+    ]
+    
+    # "Passwort vergessen?" Link
+    if forgot_password_btn:
+        card_content.append(
+            ft.Row([forgot_password_btn], alignment=ft.MainAxisAlignment.END)
+        )
+        card_content.append(ft.Container(height=8))
+    else:
+        card_content.append(ft.Container(height=24))
+    
+    card_content.extend([
         login_btn,
         ft.Container(height=16),
         info_text,
@@ -301,7 +364,7 @@ def create_login_card(
         ),
         ft.Container(height=12),
         ft.Row([continue_btn], alignment=ft.MainAxisAlignment.CENTER),
-    ]
+    ])
     
     if is_logged_in and logout_btn:
         card_content.append(logout_btn)

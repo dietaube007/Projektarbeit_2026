@@ -125,10 +125,17 @@ def create_farben_panel(
             ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
         )
     
+    # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+    surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+    outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+    
     panel = ft.Container(
         content=farben_container,
         padding=12,
         visible=False,
+        bgcolor=surface_color,
+        border_radius=8,
+        border=ft.border.all(1, outline_color) if outline_color else None,
     )
     
     return farben_container, toggle_icon, panel
@@ -147,6 +154,10 @@ def create_farben_header(
     Returns:
         Container mit Header-Layout
     """
+    # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+    surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+    outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+    
     return ft.Container(
         content=ft.Row(
             [
@@ -160,8 +171,8 @@ def create_farben_header(
         padding=8,
         on_click=on_click,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-        border=ft.border.all(1, ft.Colors.GREY_200),
+        bgcolor=surface_color,
+        border=ft.border.all(1, outline_color) if outline_color else None,
     )
 
 

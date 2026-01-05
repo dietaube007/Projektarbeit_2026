@@ -1,5 +1,5 @@
 # PetBuddy - Hauptanwendung.
-# 
+#
 # Dieses Modul ist der Einstiegspunkt der Anwendung.
 # Die Hauptlogik wurde in das app/ Modul ausgelagert.
 
