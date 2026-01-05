@@ -195,6 +195,31 @@ def create_view_toggle(on_change: Callable[[ft.ControlEvent], None]) -> ft.Segme
     )
 
 
+def create_sort_dropdown(
+    on_change: Callable[[ft.ControlEvent], None]
+) -> ft.Dropdown:
+    """Erstellt das Sortier-Dropdown.
+    
+    Args:
+        on_change: Callback-Funktion die bei Änderung aufgerufen wird
+    
+    Returns:
+        Dropdown für Sortier-Optionen
+    """
+    return ft.Dropdown(
+        label="Sortieren",
+        options=[
+            ft.dropdown.Option("created_at_desc", "Erstellungsdatum (neueste)"),
+            ft.dropdown.Option("created_at_asc", "Erstellungsdatum (älteste)"),
+            ft.dropdown.Option("event_date_desc", "Event-Datum (neueste)"),
+            ft.dropdown.Option("event_date_asc", "Event-Datum (älteste)"),
+        ],
+        value="created_at_desc",
+        expand=True,
+        on_change=on_change,
+    )
+
+
 def create_reset_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:
     """Erstellt den Filter-Reset-Button.
     

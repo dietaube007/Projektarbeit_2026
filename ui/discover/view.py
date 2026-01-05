@@ -23,6 +23,7 @@ from .cards import (
     show_detail_dialog,
 )
 from .filters import (
+    create_sort_dropdown,
     create_search_field,
     create_dropdown,
     populate_dropdown,
@@ -32,6 +33,7 @@ from .filters import (
     create_reset_button,
 )
 from .data import (
+    sort_by_event_date,
     build_query,
     filter_by_search,
     filter_by_colors,
@@ -143,16 +145,22 @@ class DiscoverView:
             on_click=self._toggle_farben_panel,
         )
 
+        # Sortier-Dropdown
+        self.sort_dropdown = create_sort_dropdown(
+            on_change=lambda _: self.page.run_task(self.load_posts)
+        )
+
         # Buttons
         self.reset_btn = create_reset_button(on_click=self._reset_filters)
 
         self.search_row = ft.ResponsiveRow(
             controls=[
-                ft.Container(self.search_q, col={"xs": 12, "md": 5}),
-                ft.Container(self.filter_typ, col={"xs": 6, "md": 2}),
-                ft.Container(self.filter_art, col={"xs": 6, "md": 2}),
+                ft.Container(self.search_q, col={"xs": 12, "md": 4}),
+                ft.Container(self.filter_typ, col={"xs": 6, "md": 1.5}),
+                ft.Container(self.filter_art, col={"xs": 6, "md": 1.5}),
                 ft.Container(self.filter_geschlecht, col={"xs": 6, "md": 2}),
                 ft.Container(self.filter_rasse, col={"xs": 6, "md": 1}),
+                ft.Container(self.sort_dropdown, col={"xs": 12, "md": 2}),
                 ft.Container(self.reset_btn, col={"xs": 12, "md": 12}),
                 ft.Container(self.farben_header, col={"xs": 12, "md": 12}),
                 ft.Container(self.farben_panel, col={"xs": 12, "md": 12}),
@@ -357,7 +365,8 @@ class DiscoverView:
 
             # Query bauen und ausführen
             # Optimierung: user_id wird übergeben für zukünftige Join-Optimierung
-            query = build_query(self.sb, filters, user_id=self.current_user_id)
+            sort_option = self.sort_dropdown.value or "created_at_desc"
+            query = build_query(self.sb, filters, user_id=self.current_user_id, sort_option=sort_option)
             result = query.limit(MAX_POSTS_LIMIT).execute()
             items = result.data or []
 
@@ -366,6 +375,13 @@ class DiscoverView:
 
             # Farben (Python-Filter)
             items = filter_by_colors(items, set(self.selected_farben))
+            
+            # Event-Datum Sortierung in Python (falls gewählt)
+            # Dies stellt sicher, dass Posts ohne event_date auch angezeigt werden
+            if sort_option == "event_date_desc":
+                items = sort_by_event_date(items, desc=True)
+            elif sort_option == "event_date_asc":
+                items = sort_by_event_date(items, desc=False)
 
             # Favoritenstatus markieren
             # Optimierung: Favoriten werden in einer einzigen Query geladen (kein N+1 Problem)
@@ -455,6 +471,7 @@ class DiscoverView:
         self.filter_art.value = "alle"
         self.filter_geschlecht.value = "alle"
         self.filter_rasse.value = "alle"
+        self.sort_dropdown.value = "created_at_desc"
         self.selected_farben.clear()
 
         # Farben-Checkboxen zurücksetzen

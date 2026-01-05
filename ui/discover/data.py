@@ -15,7 +15,8 @@ logger = get_logger(__name__)
 def build_query(
     sb,
     filters: Dict[str, Any],
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    sort_option: str = "created_at_desc"
 ) -> Any:
     """Baut die Supabase-Abfrage mit den aktiven Filtern.
 
@@ -23,6 +24,7 @@ def build_query(
         sb: Supabase Client-Instanz
         filters: Dictionary mit Filterwerten (typ, art, geschlecht, rasse)
         user_id: Optional User-ID für optimierte Favoriten-Abfrage
+        sort_option: Sortier-Option (z.B. "created_at_desc", "event_date_asc", "headline_asc")
 
     Returns:
         Supabase Query-Objekt mit angewendeten Filtern
@@ -43,8 +45,21 @@ def build_query(
             post_color(color(id, name))
             """
         )
-        .order("created_at", desc=True)
     )
+    
+    # Sortierung anwenden
+    # Hinweis: Event-Datum Sortierung wird in Python durchgeführt, da viele Posts kein event_date haben
+    if sort_option == "created_at_desc":
+        query = query.order("created_at", desc=True)
+    elif sort_option == "created_at_asc":
+        query = query.order("created_at", desc=False)
+    elif sort_option in ("event_date_desc", "event_date_asc"):
+        # Für Event-Datum Sortierung: Zuerst nach created_at laden, dann in Python sortieren
+        # Dies stellt sicher, dass alle Posts geladen werden
+        query = query.order("created_at", desc=True)
+    else:
+        # Fallback: Neueste zuerst
+        query = query.order("created_at", desc=True)
     
     # Filter: Kategorie (post_status) - mit Validierung
     filter_typ = filters.get("typ")
@@ -124,6 +139,46 @@ def filter_by_search(items: List[Dict[str, Any]], search_query: str) -> List[Dic
         return q in h or q in d or q in loc
     
     return [it for it in items if matches(it)]
+
+
+def sort_by_event_date(items: List[Dict[str, Any]], desc: bool = True) -> List[Dict[str, Any]]:
+    """Sortiert Posts nach Event-Datum.
+    
+    Posts ohne event_date werden am Ende platziert.
+    
+    Args:
+        items: Liste von Post-Dictionaries
+        desc: True für absteigend (neueste zuerst), False für aufsteigend
+    
+    Returns:
+        Sortierte Liste von Posts
+    """
+    from datetime import datetime
+    
+    def get_sort_key(item: Dict[str, Any]) -> tuple:
+        """Gibt einen Sortier-Schlüssel zurück.
+        
+        Returns:
+            Tuple (has_date, date_value) - Posts mit Datum kommen zuerst
+        """
+        event_date = item.get("event_date")
+        if event_date:
+            try:
+                # Parse ISO-Format Datum
+                if isinstance(event_date, str):
+                    date_obj = datetime.fromisoformat(event_date.replace("Z", "+00:00"))
+                else:
+                    date_obj = event_date
+                # has_date=True bedeutet, dass es vor Posts ohne Datum kommt
+                return (True, date_obj)
+            except (ValueError, AttributeError):
+                pass
+        # Posts ohne Datum bekommen (False, None) - kommen ans Ende
+        return (False, None)
+    
+    # Sortiere: Posts mit event_date zuerst, dann nach Datum, dann Posts ohne Datum
+    sorted_items = sorted(items, key=get_sort_key, reverse=desc)
+    return sorted_items
 
 
 def filter_by_colors(items: List[Dict[str, Any]], selected_color_ids: Set[int]) -> List[Dict[str, Any]]:
