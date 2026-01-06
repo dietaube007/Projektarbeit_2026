@@ -370,16 +370,16 @@ def render_my_posts_list(
     
     if not_logged_in:
         posts_list.controls.append(
-            ft.Text("Bitte einloggen um deine Meldungen zu sehen.", color=ft.Colors.GREY_600)
+            ft.Text("Bitte einloggen um Ihre Meldungen zu sehen.", color=ft.Colors.GREY_600)
         )
     elif not posts_items:
         posts_list.controls.append(
             ft.Column(
                 [
                     ft.Icon(ft.Icons.ARTICLE_OUTLINED, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Du hast noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
+                    ft.Text("Sie haben noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
                     ft.Text(
-                        "Erstelle eine Meldung über den 'Melden'-Tab.",
+                        "Erstellen Sie eine Meldung über den 'Melden'-Tab.",
                         size=12,
                         color=ft.Colors.GREY_500,
                     ),
@@ -478,7 +478,7 @@ class ProfileMyPostsMixin:
             modal=True,
             title=ft.Text("Meldung löschen?"),
             content=ft.Text(
-                "Möchtest du diese Meldung wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
+                "Möchten Sie diese Meldung wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
             ),
             actions=[
                 ft.TextButton("Abbrechen", on_click=on_cancel),

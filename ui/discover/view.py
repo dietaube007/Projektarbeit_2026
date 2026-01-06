@@ -181,7 +181,7 @@ class DiscoverView:
                 [
                     ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
                     ft.Text("Noch keine Meldungen", weight=ft.FontWeight.W_600),
-                    ft.Text("Passe deine Filter an oder melde ein Tier.", color=ft.Colors.GREY_700),
+                    ft.Text("Passen Sie Ihre Filter an oder melden Sie ein Tier.", color=ft.Colors.GREY_700),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=8,
@@ -291,7 +291,7 @@ class DiscoverView:
                 self.on_login_required()
             else:
                 self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
+                    ft.Text("Bitte melden Sie sich an, um Meldungen zu favorisieren."),
                     open=True,
                 )
                 self.page.update()

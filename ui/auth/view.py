@@ -147,13 +147,13 @@ class AuthView:
             if res.user:
                 # Prüfen ob E-Mail bereits registriert ist
                 if not res.user.identities or len(res.user.identities) == 0:
-                    self._show_reg_message("❌ E-Mail bereits registriert. Bitte melde dich an!", ft.Colors.RED)
+                    self._show_reg_message("❌ E-Mail bereits registriert. Bitte melden Sie sich an!", ft.Colors.RED)
                     return
                 
                 # Prüfen ob E-Mail-Bestätigung erforderlich ist
                 if res.user.confirmed_at is None:
                     self._show_success_dialog(
-                        "Bestätigungs-E-Mail gesendet! Bitte prüfe dein Postfach."
+                        "Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihr Postfach."
                     )
                     return
             else:
@@ -180,7 +180,7 @@ class AuthView:
         if "invalid login credentials" in error_str or "invalid credentials" in error_str:
             self._show_login_message("❌ E-Mail oder Passwort falsch.", ft.Colors.RED)
         elif "email not confirmed" in error_str:
-            self._show_login_message("❌ Bitte bestätige zuerst deine E-Mail.", ft.Colors.ORANGE)
+            self._show_login_message("❌ Bitte bestätigen Sie zuerst Ihre E-Mail.", ft.Colors.ORANGE)
         else:
             self._show_login_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
 
@@ -205,7 +205,7 @@ class AuthView:
             prefix_icon=ft.Icons.EMAIL,
             keyboard_type=ft.KeyboardType.EMAIL,
             width=300,
-            hint_text="Deine registrierte E-Mail",
+            hint_text="Ihre registrierte E-Mail",
         )
 
         # Vorausfüllen mit Login-E-Mail falls vorhanden
@@ -244,7 +244,7 @@ class AuthView:
                     self.page,
                     "E-Mail gesendet",
                     f"Eine E-Mail wurde an {email} gesendet.\n\n"
-                    "Bitte prüfe auch deinen Spam-Ordner."
+                    "Bitte prüfen Sie auch Ihren Spam-Ordner."
                 )
             except Exception as ex:
                 error_text.value = f"Fehler: {str(ex)[:50]}"
@@ -471,7 +471,7 @@ class AuthView:
             color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
         )
         self._subtitle_text = ft.Text(
-            "Melde dich an, um deine Haustierhilfe zu\nstarten 🐾",
+            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten 🐾",
             size=14,
             color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,

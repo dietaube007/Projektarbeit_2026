@@ -130,11 +130,22 @@ class PostForm:
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
         
+        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+        panel_surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        panel_outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+        
         self.farben_panel = ft.Container(
             content=self.farben_container,
             padding=12,
             visible=True,
+            bgcolor=panel_surface_color,
+            border_radius=8,
+            border=ft.border.all(1, panel_outline_color) if panel_outline_color else None,
         )
+        
+        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
         
         self.farben_header = ft.Container(
             content=ft.Row(
@@ -149,7 +160,8 @@ class PostForm:
             padding=8,
             on_click=self._toggle_farben_panel,
             border_radius=8,
-            bgcolor=ft.Colors.GREY_100,
+            bgcolor=surface_color,
+            border=ft.border.all(1, outline_color) if outline_color else None,
         )
         
         # Beschreibung & Standort
@@ -368,7 +380,7 @@ class PostForm:
         try:
             user_response = self.sb.auth.get_user()
             if not user_response or not user_response.user:
-                self._show_error_dialog("Nicht eingeloggt", "Bitte melde dich an, um eine Meldung zu erstellen.")
+                self._show_error_dialog("Nicht eingeloggt", "Bitte melden Sie sich an, um eine Meldung zu erstellen.")
                 return
             user_id = user_response.user.id
         except Exception as e:
@@ -407,7 +419,7 @@ class PostForm:
                 self.post_service.add_photo(post_id, self.selected_photo["url"])
             
             self._show_status("")
-            self._show_success_dialog("Meldung erstellt", "Deine Meldung wurde erfolgreich veröffentlicht!")
+            self._show_success_dialog("Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
             
             self._reset_form()
             
@@ -529,17 +541,28 @@ class PostForm:
     def build(self) -> ft.Column:
         """Baut und gibt das Formular-Layout zurück."""
         
+        # Theme-Farben für Light/Dark Mode
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+        on_surface_variant = getattr(ft.Colors, "ON_SURFACE_VARIANT", None)
+        
+        # Text-Farben basierend auf Theme
+        text_color = on_surface_variant if on_surface_variant else (ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_700)
+        icon_color = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_500
+        border_color = outline_color if outline_color else (ft.Colors.GREY_600 if is_dark else ft.Colors.GREY_300)
+        
         # Foto-Upload Bereich
         photo_area = ft.Container(
             content=ft.Column([
                 ft.Container(
                     content=ft.Column([
-                        ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=ft.Colors.GREY_500),
-                        ft.Text("Foto hochladen (Tippen)", color=ft.Colors.GREY_700, size=12),
+                        ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=icon_color),
+                        ft.Text("Foto hochladen (Tippen)", color=text_color, size=12),
                     ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     width=400,
                     height=150,
-                    border=ft.border.all(2, ft.Colors.GREY_300),
+                    border=ft.border.all(2, border_color),
                     border_radius=8,
                     on_click=lambda _: self.page.run_task(self._pick_photo),
                 ),
@@ -556,7 +579,7 @@ class PostForm:
                 self.meldungsart,
                 ft.Divider(height=20),
                 
-                ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 photo_area,
                 ft.Divider(height=20),
                 
@@ -568,11 +591,11 @@ class PostForm:
                 self.farben_panel,
                 ft.Divider(height=20),
                 
-                ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 self.info_tf,
                 ft.Divider(height=20),
                 
-                ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 self.location_tf,
                 self.date_tf,
                 ft.Divider(height=20),

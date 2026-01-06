@@ -80,7 +80,7 @@ class PetBuddyApp:
         try:
             self.page.title = "PetBuddy"
             self.page.padding = 0
-            self.page.scroll = ft.ScrollMode.ADAPTIVE
+            self.page.scroll = ft.ScrollMode.AUTO
             self.page.window_min_width = WINDOW_MIN_WIDTH
             self.page.window_width = WINDOW_DEFAULT_WIDTH
             self.page.window_height = WINDOW_DEFAULT_HEIGHT
@@ -202,157 +202,7 @@ class PetBuddyApp:
         if self.nav:
             self.nav.selected_index = TAB_MELDEN
         self._show_main_app()
-    
-        """Zeigt die Seite zum Setzen eines neuen Passworts."""
-        from services.profile import ProfileService
-        from ui.components import show_success_dialog, show_error_dialog
-        
-        profile_service = ProfileService(self.sb)
-        
-        # UI-Elemente
-        new_password_field = ft.TextField(
-            label="Neues Passwort",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK,
-            hint_text="Min. 8 Zeichen, Groß/Klein, Zahl, Sonderzeichen",
-            width=350,
-            autofocus=True,
-        )
-        
-        confirm_password_field = ft.TextField(
-            label="Passwort bestätigen",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK,
-            width=350,
-        )
-        
-        error_text = ft.Text("", color=ft.Colors.RED, size=13, visible=False)
-        success_text = ft.Text("", color=ft.Colors.GREEN, size=13, visible=False)
-        
-        def on_save(e):
-            new_pw = new_password_field.value or ""
-            confirm_pw = confirm_password_field.value or ""
-            
-            # Validierung
-            is_valid, pw_error = profile_service.validate_password(new_pw)
-            if not is_valid:
-                error_text.value = pw_error
-                error_text.visible = True
-                success_text.visible = False
-                self.page.update()
-                return
-            
-            if new_pw != confirm_pw:
-                error_text.value = "Passwörter stimmen nicht überein."
-                error_text.visible = True
-                success_text.visible = False
-                self.page.update()
-                return
-            
-            # Passwort setzen
-            success, error_msg = profile_service.update_password(new_pw)
-            
-            if success:
-                error_text.visible = False
-                success_text.value = "✅ Passwort erfolgreich geändert!"
-                success_text.visible = True
-                self.page.update()
-                
-                # Nach 2 Sekunden zur Startseite
-                import time
-                time.sleep(2)
-                self.page.go("/discover")
-            else:
-                error_text.value = error_msg or "Fehler beim Speichern."
-                error_text.visible = True
-                success_text.visible = False
-                self.page.update()
-        
-        def on_cancel(e):
-            # Zur Startseite, wenn eingeloggt, sonst zur Login-Seite
-            if self.is_logged_in:
-                self.page.go("/discover")
-            else:
-                # Ausloggen und zur Login-Seite
-                try:
-                    self.sb.auth.sign_out()
-                except Exception:
-                    pass
-                self.is_logged_in = False
-                self.page.go("/login")
-        
-        # Reset-Seite UI
-        card_content = [
-            ft.Icon(ft.Icons.LOCK_RESET, size=60, color=PRIMARY_COLOR),
-            ft.Container(height=16),
-            ft.Text("Neues Passwort setzen", size=24, weight=ft.FontWeight.BOLD),
-            ft.Container(height=8),
-            ft.Text(
-                "Gib dein neues Passwort ein.",
-                size=14,
-                color=ft.Colors.GREY_600,
-                text_align=ft.TextAlign.CENTER,
-            ),
-            ft.Container(height=24),
-        ]
-        
-        card_content.extend([
-            new_password_field,
-            ft.Container(height=12),
-            confirm_password_field,
-            ft.Container(height=8),
-            error_text,
-            success_text,
-            ft.Container(height=24),
-            ft.Row([
-                ft.TextButton("Abbrechen", on_click=on_cancel),
-                ft.ElevatedButton(
-                    "Passwort speichern",
-                    icon=ft.Icons.SAVE,
-                    bgcolor=PRIMARY_COLOR,
-                    color=ft.Colors.WHITE,
-                    on_click=on_save,
-                ),
-            ], alignment=ft.MainAxisAlignment.CENTER, spacing=16),
-        ])
-        
-        reset_card = ft.Container(
-            content=ft.Column(
-                card_content,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=0,
-            ),
-            padding=40,
-            border_radius=20,
-            bgcolor=ft.Colors.WHITE,
-            width=450,
-            shadow=ft.BoxShadow(
-                blur_radius=30,
-                spread_radius=0,
-                color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
-                offset=ft.Offset(0, 4),
-            ),
-        )
-        
-        # Seite aufbauen
-        self.page.appbar = None
-        self.page.navigation_bar = None
-        self.page.controls.clear()
-        self.page.add(
-            ft.Container(
-                content=ft.Column([
-                    ft.Container(expand=True),
-                    reset_card,
-                    ft.Container(expand=True),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
-                bgcolor=ft.Colors.GREY_100,
-                expand=True,
-            )
-        )
-        self.page.update()
-    
+
     def _show_error(self, message: str) -> None:
         """Zeigt eine Fehlermeldung in der Snackbar.
         
@@ -571,8 +421,8 @@ class PetBuddyApp:
     
     def _show_login(self) -> None:
         """Zeigt die Login-Maske."""
-        # URL auf /login setzen
-        self.page.go("/login")
+        # Setze Route direkt, um Endlosschleife zu vermeiden
+        self.page.route = "/login"
         
         def on_login_success() -> None:
             self.is_logged_in = True
@@ -615,5 +465,8 @@ class PetBuddyApp:
         
         # Initiale Route setzen und navigieren
         initial_route = self.page.route or "/"
+        if not self.page.route:
+            self.page.route = initial_route
+        logger.info(f"Initiale Route beim Start: {self.page.route}")
         self._navigate_to(initial_route)
 

@@ -42,7 +42,7 @@ def create_login_password_field() -> ft.TextField:
     """
     return ft.TextField(
         label="Passwort",
-        hint_text="Dein Passwort",
+        hint_text="Ihr Passwort",
         password=True,
         can_reveal_password=True,
         border_radius=8,
@@ -104,7 +104,7 @@ def create_register_username_field() -> ft.TextField:
     """
     return ft.TextField(
         label="Anzeigename",
-        hint_text="Dein Name",
+        hint_text="Ihr Name",
         border_radius=12,
         max_length=MAX_DISPLAY_NAME_LENGTH,
     )

@@ -503,7 +503,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Profilbild löschen?"),
-            content=ft.Text("Möchtest du dein Profilbild wirklich löschen?"),
+            content=ft.Text("Möchten Sie Ihr Profilbild wirklich löschen?"),
             actions=[
                 ft.TextButton("Abbrechen", on_click=on_cancel),
                 ft.ElevatedButton(
@@ -559,7 +559,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
             ft.Column([
                 _build_menu_item(ft.Icons.EDIT_OUTLINED, "Profil bearbeiten", on_click=lambda _: self._show_edit_profile()),
                     ft.Divider(height=1),
-                _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Deine erstellten Meldungen", lambda _: self._show_my_posts()),
+                _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Ihre erstellten Meldungen", lambda _: self._show_my_posts()),
                     ft.Divider(height=1),
                 _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit ❤️", lambda _: self._show_favorites()),
                     ft.Divider(height=1),
@@ -660,7 +660,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
             ft.Column([
                 _build_section_title("Passwort"),
                 ft.Container(height=8),
-                ft.Text("Ändere dein Passwort", size=14, color=ft.Colors.GREY_600),
+                ft.Text("Ändern Sie Ihr Passwort", size=14, color=ft.Colors.GREY_600),
                 ft.Container(height=8),
                 ft.FilledButton(
                     "Passwort ändern",
@@ -685,7 +685,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
                 _build_setting_row(
                     ft.Icons.NOTIFICATIONS_OUTLINED,
                     "Push-Benachrichtigungen",
-                    "Erhalte Updates zu deinen Meldungen",
+                    "Erhalten Sie Updates zu Ihren Meldungen",
                     ft.Switch(value=True),
                 ),
                 ft.Divider(height=20),
