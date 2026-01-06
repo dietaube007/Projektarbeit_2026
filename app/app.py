@@ -571,6 +571,9 @@ class PetBuddyApp:
     
     def _show_login(self) -> None:
         """Zeigt die Login-Maske."""
+        # URL auf /login setzen
+        self.page.go("/login")
+        
         def on_login_success() -> None:
             self.is_logged_in = True
             self.pending_tab_after_login = None

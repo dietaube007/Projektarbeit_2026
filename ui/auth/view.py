@@ -124,13 +124,23 @@ class AuthView:
         try:
             self._show_reg_message("📝 Registrierung läuft...", ft.Colors.BLUE)
             
+            # Redirect-URL für E-Mail-Bestätigung bestimmen
+            import os
+            if os.getenv("FLY_APP_NAME"):
+                # Produktion
+                redirect_url = "https://petbuddy.fly.dev/login"
+            else:
+                # Lokal
+                redirect_url = "http://localhost:8550/login"
+            
             res = self.sb.auth.sign_up({
                 "email": email, 
                 "password": password,
                 "options": {
                     "data": {
                         "display_name": username
-                    }
+                    },
+                    "email_redirect_to": redirect_url
                 }
             })
             
