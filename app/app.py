@@ -166,12 +166,18 @@ class PetBuddyApp:
         if not self.discover_view:
             if not self.build_ui():
                 return
-        
+
         self.current_tab = TAB_START
         if self.nav:
             self.nav.selected_index = TAB_START
-        
+
         self._show_main_app()
+
+        # Gespeicherten Suchauftrag anwenden falls vorhanden
+        saved_search = self.page.session.get("apply_saved_search")
+        if saved_search and self.discover_view:
+            self.page.session.remove("apply_saved_search")
+            self.discover_view.apply_saved_search(saved_search)
     
     def _show_profile(self) -> None:
         """Zeigt die Profil-Seite."""

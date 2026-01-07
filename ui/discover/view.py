@@ -10,9 +10,17 @@ import flet as ft
 from supabase import Client
 
 from ui.theme import soft_card, chip
-from ui.constants import STATUS_COLORS, SPECIES_COLORS, MAX_POSTS_LIMIT, DEFAULT_PLACEHOLDER
+from ui.constants import (
+    STATUS_COLORS,
+    SPECIES_COLORS,
+    MAX_POSTS_LIMIT,
+    DEFAULT_PLACEHOLDER,
+    PRIMARY_COLOR,
+)
 from ui.helpers import extract_item_data
+from ui.components import show_success_dialog, show_error_dialog
 from services.references import ReferenceService
+from services.saved_search import SavedSearchService
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -61,6 +69,7 @@ class DiscoverView:
 
         # Services
         self.ref_service = ReferenceService(self.sb)
+        self.saved_search_service = SavedSearchService(self.sb)
 
         # Filter-Status
         self.selected_farben: list[int] = []
@@ -152,6 +161,11 @@ class DiscoverView:
 
         # Buttons
         self.reset_btn = create_reset_button(on_click=self._reset_filters)
+        self.save_search_btn = ft.TextButton(
+            "Suche speichern",
+            icon=ft.Icons.BOOKMARK_ADD_OUTLINED,
+            on_click=self._show_save_search_dialog,
+        )
 
         self.search_row = ft.ResponsiveRow(
             controls=[
@@ -161,7 +175,10 @@ class DiscoverView:
                 ft.Container(self.filter_geschlecht, col={"xs": 6, "md": 2}),
                 ft.Container(self.filter_rasse, col={"xs": 6, "md": 1}),
                 ft.Container(self.sort_dropdown, col={"xs": 12, "md": 2}),
-                ft.Container(self.reset_btn, col={"xs": 12, "md": 12}),
+                ft.Container(
+                    ft.Row([self.reset_btn, self.save_search_btn], spacing=8),
+                    col={"xs": 12, "md": 12},
+                ),
                 ft.Container(self.farben_header, col={"xs": 12, "md": 12}),
                 ft.Container(self.farben_panel, col={"xs": 12, "md": 12}),
             ],
@@ -478,6 +495,185 @@ class DiscoverView:
         for container in self.farben_filter_container.controls:
             if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
                 container.content.value = False
+
+        self.page.update()
+        self.page.run_task(self.load_posts)
+
+    def _show_save_search_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Zeigt Dialog zum Speichern der aktuellen Suche."""
+        # Prüfen ob eingeloggt
+        if not self.current_user_id:
+            if self.on_login_required:
+                self.on_login_required()
+            else:
+                self.page.snack_bar = ft.SnackBar(
+                    ft.Text("Bitte melden Sie sich an, um Suchaufträge zu speichern."),
+                    open=True,
+                )
+                self.page.update()
+            return
+
+        name_field = ft.TextField(
+            label="Name des Suchauftrags",
+            hint_text="z.B. 'Vermisste Katzen in Berlin'",
+            width=300,
+            autofocus=True,
+        )
+        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+
+        # Aktive Filter anzeigen
+        active_filters = []
+        if self.search_q.value:
+            active_filters.append(f"🔍 {self.search_q.value[:20]}")
+        if self.filter_typ.value and self.filter_typ.value != "alle":
+            active_filters.append(f"📋 Kategorie")
+        if self.filter_art.value and self.filter_art.value != "alle":
+            active_filters.append(f"🐾 Tierart")
+        if self.filter_rasse.value and self.filter_rasse.value != "alle":
+            active_filters.append(f"🏷️ Rasse")
+        if self.filter_geschlecht.value and self.filter_geschlecht.value not in ["alle", "keine_angabe"]:
+            active_filters.append(f"⚥ Geschlecht")
+        if self.selected_farben:
+            active_filters.append(f"🎨 {len(self.selected_farben)} Farben")
+
+        filter_preview = ft.Text(
+            ", ".join(active_filters) if active_filters else "Alle Meldungen (keine Filter aktiv)",
+            size=12,
+            color=ft.Colors.GREY_600,
+        )
+
+        def on_save(e):
+            name = name_field.value.strip()
+            if not name:
+                error_text.value = "Bitte geben Sie einen Namen ein."
+                error_text.visible = True
+                self.page.update()
+                return
+
+            # Filter-Werte sammeln
+            status_id = None
+            species_id = None
+            breed_id = None
+            sex_id = None
+
+            try:
+                if self.filter_typ.value and self.filter_typ.value != "alle":
+                    status_id = int(self.filter_typ.value)
+            except ValueError:
+                pass
+
+            try:
+                if self.filter_art.value and self.filter_art.value != "alle":
+                    species_id = int(self.filter_art.value)
+            except ValueError:
+                pass
+
+            try:
+                if self.filter_rasse.value and self.filter_rasse.value != "alle":
+                    breed_id = int(self.filter_rasse.value)
+            except ValueError:
+                pass
+
+            try:
+                if self.filter_geschlecht.value and self.filter_geschlecht.value not in ["alle", "keine_angabe"]:
+                    sex_id = int(self.filter_geschlecht.value)
+            except ValueError:
+                pass
+
+            success, error = self.saved_search_service.save_search(
+                name=name,
+                search_query=self.search_q.value if self.search_q.value else None,
+                status_id=status_id,
+                species_id=species_id,
+                breed_id=breed_id,
+                sex_id=sex_id,
+                colors=self.selected_farben if self.selected_farben else None,
+            )
+
+            if success:
+                self.page.close(dialog)
+                show_success_dialog(
+                    self.page,
+                    "Suchauftrag gespeichert",
+                    f"'{name}' wurde gespeichert.\n\nSie finden ihn unter Profil → Gespeicherte Suchaufträge."
+                )
+            else:
+                error_text.value = error or "Fehler beim Speichern."
+                error_text.visible = True
+                self.page.update()
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.BOOKMARK_ADD, color=PRIMARY_COLOR),
+                ft.Text("Suche speichern", weight=ft.FontWeight.BOLD),
+            ], spacing=8),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Aktive Filter:", size=14, weight=ft.FontWeight.W_500),
+                    filter_preview,
+                    ft.Container(height=12),
+                    name_field,
+                    error_text,
+                ], spacing=8, tight=True),
+                width=350,
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel),
+                ft.ElevatedButton(
+                    "Speichern",
+                    icon=ft.Icons.SAVE,
+                    on_click=on_save,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
+    def apply_saved_search(self, search: Dict[str, Any]) -> None:
+        """Wendet einen gespeicherten Suchauftrag auf die Filter an."""
+        # Saved Search speichert Filter als JSON in search["filters"]
+        filters = search.get("filters") or {}
+
+        # Suchbegriff
+        self.search_q.value = filters.get("search_query", "") or ""
+
+        # Status/Kategorie
+        status_id = filters.get("status_id")
+        self.filter_typ.value = str(status_id) if status_id else "alle"
+
+        # Tierart
+        species_id = filters.get("species_id")
+        self.filter_art.value = str(species_id) if species_id else "alle"
+
+        # Rasse - muss nach Tierart geladen werden
+        breed_id = filters.get("breed_id")
+
+        # Geschlecht
+        sex_id = filters.get("sex_id")
+        self.filter_geschlecht.value = str(sex_id) if sex_id else "alle"
+
+        # Farben
+        colors = filters.get("colors", [])
+        self.selected_farben = colors if colors else []
+
+        # Farben-Checkboxen aktualisieren
+        for container in self.farben_filter_container.controls:
+            if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
+                cb = container.content
+                if hasattr(cb, "data") and cb.data:
+                    cb.value = cb.data in self.selected_farben
+
+        # Rassen für die gewählte Tierart laden
+        if species_id:
+            self._update_rassen()
+            if breed_id:
+                self.filter_rasse.value = str(breed_id)
+        else:
+            self.filter_rasse.value = "alle"
 
         self.page.update()
         self.page.run_task(self.load_posts)

@@ -22,6 +22,7 @@ from utils.logging_config import get_logger
 from ui.components import show_success_dialog, show_error_dialog
 
 from services.profile import ProfileService
+from services.saved_search import SavedSearchService
 
 from .favorites import (
     render_favorites_list,
@@ -31,6 +32,7 @@ from .my_posts import (
     render_my_posts_list,
     ProfileMyPostsMixin,
 )
+from .saved_searches import build_saved_searches_list
 
 logger = get_logger(__name__)
 
@@ -125,6 +127,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
     VIEW_SETTINGS: str = "settings"
     VIEW_FAVORITES: str = "favorites"
     VIEW_MY_POSTS: str = "my_posts"
+    VIEW_SAVED_SEARCHES: str = "saved_searches"
 
     def __init__(
         self,
@@ -141,8 +144,9 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         self.on_favorites_changed = on_favorites_changed
         self.on_posts_changed = on_posts_changed
 
-        # ProfileService initialisieren
+        # Services initialisieren
         self.profile_service = ProfileService(sb)
+        self.saved_search_service = SavedSearchService(sb)
 
         self.user_data = None
         self.current_view = self.VIEW_MAIN
@@ -242,6 +246,10 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         self._rebuild()
         self.page.run_task(self._load_my_posts)
 
+    def _show_saved_searches(self):
+        self.current_view = self.VIEW_SAVED_SEARCHES
+        self._rebuild()
+
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
         try:
@@ -253,6 +261,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
                 self.VIEW_SETTINGS: self._build_settings,
                 self.VIEW_FAVORITES: self._build_favorites,
                 self.VIEW_MY_POSTS: self._build_my_posts,
+                self.VIEW_SAVED_SEARCHES: self._build_saved_searches,
             }
 
             builder = view_builders.get(self.current_view, self._build_main_menu)
@@ -558,11 +567,13 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         menu_list = soft_card(
             ft.Column([
                 _build_menu_item(ft.Icons.EDIT_OUTLINED, "Profil bearbeiten", on_click=lambda _: self._show_edit_profile()),
-                    ft.Divider(height=1),
+                ft.Divider(height=1),
                 _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Ihre erstellten Meldungen", lambda _: self._show_my_posts()),
-                    ft.Divider(height=1),
+                ft.Divider(height=1),
                 _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit ❤️", lambda _: self._show_favorites()),
-                    ft.Divider(height=1),
+                ft.Divider(height=1),
+                _build_menu_item(ft.Icons.BOOKMARK_BORDER, "Gespeicherte Suchaufträge", "Ihre Filter-Vorlagen", lambda _: self._show_saved_searches()),
+                ft.Divider(height=1),
                 _build_menu_item(ft.Icons.SETTINGS_OUTLINED, "Einstellungen", on_click=lambda _: self._show_settings()),
             ], spacing=0),
             pad=12,
@@ -835,6 +846,24 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         )
 
         return [back_button, my_posts_card]
+
+    def _build_saved_searches(self) -> list:
+        """Baut die Gespeicherte-Suchaufträge-Ansicht."""
+        return [
+            build_saved_searches_list(
+                page=self.page,
+                saved_search_service=self.saved_search_service,
+                on_apply_search=self._on_apply_saved_search,
+                on_back=self._show_main_menu,
+            )
+        ]
+
+    def _on_apply_saved_search(self, search: dict):
+        """Wendet einen gespeicherten Suchauftrag an und navigiert zur Startseite."""
+        # Die Suche wird über die App angewendet
+        # Speichern in session_storage zur Verwendung in DiscoverView
+        self.page.session.set("apply_saved_search", search)
+        self.page.go("/")
 
     # ════════════════════════════════════════════════════════════════════
     # HELPER für Mixins
