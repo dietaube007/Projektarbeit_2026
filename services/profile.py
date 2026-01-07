@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import io
+import httpx
 from typing import Optional, List, Dict, Any, Tuple
 
 from PIL import Image
@@ -559,4 +560,120 @@ class ProfileService:
         except Exception as e:
             logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
             return False
+
+    # ════════════════════════════════════════════════════════════════════
+    # KONTO LÖSCHEN
+    # ════════════════════════════════════════════════════════════════════
+
+    def delete_account(self) -> Tuple[bool, str]:
+        """Löscht das Konto des aktuellen Benutzers.
+
+        Löscht:
+        - Profilbild aus Storage
+        - Tierbilder aus Storage
+        - Alle Favoriten des Benutzers
+        - Alle Meldungen des Benutzers (inkl. Bilder und Farben)
+        - Das Benutzerkonto selbst (über Edge Function)
+
+        Returns:
+            Tuple (Erfolg, Fehlermeldung oder leerer String)
+        """
+        user = self.get_current_user()
+        if not user:
+            return False, "Nicht eingeloggt."
+
+        user_id = user.id
+        PET_IMAGES_BUCKET = "pet-images"
+
+        try:
+            # 1. Profilbild aus Storage löschen
+            self.delete_profile_image()
+
+            # 2. Tierbilder aus Storage löschen
+            try:
+                # Alle Posts des Benutzers holen
+                posts_res = self.sb.table("post").select("id").eq("user_id", user_id).execute()
+                post_ids = [p["id"] for p in (posts_res.data or [])]
+
+                for post_id in post_ids:
+                    # Bilder-URLs für diesen Post holen
+                    images_res = self.sb.table("post_image").select("url").eq("post_id", post_id).execute()
+                    for img in (images_res.data or []):
+                        url = img.get("url", "")
+                        if PET_IMAGES_BUCKET in url:
+                            try:
+                                parts = url.split(f"{PET_IMAGES_BUCKET}/")
+                                if len(parts) > 1:
+                                    file_path = parts[1].split("?")[0]
+                                    self.sb.storage.from_(PET_IMAGES_BUCKET).remove([file_path])
+                                    logger.debug(f"Tierbild gelöscht: {file_path}")
+                            except Exception as e:
+                                logger.warning(f"Fehler beim Löschen des Tierbilds ({url}): {e}")
+                logger.info(f"Tierbilder gelöscht für User {user_id}")
+            except Exception as e:
+                logger.warning(f"Fehler beim Löschen der Tierbilder: {e}")
+
+            # 3. Favoriten löschen
+            try:
+                self.sb.table("favorite").delete().eq("user_id", user_id).execute()
+                logger.info(f"Favoriten gelöscht für User {user_id}")
+            except Exception as e:
+                logger.warning(f"Fehler beim Löschen der Favoriten: {e}")
+
+            # 4. Meldungen des Benutzers komplett löschen (inkl. verknüpfte Daten)
+            try:
+                posts_res = self.sb.table("post").select("id").eq("user_id", user_id).execute()
+                post_ids = [p["id"] for p in (posts_res.data or [])]
+
+                for post_id in post_ids:
+                    # Verknüpfte Daten löschen
+                    self.sb.table("post_image").delete().eq("post_id", post_id).execute()
+                    self.sb.table("post_color").delete().eq("post_id", post_id).execute()
+                    # Favoriten anderer Benutzer für diesen Post löschen
+                    self.sb.table("favorite").delete().eq("post_id", post_id).execute()
+
+                # Posts selbst löschen
+                self.sb.table("post").delete().eq("user_id", user_id).execute()
+                logger.info(f"Meldungen gelöscht für User {user_id}")
+            except Exception as e:
+                logger.warning(f"Fehler beim Löschen der Meldungen: {e}")
+
+            # 5. Benutzer über Edge Function löschen
+            try:
+                # Access Token für die Edge Function holen
+                session = self.sb.auth.get_session()
+                if session and session.access_token:
+                    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+                    edge_function_url = f"{supabase_url}/functions/v1/delete-user"
+
+                    response = httpx.post(
+                        edge_function_url,
+                        headers={
+                            "Authorization": f"Bearer {session.access_token}",
+                            "Content-Type": "application/json",
+                        },
+                        timeout=30.0,
+                    )
+
+                    if response.status_code == 200:
+                        logger.info(f"Benutzer {user_id} erfolgreich über Edge Function gelöscht")
+                    else:
+                        logger.warning(f"Edge Function Fehler: {response.status_code} - {response.text}")
+                else:
+                    logger.warning("Keine Session gefunden für Edge Function Aufruf")
+            except Exception as e:
+                logger.warning(f"Fehler beim Aufruf der Edge Function: {e}")
+
+            # 6. Ausloggen (falls noch nicht durch Edge Function geschehen)
+            try:
+                self.logout()
+            except Exception:
+                pass
+
+            logger.info(f"Konto gelöscht für User {user_id}")
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Fehler beim Löschen des Kontos: {e}", exc_info=True)
+            return False, str(e)
 

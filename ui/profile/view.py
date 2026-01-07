@@ -672,7 +672,104 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
             elev=CARD_ELEVATION,
         )
 
-        return [back_button, change_image_section, change_name_section, password_section]
+        # Konto löschen Section
+        delete_account_section = soft_card(
+            ft.Column([
+                _build_section_title("Konto löschen"),
+                ft.Container(height=8),
+                ft.Text(
+                    "Wenn Sie Ihr Konto löschen, werden alle Ihre Daten unwiderruflich entfernt.",
+                    size=14,
+                    color=ft.Colors.GREY_600,
+                ),
+                ft.Container(height=8),
+                ft.OutlinedButton(
+                    "Konto löschen",
+                    icon=ft.Icons.DELETE_FOREVER,
+                    on_click=lambda _: self._confirm_delete_account(),
+                    style=ft.ButtonStyle(
+                        color=ft.Colors.RED,
+                        side=ft.BorderSide(1, ft.Colors.RED),
+                    ),
+                ),
+            ], spacing=8),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+        return [back_button, change_image_section, change_name_section, password_section, delete_account_section]
+
+    def _confirm_delete_account(self):
+        """Zeigt Bestätigungsdialog zum Löschen des Kontos."""
+        confirm_field = ft.TextField(
+            label="Zur Bestätigung 'LÖSCHEN' eingeben",
+            width=300,
+        )
+        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+
+        def on_confirm(e):
+            if confirm_field.value != "LÖSCHEN":
+                error_text.value = "Bitte geben Sie 'LÖSCHEN' ein, um fortzufahren."
+                error_text.visible = True
+                self.page.update()
+                return
+
+            self.page.close(dialog)
+            self._delete_account()
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.WARNING, color=ft.Colors.RED, size=28),
+                ft.Text("Konto wirklich löschen?", weight=ft.FontWeight.BOLD),
+            ], spacing=8),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text(
+                        "Diese Aktion kann nicht rückgängig gemacht werden!\n\n"
+                        "Folgende Daten werden gelöscht:\n"
+                        "• Ihr Profilbild\n"
+                        "• Ihre Favoriten\n"
+                        "• Ihre Meldungen",
+                        size=14,
+                    ),
+                    ft.Container(height=16),
+                    confirm_field,
+                    error_text,
+                ], spacing=8, tight=True),
+                width=350,
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel),
+                ft.ElevatedButton(
+                    "Endgültig löschen",
+                    bgcolor=ft.Colors.RED_600,
+                    color=ft.Colors.WHITE,
+                    on_click=on_confirm,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
+    def _delete_account(self):
+        """Löscht das Benutzerkonto."""
+        success, error_msg = self.profile_service.delete_account()
+
+        if success:
+            show_success_dialog(
+                self.page,
+                "Konto gelöscht",
+                "Ihr Konto wurde erfolgreich gelöscht.",
+                on_close=lambda: self.page.go("/login") if self.on_logout else None
+            )
+            if self.on_logout:
+                self.on_logout()
+        else:
+            show_error_dialog(self.page, "Fehler", error_msg or "Konto konnte nicht gelöscht werden.")
 
     def _build_settings(self) -> list:
         """Baut die Einstellungen-Ansicht."""
