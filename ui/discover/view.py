@@ -524,17 +524,17 @@ class DiscoverView:
         # Aktive Filter anzeigen
         active_filters = []
         if self.search_q.value:
-            active_filters.append(f"🔍 {self.search_q.value[:20]}")
+            active_filters.append(f"Suche: {self.search_q.value[:20]}")
         if self.filter_typ.value and self.filter_typ.value != "alle":
-            active_filters.append(f"📋 Kategorie")
+            active_filters.append("Kategorie")
         if self.filter_art.value and self.filter_art.value != "alle":
-            active_filters.append(f"🐾 Tierart")
+            active_filters.append("Tierart")
         if self.filter_rasse.value and self.filter_rasse.value != "alle":
-            active_filters.append(f"🏷️ Rasse")
+            active_filters.append("Rasse")
         if self.filter_geschlecht.value and self.filter_geschlecht.value not in ["alle", "keine_angabe"]:
-            active_filters.append(f"⚥ Geschlecht")
+            active_filters.append("Geschlecht")
         if self.selected_farben:
-            active_filters.append(f"🎨 {len(self.selected_farben)} Farben")
+            active_filters.append(f"{len(self.selected_farben)} Farben")
 
         filter_preview = ft.Text(
             ", ".join(active_filters) if active_filters else "Alle Meldungen (keine Filter aktiv)",

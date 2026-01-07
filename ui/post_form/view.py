@@ -336,15 +336,15 @@ class PostForm:
                         
                         self.photo_preview.src_base64 = result["base64"]
                         self.photo_preview.visible = True
-                        self._show_status(f"✓ Hochgeladen: {ev.file_name}")
+                        self._show_status(f"Bild hochgeladen: {ev.file_name}")
                     else:
-                        self._show_status("❌ Fehler beim Hochladen", is_error=True)
+                        self._show_status("Fehler beim Hochladen", is_error=True)
                     
                     # Lokale Datei aufräumen
                     cleanup_local_file(upload_path)
                     
                 except Exception as ex:
-                    self._show_status(f"❌ Fehler: {ex}", is_error=True)
+                    self._show_status(f"Fehler: {ex}", is_error=True)
         
         fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
         self.page.overlay.append(fp)
@@ -468,7 +468,7 @@ class PostForm:
             return
         
         try:
-            self._show_status("⏳ Erstelle Meldung...", is_loading=True)
+            self._show_status("Erstelle Meldung...", is_loading=True)
             
             # Input sanitizen vor dem Speichern
             headline = sanitize_string(self.name_tf.value, max_length=MAX_HEADLINE_LENGTH)

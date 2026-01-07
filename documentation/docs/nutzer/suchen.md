@@ -58,9 +58,9 @@ Setze alle Dropdowns auf **Alle** und entferne Farb-Auswahlen, dann klicke erneu
 
 Jede Meldung zeigt:
 
-- 📷 Bild (falls vorhanden)
-- 🏷️ Status-Badge (Vermisst/Fundtier)
-- 🐾 Tierart-Badge
-- 📍 Standort
-- 📅 Datum
-- 🎨 Farben
+- Bild (falls vorhanden)
+- Status-Badge (Vermisst/Fundtier)
+- Tierart-Badge
+- Standort
+- Datum
+- Farben

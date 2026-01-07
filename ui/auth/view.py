@@ -94,11 +94,11 @@ class AuthView:
             })
             
             if res.user:
-                self._show_login_message("✅ Erfolgreich!", ft.Colors.GREEN)
+                self._show_login_message("Erfolgreich!", ft.Colors.GREEN)
                 if self.on_auth_success:
                     self.on_auth_success()
             else:
-                self._show_login_message("❌ Anmeldung fehlgeschlagen.", ft.Colors.RED)
+                self._show_login_message("Anmeldung fehlgeschlagen.", ft.Colors.RED)
                 
         except Exception as ex:
             self._handle_login_error(ex)
@@ -112,7 +112,7 @@ class AuthView:
         
         # Passwörter vergleichen
         if password != password_confirm:
-            self._show_reg_message("❌ Passwörter stimmen nicht überein.", ft.Colors.RED)
+            self._show_reg_message("Passwörter stimmen nicht überein.", ft.Colors.RED)
             return
         
         # Validierung
@@ -147,7 +147,7 @@ class AuthView:
             if res.user:
                 # Prüfen ob E-Mail bereits registriert ist
                 if not res.user.identities or len(res.user.identities) == 0:
-                    self._show_reg_message("❌ E-Mail bereits registriert. Bitte melden Sie sich an!", ft.Colors.RED)
+                    self._show_reg_message("E-Mail bereits registriert. Bitte melden Sie sich an!", ft.Colors.RED)
                     return
                 
                 # Prüfen ob E-Mail-Bestätigung erforderlich ist
@@ -157,7 +157,7 @@ class AuthView:
                     )
                     return
             else:
-                self._show_reg_message("❌ Fehler!", ft.Colors.RED)
+                self._show_reg_message("Fehler!", ft.Colors.RED)
                 
         except Exception as ex:
             self._handle_register_error(ex)
@@ -166,7 +166,7 @@ class AuthView:
         """Meldet den Benutzer ab."""
         try:
             self.sb.auth.sign_out()
-            self._show_login_message("✅ Abgemeldet.", ft.Colors.GREEN)
+            self._show_login_message("Abgemeldet.", ft.Colors.GREEN)
         except Exception:
             pass
 
@@ -178,19 +178,19 @@ class AuthView:
         """Behandelt Login-Fehler."""
         error_str = str(ex).lower()
         if "invalid login credentials" in error_str or "invalid credentials" in error_str:
-            self._show_login_message("❌ E-Mail oder Passwort falsch.", ft.Colors.RED)
+            self._show_login_message("E-Mail oder Passwort falsch.", ft.Colors.RED)
         elif "email not confirmed" in error_str:
-            self._show_login_message("❌ Bitte bestätigen Sie zuerst Ihre E-Mail.", ft.Colors.ORANGE)
+            self._show_login_message("Bitte bestätigen Sie zuerst Ihre E-Mail.", ft.Colors.ORANGE)
         else:
-            self._show_login_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+            self._show_login_message(f"Fehler: {str(ex)[:50]}", ft.Colors.RED)
 
     def _handle_register_error(self, ex: Exception):
         """Behandelt Registrierungs-Fehler."""
         error_str = str(ex).lower()
         if "already registered" in error_str:
-            self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
+            self._show_reg_message("E-Mail bereits registriert.", ft.Colors.RED)
         else:
-            self._show_reg_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+            self._show_reg_message(f"Fehler: {str(ex)[:50]}", ft.Colors.RED)
 
     # ─────────────────────────────────────────────────────────────
     # Passwort vergessen
@@ -471,7 +471,7 @@ class AuthView:
             color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
         )
         self._subtitle_text = ft.Text(
-            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten 🐾",
+            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
             size=14,
             color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,

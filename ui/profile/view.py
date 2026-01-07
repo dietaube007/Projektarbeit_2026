@@ -570,7 +570,7 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
                 ft.Divider(height=1),
                 _build_menu_item(ft.Icons.ARTICLE_OUTLINED, "Meine Meldungen", "Ihre erstellten Meldungen", lambda _: self._show_my_posts()),
                 ft.Divider(height=1),
-                _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit ❤️", lambda _: self._show_favorites()),
+                _build_menu_item(ft.Icons.FAVORITE_BORDER, "Favorisierte Meldungen", "Meldungen mit Favorit-Markierung", lambda _: self._show_favorites()),
                 ft.Divider(height=1),
                 _build_menu_item(ft.Icons.BOOKMARK_BORDER, "Gespeicherte Suchaufträge", "Ihre Filter-Vorlagen", lambda _: self._show_saved_searches()),
                 ft.Divider(height=1),

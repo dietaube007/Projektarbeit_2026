@@ -118,7 +118,7 @@ def _build_search_card(
     # Suchbegriff
     search_query = filters.get("search_query")
     if search_query:
-        filter_chips.append(_create_filter_chip(f"🔍 {str(search_query)[:20]}"))
+        filter_chips.append(_create_filter_chip(f"Suche: {str(search_query)[:20]}"))
 
     # Referenzdaten für Namen laden
     post_statuses = {s["id"]: s for s in ref_service.get_post_statuses()}
@@ -131,14 +131,14 @@ def _build_search_card(
     if status_id:
         status = post_statuses.get(int(status_id)) if isinstance(status_id, (int, str)) else None
         name = status.get("name") if status else f"Status #{status_id}"
-        filter_chips.append(_create_filter_chip(f"📋 {name}"))
+        filter_chips.append(_create_filter_chip(f"Status: {name}"))
 
     # Tierart
     species_id = filters.get("species_id")
     if species_id:
         species = species_list.get(int(species_id)) if isinstance(species_id, (int, str)) else None
         name = species.get("name") if species else f"Tierart #{species_id}"
-        filter_chips.append(_create_filter_chip(f"🐾 {name}"))
+        filter_chips.append(_create_filter_chip(f"Tierart: {name}"))
 
     # Rasse
     breed_id = filters.get("breed_id")
@@ -157,19 +157,19 @@ def _build_search_card(
                     breed_obj = b
                     break
         name = breed_obj.get("name") if breed_obj else f"Rasse #{breed_id}"
-        filter_chips.append(_create_filter_chip(f"🏷️ {name}"))
+        filter_chips.append(_create_filter_chip(f"Rasse: {name}"))
 
     # Geschlecht
     sex_id = filters.get("sex_id")
     if sex_id:
         sex = sex_list.get(int(sex_id)) if isinstance(sex_id, (int, str)) else None
         name = sex.get("name") if sex else f"Geschlecht #{sex_id}"
-        filter_chips.append(_create_filter_chip(f"⚥ {name}"))
+        filter_chips.append(_create_filter_chip(f"Geschlecht: {name}"))
 
     # Farben
     colors = filters.get("colors", [])
     if colors and len(colors) > 0:
-        filter_chips.append(_create_filter_chip(f"🎨 {len(colors)} Farben"))
+        filter_chips.append(_create_filter_chip(f"{len(colors)} Farben"))
 
     # Falls keine Filter aktiv
     if not filter_chips:
