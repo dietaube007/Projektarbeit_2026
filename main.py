@@ -26,6 +26,9 @@ os.environ["FLET_SECRET_KEY"] = os.getenv("FLET_SECRET_KEY", "")
 
 
 def main(page: ft.Page):
+    # App-Sprache auf Deutsch setzen (betrifft u.a. DatePicker)
+    page.locale = "de-DE"
+
     app = PetBuddyApp(page)
     app.run()
 
