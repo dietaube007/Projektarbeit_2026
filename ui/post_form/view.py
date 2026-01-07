@@ -117,6 +117,8 @@ class PostForm:
         # Name/Überschrift
         self.title_label = create_title_label()
         self.name_tf = create_name_field()
+        # Dynamischer Zeichenzähler für Name
+        self.name_tf.on_change = self._update_name_counter
         
         # Dropdowns
         self.species_dd = create_species_dropdown()
@@ -166,6 +168,8 @@ class PostForm:
         
         # Beschreibung & Standort
         self.info_tf = create_description_field()
+        # Dynamischer Zeichenzähler für Beschreibung
+        self.info_tf.on_change = self._update_description_counter
         self.location_tf = create_location_field()
         self.date_tf = create_date_field()
 
@@ -250,6 +254,20 @@ class PostForm:
             self.title_label.value = "Name﹡"
         else:
             self.title_label.value = "Überschrift﹡"
+        self.page.update()
+
+    def _update_name_counter(self, _=None):
+        """Aktualisiert den Zeichenzähler für das Name/Überschrift-Feld."""
+        text = self.name_tf.value or ""
+        length = len(text)
+        self.name_tf.counter_text = f"{length} / {MAX_HEADLINE_LENGTH}"
+        self.page.update()
+
+    def _update_description_counter(self, _=None):
+        """Aktualisiert den Zeichenzähler für das Beschreibungsfeld."""
+        text = self.info_tf.value or ""
+        length = len(text)
+        self.info_tf.counter_text = f"{length} / {MAX_DESCRIPTION_LENGTH}"
         self.page.update()
 
     def _open_date_picker(self):

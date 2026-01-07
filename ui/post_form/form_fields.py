@@ -23,6 +23,11 @@ from ui.post_form.constants import (
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
 )
+from ui.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+)
 
 
 def create_meldungsart_button(on_change: Callable[[ft.ControlEvent], None]) -> ft.SegmentedButton:
@@ -64,7 +69,12 @@ def create_name_field() -> ft.TextField:
     Returns:
         TextField für Name/Überschrift-Eingabe
     """
-    return ft.TextField(width=FIELD_WIDTH_MEDIUM)
+    return ft.TextField(
+        width=FIELD_WIDTH_MEDIUM,
+        max_length=MAX_HEADLINE_LENGTH,
+        counter_text=f"0 / {MAX_HEADLINE_LENGTH}",
+        helper_text=f"Max. {MAX_HEADLINE_LENGTH} Zeichen",
+    )
 
 
 def create_title_label() -> ft.Text:
@@ -129,6 +139,9 @@ def create_description_field() -> ft.TextField:
         max_lines=4,
         width=FIELD_WIDTH_LARGE,
         min_lines=2,
+        max_length=MAX_DESCRIPTION_LENGTH,
+        counter_text=f"0 / {MAX_DESCRIPTION_LENGTH}",
+        helper_text=f"Min. {MIN_DESCRIPTION_LENGTH}, max. {MAX_DESCRIPTION_LENGTH} Zeichen",
     )
 
 
