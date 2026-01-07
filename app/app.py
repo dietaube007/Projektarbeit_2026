@@ -34,6 +34,7 @@ from ui.constants import (
 from app.dialogs import (
     create_login_required_dialog,
     create_favorite_login_dialog,
+    create_saved_search_login_dialog,
     create_login_banner,
 )
 from app.navigation import (
@@ -260,6 +261,20 @@ class PetBuddyApp:
         )
         self.page.open(dialog)
     
+    def _show_saved_search_login_dialog(self) -> None:
+        """Zeigt ein Pop-up Dialog wenn Gast auf 'Suche speichern' klickt."""
+        def on_login_click(e: ft.ControlEvent) -> None:
+            self.page.close(dialog)
+            self._show_login()
+        
+        def on_cancel_click(e: ft.ControlEvent) -> None:
+            self.page.close(dialog)
+        
+        dialog = create_saved_search_login_dialog(
+            self.page, on_login_click, on_cancel_click
+        )
+        self.page.open(dialog)
+    
     # ════════════════════════════════════════════════════════════════════
     # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
@@ -339,7 +354,8 @@ class PetBuddyApp:
                 sb=self.sb,
                 on_contact_click=None,
                 on_melden_click=self.go_to_melden_tab,
-                on_login_required=self._show_favorite_login_dialog
+                on_login_required=self._show_favorite_login_dialog,
+                on_save_search_login_required=self._show_saved_search_login_dialog,
             )
             
             # PostForm erstellen

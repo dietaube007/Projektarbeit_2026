@@ -208,6 +208,40 @@ class PostService:
         except Exception as ex:
             logger.error(f"Fehler beim Laden der Posts (Limit: {limit}): {ex}", exc_info=True)
             return []
+
+    def get_my_posts(self, user_id: str) -> List[Dict[str, Any]]:
+        """Lädt alle Meldungen eines bestimmten Benutzers."""
+        if not user_id:
+            return []
+
+        try:
+            res = (
+                self.sb.table("post")
+                .select(
+                    """
+                    id,
+                    headline,
+                    description,
+                    location_text,
+                    event_date,
+                    created_at,
+                    is_active,
+                    post_status(id, name),
+                    species(id, name),
+                    breed(id, name),
+                    sex(id, name),
+                    post_image(url),
+                    post_color(color(id, name))
+                    """
+                )
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return res.data or []
+        except Exception as ex:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden der eigenen Meldungen für User {user_id}: {ex}", exc_info=True)
+            return []
     
     def add_color(self, post_id: str, color_id: int) -> None:
         """Fügt eine Farbe zu einem Post hinzu.

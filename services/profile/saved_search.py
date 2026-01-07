@@ -95,8 +95,8 @@ class SavedSearchService:
         search_query: Optional[str] = None,
         status_id: Optional[int] = None,
         species_id: Optional[int] = None,
-        breed_id: Optional[int] = None,
-        sex_id: Optional[int] = None,
+        breed_id: Optional[Any] = None,  # Kann int oder "keine_angabe" sein
+        sex_id: Optional[Any] = None,  # Kann int oder "keine_angabe" sein
         colors: Optional[List[int]] = None,
     ) -> Tuple[bool, str]:
         """Speichert einen neuen Suchauftrag.
@@ -145,10 +145,15 @@ class SavedSearchService:
                 "search_query": search_query.strip() if search_query else None,
                 "status_id": status_id if status_id and status_id != 0 else None,
                 "species_id": species_id if species_id and species_id != 0 else None,
-                "breed_id": breed_id if breed_id and breed_id != 0 else None,
-                "sex_id": sex_id if sex_id and sex_id != 0 else None,
+                "breed_id": breed_id if breed_id and breed_id != 0 and breed_id != "keine_angabe" else None,
+                "sex_id": sex_id if sex_id and sex_id != 0 and sex_id != "keine_angabe" else None,
                 "colors": colors if colors else [],
             }
+            # "keine_angabe" als speziellen Wert speichern
+            if sex_id == "keine_angabe":
+                filters["geschlecht"] = "keine_angabe"
+            if breed_id == "keine_angabe":
+                filters["rasse"] = "keine_angabe"
             # None-Werte aus dem JSON entfernen, um es schlank zu halten
             filters = {k: v for k, v in filters.items() if v not in (None, [], "")}
 
@@ -255,3 +260,4 @@ class SavedSearchService:
         except Exception as e:
             logger.error(f"Fehler beim Laden des Suchauftrags: {e}", exc_info=True)
             return None
+

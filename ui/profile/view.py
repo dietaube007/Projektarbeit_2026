@@ -22,7 +22,7 @@ from utils.logging_config import get_logger
 from ui.components import show_success_dialog, show_error_dialog
 
 from services.profile import ProfileService
-from services.saved_search import SavedSearchService
+from services.profile import SavedSearchService
 
 from .favorites import (
     render_favorites_list,
@@ -33,6 +33,18 @@ from .my_posts import (
     ProfileMyPostsMixin,
 )
 from .saved_searches import build_saved_searches_list
+from .profile_image_helpers import (
+    handle_profile_image_upload,
+    process_profile_image,
+    update_avatar_image,
+    confirm_delete_profile_image,
+    delete_profile_image,
+)
+from .profile_security import (
+    show_change_password_dialog,
+    confirm_delete_account,
+    delete_account,
+)
 
 logger = get_logger(__name__)
 
@@ -252,23 +264,20 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
 
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
-        try:
-            self.main_container.controls.clear()
+        self.main_container.controls.clear()
 
-            view_builders = {
-                self.VIEW_MAIN: self._build_main_menu,
-                self.VIEW_EDIT_PROFILE: self._build_edit_profile,
-                self.VIEW_SETTINGS: self._build_settings,
-                self.VIEW_FAVORITES: self._build_favorites,
-                self.VIEW_MY_POSTS: self._build_my_posts,
-                self.VIEW_SAVED_SEARCHES: self._build_saved_searches,
-            }
+        view_builders = {
+            self.VIEW_MAIN: self._build_main_menu,
+            self.VIEW_EDIT_PROFILE: self._build_edit_profile,
+            self.VIEW_SETTINGS: self._build_settings,
+            self.VIEW_FAVORITES: self._build_favorites,
+            self.VIEW_MY_POSTS: self._build_my_posts,
+            self.VIEW_SAVED_SEARCHES: self._build_saved_searches,
+        }
 
-            builder = view_builders.get(self.current_view, self._build_main_menu)
-            self.main_container.controls = builder()
-            self.page.update()
-        except Exception as e:
-            logger.error(f"Fehler beim Rebuild: {e}", exc_info=True)
+        builder = view_builders.get(self.current_view, self._build_main_menu)
+        self.main_container.controls = builder()
+        self.page.update()
 
     # ════════════════════════════════════════════════════════════════════
     # AKTIONEN (über ProfileService)
@@ -311,241 +320,27 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
 
     def _show_change_password_dialog(self):
         """Zeigt einen Dialog zum Ändern des Passworts."""
-        current_password_field = ft.TextField(
-            label="Aktuelles Passwort",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK_OUTLINE,
-            width=300,
-        )
-        
-        new_password_field = ft.TextField(
-            label="Neues Passwort",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK,
-            hint_text="Min. 8 Zeichen, Groß/Klein, Zahl, Sonderzeichen",
-            width=300,
-        )
-        
-        confirm_password_field = ft.TextField(
-            label="Neues Passwort bestätigen",
-            password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK,
-            width=300,
-        )
-        
-        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
-        
-        def on_save(e):
-            current_pw = current_password_field.value
-            new_pw = new_password_field.value
-            confirm_pw = confirm_password_field.value
-            
-            # Validierung
-            if not current_pw:
-                error_text.value = "Bitte aktuelles Passwort eingeben."
-                error_text.visible = True
-                self.page.update()
-                return
-
-            # Passwort-Anforderungen prüfen
-            is_valid, pw_error = self.profile_service.validate_password(new_pw)
-            if not is_valid:
-                error_text.value = pw_error
-                error_text.visible = True
-                self.page.update()
-                return
-
-            if new_pw != confirm_pw:
-                error_text.value = "Passwörter stimmen nicht überein."
-                error_text.visible = True
-                self.page.update()
-                return
-            
-            # Erst mit aktuellem Passwort authentifizieren
-            try:
-                email = self.profile_service.get_email()
-                if not email:
-                    error_text.value = "E-Mail nicht gefunden."
-                    error_text.visible = True
-                    self.page.update()
-                    return
-                
-                # Re-Authentifizierung mit aktuellem Passwort
-                auth_result = self.sb.auth.sign_in_with_password({
-                    "email": email,
-                    "password": current_pw
-                })
-                
-                if not auth_result or not auth_result.user:
-                    error_text.value = "Aktuelles Passwort ist falsch."
-                    error_text.visible = True
-                    self.page.update()
-                    return
-
-                # Neues Passwort setzen
-                success, error_msg = self.profile_service.update_password(new_pw)
-                
-                if success:
-                    self.page.close(dialog)
-                    show_success_dialog(self.page, "Erfolg", "Passwort wurde geändert!")
-                else:
-                    error_text.value = error_msg or "Fehler beim Ändern."
-                    error_text.visible = True
-                    self.page.update()
-
-            except Exception as ex:
-                logger.error(f"Fehler beim Passwort ändern: {ex}", exc_info=True)
-                error_text.value = "Aktuelles Passwort ist falsch."
-                error_text.visible = True
-                self.page.update()
-
-        def on_cancel(e):
-            self.page.close(dialog)
-        
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Passwort ändern", weight=ft.FontWeight.BOLD),
-            content=ft.Container(
-                content=ft.Column([
-                    current_password_field,
-                    ft.Divider(height=16),
-                    new_password_field,
-                    confirm_password_field,
-                    error_text,
-                ], spacing=8, tight=True),
-                width=320,
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=on_cancel),
-                ft.ElevatedButton("Speichern", icon=ft.Icons.SAVE, on_click=on_save),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.open(dialog)
+        show_change_password_dialog(self)
 
     async def _handle_profile_image_upload(self, e: ft.FilePickerResultEvent):
         """Behandelt den Upload eines Profilbilds."""
-        logger.info(f"_handle_profile_image_upload aufgerufen, files: {e.files}")
-
-        if not e.files:
-            logger.info("Keine Dateien ausgewählt")
-            return
-
-        try:
-            selected_file = e.files[0]
-            logger.info(f"Datei: name={selected_file.name}, path={selected_file.path}, size={selected_file.size}")
-
-            if selected_file.path:
-                # Desktop-Modus
-                await self._process_profile_image(selected_file.path)
-            else:
-                # Web-Modus
-                if selected_file.size and selected_file.size > 5 * 1024 * 1024:
-                    show_error_dialog(self.page, "Fehler", "Die Datei ist zu groß. Max. 5 MB.")
-                    return
-
-                upload_name = f"profile_{uuid.uuid4().hex}_{selected_file.name}"
-                self.profile_image_picker.upload([
-                    ft.FilePickerUploadFile(
-                        selected_file.name,
-                        upload_url=self.page.get_upload_url(upload_name, 600),
-                    )
-                ])
-
-                await asyncio.sleep(1)
-                upload_dir = os.path.join(os.getcwd(), "image_uploads")
-                file_path = os.path.join(upload_dir, upload_name)
-
-                for _ in range(20):
-                    if os.path.exists(file_path):
-                        break
-                    await asyncio.sleep(0.5)
-
-                if os.path.exists(file_path):
-                    await self._process_profile_image(file_path)
-                    try:
-                        os.remove(file_path)
-                    except Exception:
-                        pass
-                else:
-                    show_error_dialog(self.page, "Fehler", "Upload fehlgeschlagen. Bitte erneut versuchen.")
-
-        except Exception as ex:
-            logger.error(f"Fehler beim Upload: {ex}", exc_info=True)
-            show_error_dialog(self.page, "Fehler", f"Fehler: {str(ex)}")
+        await handle_profile_image_upload(self, e)
 
     async def _process_profile_image(self, file_path: str):
         """Verarbeitet und lädt ein Profilbild hoch."""
-        success, image_url, error_msg = self.profile_service.upload_profile_image(file_path)
-
-        if success and image_url:
-            self._update_avatar_image(image_url)
-            await self._load_user_data()
-            show_success_dialog(self.page, "Erfolg", "Profilbild aktualisiert.")
-        else:
-            show_error_dialog(self.page, "Fehler", error_msg or "Upload fehlgeschlagen.")
+        await process_profile_image(self, file_path)
 
     def _update_avatar_image(self, image_url: Optional[str]):
         """Aktualisiert den Avatar."""
-        if image_url:
-            # Cache-Busting: Timestamp anhängen um Browser-Caching zu vermeiden
-            cache_buster = f"?t={int(time.time() * 1000)}"
-            self.avatar.foreground_image_src = image_url + cache_buster
-            self.avatar.content = None
-        else:
-            self.avatar.foreground_image_src = None
-            self.avatar.content = ft.Icon(ft.Icons.PERSON, size=50, color=ft.Colors.WHITE)
-        self.page.update()
+        update_avatar_image(self, image_url)
 
     def _confirm_delete_profile_image(self):
         """Zeigt Bestätigungsdialog zum Löschen des Profilbilds."""
-        def on_confirm(e):
-            self.page.close(dialog)
-            self.page.run_task(self._delete_profile_image)
-
-        def on_cancel(e):
-            self.page.close(dialog)
-
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Profilbild löschen?"),
-            content=ft.Text("Möchten Sie Ihr Profilbild wirklich löschen?"),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=on_cancel),
-                ft.ElevatedButton(
-                    "Löschen",
-                    bgcolor=ft.Colors.RED_600,
-                    color=ft.Colors.WHITE,
-                    on_click=on_confirm,
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.open(dialog)
+        confirm_delete_profile_image(self)
 
     async def _delete_profile_image(self):
         """Löscht das Profilbild des Benutzers."""
-        try:
-            # Bild aus Storage löschen
-            if self.profile_service.delete_profile_image():
-                # URL aus user_metadata entfernen
-                self.profile_service._update_profile_image_url(None)
-
-                # Avatar zurücksetzen
-                self._update_avatar_image(None)
-
-                # View neu laden um Button zu aktualisieren
-                self._rebuild()
-
-                show_success_dialog(self.page, "Erfolg", "Profilbild wurde gelöscht.")
-            else:
-                show_error_dialog(self.page, "Fehler", "Profilbild konnte nicht gelöscht werden.")
-        except Exception as e:
-            logger.error(f"Fehler beim Löschen des Profilbilds: {e}", exc_info=True)
-            show_error_dialog(self.page, "Fehler", f"Fehler: {str(e)}")
+        await delete_profile_image(self)
 
     # ════════════════════════════════════════════════════════════════════
     # VIEW BUILDER
@@ -598,7 +393,22 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         """Baut die Profil-Bearbeiten-Ansicht."""
         back_button = _build_back_button(lambda _: self._show_main_menu())
 
-        # Profilbild-Section
+        change_image_section = self._build_edit_profile_image_section()
+        change_name_section = self._build_edit_display_name_section()
+        password_section = self._build_edit_password_section()
+        delete_account_section = self._build_delete_account_section()
+
+        return [
+            back_button,
+            change_image_section,
+            change_name_section,
+            password_section,
+            delete_account_section,
+        ]
+
+    def _build_edit_profile_image_section(self) -> ft.Control:
+        """Profilbild-Section im Bearbeiten-View."""
+
         def handle_file_pick(_):
             logger.info("Bild ändern geklickt - öffne FilePicker")
             self.profile_image_picker.pick_files(
@@ -610,11 +420,9 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
         def handle_delete_image(_):
             self._confirm_delete_profile_image()
 
-        # Prüfen ob ein Profilbild vorhanden ist
         has_profile_image = self.profile_service.get_profile_image_url() is not None
 
-        # Buttons für Profilbild
-        image_buttons = [
+        image_buttons: list[ft.Control] = [
             ft.FilledButton("Bild ändern", icon=ft.Icons.CAMERA_ALT, on_click=handle_file_pick),
         ]
         if has_profile_image:
@@ -627,23 +435,33 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
                 )
             )
 
-        change_image_section = soft_card(
-            ft.Column([
-                _build_section_title("Profilbild"),
-                ft.Container(height=8),
-                ft.Row([
-            self.avatar,
-                    ft.Column([
-                        ft.Row(image_buttons, spacing=8, wrap=True),
-                        ft.Text("JPG, PNG oder WebP\nMax. 5 MB", size=12, color=ft.Colors.GREY_600),
-                    ], spacing=8),
-                ], spacing=20),
-            ], spacing=8),
+        return soft_card(
+            ft.Column(
+                [
+                    _build_section_title("Profilbild"),
+                    ft.Container(height=8),
+                    ft.Row(
+                        [
+                            self.avatar,
+                            ft.Column(
+                                [
+                                    ft.Row(image_buttons, spacing=8, wrap=True),
+                                    ft.Text("JPG, PNG oder WebP\nMax. 5 MB", size=12, color=ft.Colors.GREY_600),
+                                ],
+                                spacing=8,
+                            ),
+                        ],
+                        spacing=20,
+                    ),
+                ],
+                spacing=8,
+            ),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,
         )
 
-        # Name-Section
+    def _build_edit_display_name_section(self) -> ft.Control:
+        """Anzeigename-Section im Bearbeiten-View."""
         current_name = self.display_name.value or "Benutzer"
         name_field = ft.TextField(
             value=current_name,
@@ -654,133 +472,82 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
             max_length=MAX_DISPLAY_NAME_LENGTH,
         )
 
-        change_name_section = soft_card(
-            ft.Column([
-                _build_section_title("Anzeigename"),
-                ft.Container(height=8),
-                name_field,
-                ft.Container(height=8),
-                ft.FilledButton("Speichern", icon=ft.Icons.SAVE, on_click=lambda _: self.page.run_task(self._save_display_name, name_field)),
-            ], spacing=8),
-            pad=SECTION_PADDING,
-            elev=CARD_ELEVATION,
-        )
-
-        # Passwort-Section
-        password_section = soft_card(
-            ft.Column([
-                _build_section_title("Passwort"),
-                ft.Container(height=8),
-                ft.Text("Ändern Sie Ihr Passwort", size=14, color=ft.Colors.GREY_600),
-                ft.Container(height=8),
-                ft.FilledButton(
-                    "Passwort ändern",
-                    icon=ft.Icons.LOCK,
-                    on_click=lambda _: self._show_change_password_dialog(),
-                ),
-            ], spacing=8),
-            pad=SECTION_PADDING,
-            elev=CARD_ELEVATION,
-        )
-
-        # Konto löschen Section
-        delete_account_section = soft_card(
-            ft.Column([
-                _build_section_title("Konto löschen"),
-                ft.Container(height=8),
-                ft.Text(
-                    "Wenn Sie Ihr Konto löschen, werden alle Ihre Daten unwiderruflich entfernt.",
-                    size=14,
-                    color=ft.Colors.GREY_600,
-                ),
-                ft.Container(height=8),
-                ft.OutlinedButton(
-                    "Konto löschen",
-                    icon=ft.Icons.DELETE_FOREVER,
-                    on_click=lambda _: self._confirm_delete_account(),
-                    style=ft.ButtonStyle(
-                        color=ft.Colors.RED,
-                        side=ft.BorderSide(1, ft.Colors.RED),
+        return soft_card(
+            ft.Column(
+                [
+                    _build_section_title("Anzeigename"),
+                    ft.Container(height=8),
+                    name_field,
+                    ft.Container(height=8),
+                    ft.FilledButton(
+                        "Speichern",
+                        icon=ft.Icons.SAVE,
+                        on_click=lambda _: self.page.run_task(self._save_display_name, name_field),
                     ),
-                ),
-            ], spacing=8),
+                ],
+                spacing=8,
+            ),
             pad=SECTION_PADDING,
             elev=CARD_ELEVATION,
         )
 
-        return [back_button, change_image_section, change_name_section, password_section, delete_account_section]
+    def _build_edit_password_section(self) -> ft.Control:
+        """Passwort-Section im Bearbeiten-View."""
+        return soft_card(
+            ft.Column(
+                [
+                    _build_section_title("Passwort"),
+                    ft.Container(height=8),
+                    ft.Text("Ändern Sie Ihr Passwort", size=14, color=ft.Colors.GREY_600),
+                    ft.Container(height=8),
+                    ft.FilledButton(
+                        "Passwort ändern",
+                        icon=ft.Icons.LOCK,
+                        on_click=lambda _: self._show_change_password_dialog(),
+                    ),
+                ],
+                spacing=8,
+            ),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
+
+    def _build_delete_account_section(self) -> ft.Control:
+        """Konto-löschen-Section im Bearbeiten-View."""
+        return soft_card(
+            ft.Column(
+                [
+                    _build_section_title("Konto löschen"),
+                    ft.Container(height=8),
+                    ft.Text(
+                        "Wenn Sie Ihr Konto löschen, werden alle Ihre Daten unwiderruflich entfernt.",
+                        size=14,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    ft.Container(height=8),
+                    ft.OutlinedButton(
+                        "Konto löschen",
+                        icon=ft.Icons.DELETE_FOREVER,
+                        on_click=lambda _: self._confirm_delete_account(),
+                        style=ft.ButtonStyle(
+                            color=ft.Colors.RED,
+                            side=ft.BorderSide(1, ft.Colors.RED),
+                        ),
+                    ),
+                ],
+                spacing=8,
+            ),
+            pad=SECTION_PADDING,
+            elev=CARD_ELEVATION,
+        )
 
     def _confirm_delete_account(self):
         """Zeigt Bestätigungsdialog zum Löschen des Kontos."""
-        confirm_field = ft.TextField(
-            label="Zur Bestätigung 'LÖSCHEN' eingeben",
-            width=300,
-        )
-        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
-
-        def on_confirm(e):
-            if confirm_field.value != "LÖSCHEN":
-                error_text.value = "Bitte geben Sie 'LÖSCHEN' ein, um fortzufahren."
-                error_text.visible = True
-                self.page.update()
-                return
-
-            self.page.close(dialog)
-            self._delete_account()
-
-        def on_cancel(e):
-            self.page.close(dialog)
-
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Row([
-                ft.Icon(ft.Icons.WARNING, color=ft.Colors.RED, size=28),
-                ft.Text("Konto wirklich löschen?", weight=ft.FontWeight.BOLD),
-            ], spacing=8),
-            content=ft.Container(
-                content=ft.Column([
-                    ft.Text(
-                        "Diese Aktion kann nicht rückgängig gemacht werden!\n\n"
-                        "Folgende Daten werden gelöscht:\n"
-                        "• Ihr Profilbild\n"
-                        "• Ihre Favoriten\n"
-                        "• Ihre Meldungen",
-                        size=14,
-                    ),
-                    ft.Container(height=16),
-                    confirm_field,
-                    error_text,
-                ], spacing=8, tight=True),
-                width=350,
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=on_cancel),
-                ft.ElevatedButton(
-                    "Endgültig löschen",
-                    bgcolor=ft.Colors.RED_600,
-                    color=ft.Colors.WHITE,
-                    on_click=on_confirm,
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        self.page.open(dialog)
+        confirm_delete_account(self)
 
     def _delete_account(self):
         """Löscht das Benutzerkonto."""
-        success, error_msg = self.profile_service.delete_account()
-
-        if success:
-            show_success_dialog(
-                self.page,
-                "Konto gelöscht",
-                "Ihr Konto wurde erfolgreich gelöscht.",
-                on_close=lambda: self.page.go("/login") if self.on_logout else None
-            )
-            if self.on_logout:
-                self.on_logout()
-        else:
-            show_error_dialog(self.page, "Fehler", error_msg or "Konto konnte nicht gelöscht werden.")
+        delete_account(self)
 
     def _build_settings(self) -> list:
         """Baut die Einstellungen-Ansicht."""

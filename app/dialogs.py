@@ -60,6 +60,26 @@ def create_favorite_login_dialog(
     )
 
 
+def create_saved_search_login_dialog(
+    page: ft.Page,
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
+) -> ft.AlertDialog:
+    """Erstellt einen Dialog wenn Gast auf 'Suche speichern' klickt."""
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Anmeldung erforderlich"),
+        content=ft.Text(
+            "Bitte melden Sie sich an, um Suchaufträge zu speichern."
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel_click),
+            ft.ElevatedButton("Anmelden", on_click=on_login_click),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
 def create_login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
     """Erstellt ein Banner für nicht eingeloggte Benutzer."""
     return ft.Container(

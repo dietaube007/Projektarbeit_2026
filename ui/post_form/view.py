@@ -655,14 +655,14 @@ class PostForm:
             [
                 ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
                 ft.Divider(height=20),
-                
-                self.meldungsart,
-                ft.Divider(height=20),
-                
+
                 ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 photo_area,
                 ft.Divider(height=20),
-                
+
+                self.meldungsart,
+                ft.Divider(height=20),
+
                 self.title_label,
                 self.name_tf,
                 ft.Row([self.species_dd, self.breed_dd, self.sex_dd], spacing=15, wrap=True),

@@ -4,6 +4,7 @@ Hilfsfunktionen für Datenverarbeitung und Formatierung.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 
@@ -39,8 +40,18 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
     farbe = ", ".join([x for x in farben_namen if x]) if farben_namen else ""
 
     ort = item.get("location_text") or ""
-    when = (item.get("event_date") or item.get("created_at") or "")[:10]
+    when_raw = (item.get("event_date") or item.get("created_at") or "")[:10]
+    when = format_date(when_raw)
     status = "Aktiv" if item.get("is_active") else "Inaktiv"
+
+    # Benutzer-Informationen (aus separater Abfrage)
+    username = item.get("user_display_name") or ""
+    if not username:
+        username = "Nutzer"
+
+    # Erstellungsdatum (wann gepostet)
+    created_at_raw = (item.get("created_at") or "")[:10]
+    created_at = format_date(created_at_raw)
 
     return {
         "img_src": img_src,
@@ -52,21 +63,31 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
         "ort": ort,
         "when": when,
         "status": status,
+        "username": username,
+        "created_at": created_at,
     }
 
 
 def format_date(date_str: Optional[str]) -> str:
-    """Formatiert ein Datum aus ISO-Format.
+    """Formatiert ein Datum aus ISO-Format ins Anzeigeformat TT.MM.JJJJ.
 
     Args:
         date_str: Datumsstring im ISO-Format (YYYY-MM-DD)
 
     Returns:
-        Formatiertes Datum (YYYY-MM-DD) oder "—" wenn leer
+        Formatiertes Datum (TT.MM.JJJJ) oder "—" wenn leer
     """
-    if not date_str:
+    if not date_str or not date_str.strip():
         return "—"
-    return date_str[:10]
+    
+    try:
+        # ISO-Format parsen (YYYY-MM-DD)
+        date_obj = datetime.strptime(date_str[:10], "%Y-%m-%d")
+        # Formatieren als TT.MM.JJJJ
+        return date_obj.strftime("%d.%m.%Y")
+    except (ValueError, TypeError):
+        # Fallback: Original zurückgeben wenn Parsing fehlschlägt
+        return date_str[:10] if date_str else "—"
 
 
 def truncate_text(text: str, max_length: int = 100) -> str:

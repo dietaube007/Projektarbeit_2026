@@ -43,9 +43,14 @@ def _show_post_details(page: ft.Page, post: dict) -> None:
     farbe = ", ".join(farben_namen) if farben_namen else "—"
     
     ort = post.get("location_text") or "—"
-    event_date = (post.get("event_date") or "")[:10]
-    created_at = (post.get("created_at") or "")[:10]
+    event_date_raw = (post.get("event_date") or "")[:10]
+    created_at_raw = (post.get("created_at") or "")[:10]
     is_active = post.get("is_active", True)
+
+    # Datum formatieren (TT.MM.JJ)
+    from ui.helpers import format_date
+    event_date = format_date(event_date_raw)
+    created_at = format_date(created_at_raw)
     
     # Bild
     post_images = post.get("post_image") or []

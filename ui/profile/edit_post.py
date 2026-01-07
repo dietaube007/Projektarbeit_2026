@@ -3,7 +3,7 @@ ui/profile/edit_post.py
 Dialog zum Bearbeiten einer Meldung.
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Callable, Dict, List, Optional, Any
 import flet as ft
 
@@ -132,7 +132,40 @@ class EditPostDialog:
             value=self._format_date(self.post.get("event_date", "")),
             width=180,
             border_radius=8,
+            read_only=True,
         )
+
+        # DatePicker einbinden (kein zukünftiges Datum erlaubt, nur Kalender)
+        self.date_picker = ft.DatePicker(
+            first_date=date(2000, 1, 1),
+            last_date=date.today(),
+            on_change=self._on_date_picked,
+            help_text="Datum auswählen",
+            error_invalid_text="Datum außerhalb des gültigen Bereichs",
+            error_format_text="Ungültiges Datum",
+            cancel_text="Abbrechen",
+            confirm_text="OK",
+            date_picker_entry_mode=ft.DatePickerEntryMode.CALENDAR_ONLY,
+        )
+        # DatePicker als Overlay zur Seite hinzufügen (nur einmal)
+        if self.date_picker not in self.page.overlay:
+            self.page.overlay.append(self.date_picker)
+
+        # Textfeld nur über Kalender änderbar (keine direkte Eingabe)
+        self.date_tf.suffix = ft.IconButton(
+            ft.Icons.CALENDAR_MONTH,
+            on_click=lambda _: self._open_date_picker(),
+        )
+        self.date_tf.on_tap = lambda _: self._open_date_picker()
+
+        # Initiales Datum setzen (falls vorhanden)
+        event_date_str = self.post.get("event_date", "")
+        if event_date_str:
+            try:
+                parsed_date = datetime.strptime(event_date_str[:10], self.DATE_FORMAT_DB).date()
+                self.date_picker.value = parsed_date
+            except (ValueError, TypeError):
+                pass
 
     # ══════════════════════════════════════════════════════════════════════
     # HILFSMETHODEN
@@ -187,6 +220,27 @@ class EditPostDialog:
             self.selected_farben.append(color_id)
         elif not is_selected and color_id in self.selected_farben:
             self.selected_farben.remove(color_id)
+
+    def _open_date_picker(self):
+        """Öffnet den DatePicker (kompatibel mit verschiedenen Flet-Versionen)."""
+        try:
+            self.date_picker.open = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def _on_date_picked(self, e):
+        """Wird aufgerufen, wenn im DatePicker ein Datum gewählt wird."""
+        if getattr(e, "control", None) and getattr(e.control, "value", None):
+            try:
+                # value ist vom Typ date
+                selected_date = e.control.value
+                if isinstance(selected_date, date):
+                    # Formatieren im Anzeigeformat (TT.MM.JJJJ)
+                    self.date_tf.value = selected_date.strftime(self.DATE_FORMAT)
+                    self.page.update()
+            except Exception as ex:
+                logger.warning(f"Fehler beim Verarbeiten des ausgewählten Datums: {ex}")
 
     def _update_breeds(self):
         """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""

@@ -9,45 +9,21 @@ from typing import Callable, Optional, Dict, Any, List
 import flet as ft
 from supabase import Client
 
-from ui.theme import soft_card, chip
-from ui.constants import (
-    STATUS_COLORS,
-    SPECIES_COLORS,
-    MAX_POSTS_LIMIT,
-    DEFAULT_PLACEHOLDER,
-    PRIMARY_COLOR,
-)
-from ui.helpers import extract_item_data
-from ui.components import show_success_dialog, show_error_dialog
+from ui.constants import MAX_POSTS_LIMIT
 from services.references import ReferenceService
-from services.saved_search import SavedSearchService
+from services.profile import SavedSearchService, FavoritesService
+from services.discover import DiscoverService
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-from .cards import (
-    build_small_card,
-    build_big_card,
-    show_detail_dialog,
-)
-from .filters import (
-    create_sort_dropdown,
-    create_search_field,
-    create_dropdown,
-    populate_dropdown,
-    create_farben_panel,
-    create_farben_header,
-    create_view_toggle,
-    create_reset_button,
-)
-from .data import (
-    sort_by_event_date,
-    build_query,
-    filter_by_search,
-    filter_by_colors,
-    get_favorite_ids,
-    mark_favorites,
-)
+from .cards import show_detail_dialog
+from .saved_search_dialog import show_save_search_dialog
+from .filters import reset_filters, apply_saved_search_filters, collect_current_filters
+from .references_loader import load_and_populate_references, update_breeds_dropdown
+from .item_renderer import render_items, create_empty_state_card
+from .ui_builder import build_discover_ui
+from .data import get_favorite_ids
 
 
 class DiscoverView:
@@ -60,16 +36,20 @@ class DiscoverView:
         on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
         on_melden_click: Optional[Callable[[], None]] = None,
         on_login_required: Optional[Callable[[], None]] = None,
+        on_save_search_login_required: Optional[Callable[[], None]] = None,
     ) -> None:
         self.page = page
         self.sb = sb
         self.on_contact_click = on_contact_click
         self.on_melden_click = on_melden_click
         self.on_login_required = on_login_required
+        self.on_save_search_login_required = on_save_search_login_required
 
         # Services
         self.ref_service = ReferenceService(self.sb)
         self.saved_search_service = SavedSearchService(self.sb)
+        self.favorites_service = FavoritesService(self.sb)
+        self.discover_service = DiscoverService(self.sb)
 
         # Filter-Status
         self.selected_farben: list[int] = []
@@ -110,102 +90,35 @@ class DiscoverView:
     # ──────────────────────────────────────────────────────────────────
 
     def _init_ui_elements(self) -> None:
-        # Suche
-        self.search_q = create_search_field(
-            on_change=lambda _: self.page.run_task(self.load_posts)
+        """Initialisiert alle UI-Elemente über den UI-Builder."""
+        ui_elements = build_discover_ui(
+            on_search_click=lambda _: self.page.run_task(self.load_posts),
+            on_tierart_change=self._on_tierart_change,
+            on_reset_click=self._reset_filters,
+            on_save_search_click=self._show_save_search_dialog,
+            on_view_change=self._on_view_change,
+            on_toggle_farben=self._toggle_farben_panel,
         )
 
-        # Filter Dropdowns
-        self.filter_typ = create_dropdown(
-            label="Kategorie",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-        )
-
-        self.filter_art = create_dropdown(
-            label="Tierart",
-            on_change=self._on_tierart_change,
-        )
-
-        self.filter_geschlecht = create_dropdown(
-            label="Geschlecht",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-            initial_options=[
-                ft.dropdown.Option("alle", "Alle"),
-                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
-            ],
-        )
-
-        self.filter_rasse = create_dropdown(
-            label="Rasse",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-        )
-
-        # Farben Panel - wird später in _load_references befüllt
-        self.farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
-        self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN)
-        self.farben_panel = ft.Container(
-            content=self.farben_filter_container,
-            padding=12,
-            visible=False,
-        )
-
-        self.farben_header = create_farben_header(
-            toggle_icon=self.farben_toggle_icon,
-            on_click=self._toggle_farben_panel,
-        )
-
-        # Sortier-Dropdown
-        self.sort_dropdown = create_sort_dropdown(
-            on_change=lambda _: self.page.run_task(self.load_posts)
-        )
-
-        # Buttons
-        self.reset_btn = create_reset_button(on_click=self._reset_filters)
-        self.save_search_btn = ft.TextButton(
-            "Suche speichern",
-            icon=ft.Icons.BOOKMARK_ADD_OUTLINED,
-            on_click=self._show_save_search_dialog,
-        )
-
-        self.search_row = ft.ResponsiveRow(
-            controls=[
-                ft.Container(self.search_q, col={"xs": 12, "md": 4}),
-                ft.Container(self.filter_typ, col={"xs": 6, "md": 1.5}),
-                ft.Container(self.filter_art, col={"xs": 6, "md": 1.5}),
-                ft.Container(self.filter_geschlecht, col={"xs": 6, "md": 2}),
-                ft.Container(self.filter_rasse, col={"xs": 6, "md": 1}),
-                ft.Container(self.sort_dropdown, col={"xs": 12, "md": 2}),
-                ft.Container(
-                    ft.Row([self.reset_btn, self.save_search_btn], spacing=8),
-                    col={"xs": 12, "md": 12},
-                ),
-                ft.Container(self.farben_header, col={"xs": 12, "md": 12}),
-                ft.Container(self.farben_panel, col={"xs": 12, "md": 12}),
-            ],
-            spacing=10,
-            run_spacing=10,
-        )
-
-        # View toggle
-        self.view_toggle = create_view_toggle(on_change=self._on_view_change)
-
-        # Ergebnisbereiche
-        self.list_view = ft.Column(spacing=14, expand=True)
-        self.grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12, visible=False)
-
-        self.empty_state_card = soft_card(
-            ft.Column(
-                [
-                    ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Noch keine Meldungen", weight=ft.FontWeight.W_600),
-                    ft.Text("Passen Sie Ihre Filter an oder melden Sie ein Tier.", color=ft.Colors.GREY_700),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=8,
-            ),
-            elev=1,
-            pad=24,
-        )
+        # Alle UI-Elemente als Attribute setzen
+        self.search_q = ui_elements["search_q"]
+        self.filter_typ = ui_elements["filter_typ"]
+        self.filter_art = ui_elements["filter_art"]
+        self.filter_geschlecht = ui_elements["filter_geschlecht"]
+        self.filter_rasse = ui_elements["filter_rasse"]
+        self.farben_filter_container = ui_elements["farben_filter_container"]
+        self.farben_toggle_icon = ui_elements["farben_toggle_icon"]
+        self.farben_panel = ui_elements["farben_panel"]
+        self.farben_header = ui_elements["farben_header"]
+        self.sort_dropdown = ui_elements["sort_dropdown"]
+        self.search_btn = ui_elements["search_btn"]
+        self.reset_btn = ui_elements["reset_btn"]
+        self.save_search_btn = ui_elements["save_search_btn"]
+        self.search_row = ui_elements["search_row"]
+        self.view_toggle = ui_elements["view_toggle"]
+        self.list_view = ui_elements["list_view"]
+        self.grid_view = ui_elements["grid_view"]
+        self.empty_state_card = ui_elements["empty_state_card"]
 
     def _on_view_change(self, e: ft.ControlEvent) -> None:
         val = next(iter(e.control.selected), "list")
@@ -217,75 +130,33 @@ class DiscoverView:
     # ──────────────────────────────────────────────────────────────────
 
     async def _load_references(self):
-        try:
-            populate_dropdown(self.filter_typ, self.ref_service.get_post_statuses())
-            populate_dropdown(self.filter_art, self.ref_service.get_species())
-
-            # Geschlecht
-            sex_options = self.ref_service.get_sex() or []
-            self.filter_geschlecht.options = [
-                ft.dropdown.Option("alle", "Alle"),
-                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
-            ]
-            for it in sex_options:
-                self.filter_geschlecht.options.append(
-                    ft.dropdown.Option(str(it.get("id")), it.get("name", ""))
-                )
-
-            # Rassen (abhängig von Art)
-            self._all_breeds = self.ref_service.get_breeds_by_species() or {}
-            self._update_rassen_dropdown()
-
-            # Farben Checkboxen
-            self.farben_filter_container.controls = []
-            for c in self.ref_service.get_colors() or []:
-                c_id = c["id"]
-
-                def on_color_change(e, color_id=c_id):
-                    if e.control.value:
-                        if color_id not in self.selected_farben:
-                            self.selected_farben.append(color_id)
-                    else:
-                        if color_id in self.selected_farben:
-                            self.selected_farben.remove(color_id)
-                    self.page.run_task(self.load_posts)
-
-                cb = ft.Checkbox(label=c["name"], value=False, on_change=on_color_change)
-                self.farben_filter_container.controls.append(
-                    ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
-                )
-
-            self.page.update()
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden der Referenzen: {ex}", exc_info=True)
+        """Lädt alle Referenzen und befüllt die Dropdowns."""
+        self._all_breeds = load_and_populate_references(
+            ref_service=self.ref_service,
+            filter_typ=self.filter_typ,
+            filter_art=self.filter_art,
+            filter_geschlecht=self.filter_geschlecht,
+            filter_rasse=self.filter_rasse,
+            farben_filter_container=self.farben_filter_container,
+            selected_colors=self.selected_farben,
+            on_color_change_callback=lambda: None,  # Keine automatische Suche
+            page=self.page,
+        )
+        self._update_rassen_dropdown()
 
     def _on_tierart_change(self, e: ft.ControlEvent) -> None:
+        """Aktualisiert das Rassen-Dropdown bei Tierart-Änderung (ohne automatische Suche)."""
         self._update_rassen_dropdown()
-        self.page.run_task(self.load_posts)
 
     def _update_rassen_dropdown(self) -> None:
-        self.filter_rasse.options = [ft.dropdown.Option("alle", "Alle")]
-        try:
-            if self.filter_art.value and self.filter_art.value != "alle":
-                species_id = int(self.filter_art.value)
-                breeds = self._all_breeds.get(species_id, []) if hasattr(self, "_all_breeds") else []
-            else:
-                breeds = []
-                if hasattr(self, "_all_breeds"):
-                    for arr in self._all_breeds.values():
-                        breeds.extend(arr)
-
-            for b in breeds:
-                self.filter_rasse.options.append(
-                    ft.dropdown.Option(str(b.get("id")), b.get("name", ""))
-                )
-        except Exception:
-            pass
-
-        if self.filter_rasse.value not in [o.key for o in self.filter_rasse.options]:
-            self.filter_rasse.value = "alle"
-
-        self.page.update()
+        """Aktualisiert das Rassen-Dropdown basierend auf der ausgewählten Tierart."""
+        if hasattr(self, "_all_breeds"):
+            update_breeds_dropdown(
+                filter_art=self.filter_art,
+                filter_rasse=self.filter_rasse,
+                all_breeds=self._all_breeds,
+                page=self.page,
+            )
 
     def _toggle_farben_panel(self, _: Optional[ft.ControlEvent] = None) -> None:
         self.farben_panel_visible = not self.farben_panel_visible
@@ -319,31 +190,45 @@ class DiscoverView:
             return
 
         try:
-            if item.get("is_favorite"):
-                (
-                    self.sb.table("favorite")
-                    .delete()
-                    .eq("user_id", self.current_user_id)
-                    .eq("post_id", post_id)
-                    .execute()
-                )
-                item["is_favorite"] = False
-                icon_button.icon = ft.Icons.FAVORITE_BORDER
-                icon_button.icon_color = ft.Colors.GREY_600
+            is_favorite = item.get("is_favorite", False)
+            if is_favorite:
+                success = self.favorites_service.remove_favorite(post_id)
+                if success:
+                    item["is_favorite"] = False
+                    icon_button.icon = ft.Icons.FAVORITE_BORDER
+                    icon_button.icon_color = ft.Colors.GREY_600
+                    # Dialog anzeigen
+                    from ui.components import show_success_dialog
+                    show_success_dialog(
+                        self.page,
+                        "Aus Favoriten entfernt",
+                        "Die Meldung wurde aus Ihren Favoriten entfernt."
+                    )
             else:
-                (
-                    self.sb.table("favorite")
-                    .insert({"user_id": self.current_user_id, "post_id": post_id})
-                    .execute()
-                )
-                item["is_favorite"] = True
-                icon_button.icon = ft.Icons.FAVORITE
-                icon_button.icon_color = ft.Colors.RED
+                success = self.favorites_service.add_favorite(post_id)
+                if success:
+                    item["is_favorite"] = True
+                    icon_button.icon = ft.Icons.FAVORITE
+                    icon_button.icon_color = ft.Colors.RED
+                    # Dialog anzeigen
+                    from ui.components import show_success_dialog
+                    show_success_dialog(
+                        self.page,
+                        "Zu Favoriten hinzugefügt",
+                        "Die Meldung wurde zu Ihren Favoriten hinzugefügt."
+                    )
 
-            self.page.update()
+            if success:
+                self.page.update()
 
         except Exception as ex:
             logger.error(f"Fehler beim Aktualisieren der Favoriten (Post {post_id}): {ex}", exc_info=True)
+            from ui.components import show_error_dialog
+            show_error_dialog(
+                self.page,
+                "Fehler",
+                "Die Favoriten-Aktion konnte nicht durchgeführt werden."
+            )
 
     # ──────────────────────────────────────────────────────────────────
     # DATEN LADEN
@@ -380,30 +265,18 @@ class DiscoverView:
                 "rasse": self.filter_rasse.value,
             }
 
-            # Query bauen und ausführen
-            # Optimierung: user_id wird übergeben für zukünftige Join-Optimierung
-            sort_option = self.sort_dropdown.value or "created_at_desc"
-            query = build_query(self.sb, filters, user_id=self.current_user_id, sort_option=sort_option)
-            result = query.limit(MAX_POSTS_LIMIT).execute()
-            items = result.data or []
-
-            # Suche (Python-Filter)
-            items = filter_by_search(items, self.search_q.value)
-
-            # Farben (Python-Filter)
-            items = filter_by_colors(items, set(self.selected_farben))
-            
-            # Event-Datum Sortierung in Python (falls gewählt)
-            # Dies stellt sicher, dass Posts ohne event_date auch angezeigt werden
-            if sort_option == "event_date_desc":
-                items = sort_by_event_date(items, desc=True)
-            elif sort_option == "event_date_asc":
-                items = sort_by_event_date(items, desc=False)
-
-            # Favoritenstatus markieren
-            # Optimierung: Favoriten werden in einer einzigen Query geladen (kein N+1 Problem)
+            # Favoriten-IDs laden (für Markierung)
             favorite_ids = get_favorite_ids(self.sb, self.current_user_id)
-            items = mark_favorites(items, favorite_ids)
+
+            # Posts über DiscoverService laden
+            sort_option = self.sort_dropdown.value or "created_at_desc"
+            items = self.discover_service.search_posts(
+                filters=filters,
+                search_query=self.search_q.value,
+                selected_colors=set(self.selected_farben) if self.selected_farben else None,
+                sort_option=sort_option,
+                favorite_ids=favorite_ids,
+            )
 
             self.current_items = items
             self._render_items(items)
@@ -418,57 +291,18 @@ class DiscoverView:
             self.page.update()
 
     def _render_items(self, items: List[Dict[str, Any]]) -> None:
-        if not items:
-            no_results = soft_card(
-                ft.Column(
-                    [
-                        ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-                        ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-                        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
-                        ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=8,
-                ),
-                elev=1,
-                pad=24,
-            )
-            self.list_view.controls = [no_results]
-            self.grid_view.controls = []
-            self.list_view.visible = True
-            self.grid_view.visible = False
-            self.page.update()
-            return
-
-        if self.view_mode == "grid":
-            self.grid_view.controls = [
-                build_small_card(
-                    item=it,
-                    page=self.page,
-                    on_favorite_click=self._toggle_favorite,
-                    on_card_click=self._show_detail_dialog,
-                )
-                for it in items
-            ]
-            self.list_view.controls = []
-            self.list_view.visible = False
-            self.grid_view.visible = True
-        else:
-            self.list_view.controls = [
-                build_big_card(
-                    item=it,
-                    page=self.page,
-                    on_favorite_click=self._toggle_favorite,
-                    on_card_click=self._show_detail_dialog,
-                    on_contact_click=self.on_contact_click,
-                )
-                for it in items
-            ]
-            self.grid_view.controls = []
-            self.list_view.visible = True
-            self.grid_view.visible = False
-
-        self.page.update()
+        """Rendert Post-Items in List- oder Grid-Ansicht."""
+        render_items(
+            items=items,
+            view_mode=self.view_mode,
+            list_view=self.list_view,
+            grid_view=self.grid_view,
+            page=self.page,
+            on_favorite_click=self._toggle_favorite,
+            on_card_click=self._show_detail_dialog,
+            on_contact_click=self.on_contact_click,
+            on_reset=self._reset_filters,
+        )
 
     def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
         """Wrapper-Methode für den Detail-Dialog."""
@@ -476,6 +310,7 @@ class DiscoverView:
             item=item,
             page=self.page,
             on_contact_click=self.on_contact_click,
+            on_favorite_click=self._toggle_favorite,
         )
 
     # ──────────────────────────────────────────────────────────────────
@@ -483,27 +318,27 @@ class DiscoverView:
     # ──────────────────────────────────────────────────────────────────
 
     def _reset_filters(self, _: Optional[ft.ControlEvent] = None) -> None:
-        self.search_q.value = ""
-        self.filter_typ.value = "alle"
-        self.filter_art.value = "alle"
-        self.filter_geschlecht.value = "alle"
-        self.filter_rasse.value = "alle"
-        self.sort_dropdown.value = "created_at_desc"
-        self.selected_farben.clear()
-
-        # Farben-Checkboxen zurücksetzen
-        for container in self.farben_filter_container.controls:
-            if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
-                container.content.value = False
-
-        self.page.update()
-        self.page.run_task(self.load_posts)
+        reset_filters(
+            search_field=self.search_q,
+            filter_typ=self.filter_typ,
+            filter_art=self.filter_art,
+            filter_geschlecht=self.filter_geschlecht,
+            filter_rasse=self.filter_rasse,
+            sort_dropdown=self.sort_dropdown,
+            selected_colors=self.selected_farben,
+            color_checkboxes_container=self.farben_filter_container,
+            page=self.page,
+            on_reset=lambda: self.page.run_task(self.load_posts),
+        )
 
     def _show_save_search_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Zeigt Dialog zum Speichern der aktuellen Suche."""
         # Prüfen ob eingeloggt
         if not self.current_user_id:
-            if self.on_login_required:
+            if self.on_save_search_login_required:
+                self.on_save_search_login_required()
+            elif self.on_login_required:
+                # Fallback auf generischen Login-Callback
                 self.on_login_required()
             else:
                 self.page.snack_bar = ft.SnackBar(
@@ -513,169 +348,37 @@ class DiscoverView:
                 self.page.update()
             return
 
-        name_field = ft.TextField(
-            label="Name des Suchauftrags",
-            hint_text="z.B. 'Vermisste Katzen in Berlin'",
-            width=300,
-            autofocus=True,
-        )
-        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
-
-        # Aktive Filter anzeigen
-        active_filters = []
-        if self.search_q.value:
-            active_filters.append(f"Suche: {self.search_q.value[:20]}")
-        if self.filter_typ.value and self.filter_typ.value != "alle":
-            active_filters.append("Kategorie")
-        if self.filter_art.value and self.filter_art.value != "alle":
-            active_filters.append("Tierart")
-        if self.filter_rasse.value and self.filter_rasse.value != "alle":
-            active_filters.append("Rasse")
-        if self.filter_geschlecht.value and self.filter_geschlecht.value not in ["alle", "keine_angabe"]:
-            active_filters.append("Geschlecht")
-        if self.selected_farben:
-            active_filters.append(f"{len(self.selected_farben)} Farben")
-
-        filter_preview = ft.Text(
-            ", ".join(active_filters) if active_filters else "Alle Meldungen (keine Filter aktiv)",
-            size=12,
-            color=ft.Colors.GREY_600,
+        # Aktuelle Filter sammeln
+        current_filters = collect_current_filters(
+            search_field=self.search_q,
+            filter_typ=self.filter_typ,
+            filter_art=self.filter_art,
+            filter_geschlecht=self.filter_geschlecht,
+            filter_rasse=self.filter_rasse,
+            selected_colors=self.selected_farben,
         )
 
-        def on_save(e):
-            name = name_field.value.strip()
-            if not name:
-                error_text.value = "Bitte geben Sie einen Namen ein."
-                error_text.visible = True
-                self.page.update()
-                return
-
-            # Filter-Werte sammeln
-            status_id = None
-            species_id = None
-            breed_id = None
-            sex_id = None
-
-            try:
-                if self.filter_typ.value and self.filter_typ.value != "alle":
-                    status_id = int(self.filter_typ.value)
-            except ValueError:
-                pass
-
-            try:
-                if self.filter_art.value and self.filter_art.value != "alle":
-                    species_id = int(self.filter_art.value)
-            except ValueError:
-                pass
-
-            try:
-                if self.filter_rasse.value and self.filter_rasse.value != "alle":
-                    breed_id = int(self.filter_rasse.value)
-            except ValueError:
-                pass
-
-            try:
-                if self.filter_geschlecht.value and self.filter_geschlecht.value not in ["alle", "keine_angabe"]:
-                    sex_id = int(self.filter_geschlecht.value)
-            except ValueError:
-                pass
-
-            success, error = self.saved_search_service.save_search(
-                name=name,
-                search_query=self.search_q.value if self.search_q.value else None,
-                status_id=status_id,
-                species_id=species_id,
-                breed_id=breed_id,
-                sex_id=sex_id,
-                colors=self.selected_farben if self.selected_farben else None,
-            )
-
-            if success:
-                self.page.close(dialog)
-                show_success_dialog(
-                    self.page,
-                    "Suchauftrag gespeichert",
-                    f"'{name}' wurde gespeichert.\n\nSie finden ihn unter Profil → Gespeicherte Suchaufträge."
-                )
-            else:
-                error_text.value = error or "Fehler beim Speichern."
-                error_text.visible = True
-                self.page.update()
-
-        def on_cancel(e):
-            self.page.close(dialog)
-
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Row([
-                ft.Icon(ft.Icons.BOOKMARK_ADD, color=PRIMARY_COLOR),
-                ft.Text("Suche speichern", weight=ft.FontWeight.BOLD),
-            ], spacing=8),
-            content=ft.Container(
-                content=ft.Column([
-                    ft.Text("Aktive Filter:", size=14, weight=ft.FontWeight.W_500),
-                    filter_preview,
-                    ft.Container(height=12),
-                    name_field,
-                    error_text,
-                ], spacing=8, tight=True),
-                width=350,
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=on_cancel),
-                ft.ElevatedButton(
-                    "Speichern",
-                    icon=ft.Icons.SAVE,
-                    on_click=on_save,
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        show_save_search_dialog(
+            page=self.page,
+            saved_search_service=self.saved_search_service,
+            current_filters=current_filters,
+            ref_service=self.ref_service,
         )
-        self.page.open(dialog)
 
     def apply_saved_search(self, search: Dict[str, Any]) -> None:
         """Wendet einen gespeicherten Suchauftrag auf die Filter an."""
-        # Saved Search speichert Filter als JSON in search["filters"]
-        filters = search.get("filters") or {}
-
-        # Suchbegriff
-        self.search_q.value = filters.get("search_query", "") or ""
-
-        # Status/Kategorie
-        status_id = filters.get("status_id")
-        self.filter_typ.value = str(status_id) if status_id else "alle"
-
-        # Tierart
-        species_id = filters.get("species_id")
-        self.filter_art.value = str(species_id) if species_id else "alle"
-
-        # Rasse - muss nach Tierart geladen werden
-        breed_id = filters.get("breed_id")
-
-        # Geschlecht
-        sex_id = filters.get("sex_id")
-        self.filter_geschlecht.value = str(sex_id) if sex_id else "alle"
-
-        # Farben
-        colors = filters.get("colors", [])
-        self.selected_farben = colors if colors else []
-
-        # Farben-Checkboxen aktualisieren
-        for container in self.farben_filter_container.controls:
-            if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
-                cb = container.content
-                if hasattr(cb, "data") and cb.data:
-                    cb.value = cb.data in self.selected_farben
-
-        # Rassen für die gewählte Tierart laden
-        if species_id:
-            self._update_rassen()
-            if breed_id:
-                self.filter_rasse.value = str(breed_id)
-        else:
-            self.filter_rasse.value = "alle"
-
-        self.page.update()
+        apply_saved_search_filters(
+            search=search,
+            search_field=self.search_q,
+            filter_typ=self.filter_typ,
+            filter_art=self.filter_art,
+            filter_geschlecht=self.filter_geschlecht,
+            filter_rasse=self.filter_rasse,
+            selected_colors=self.selected_farben,
+            color_checkboxes_container=self.farben_filter_container,
+            update_breeds_callback=self._update_rassen_dropdown,
+            page=self.page,
+        )
         self.page.run_task(self.load_posts)
 
     # ──────────────────────────────────────────────────────────────────
