@@ -1,50 +1,29 @@
 """
-Post Form View - Hauptformular zum Erstellen von Tier-Meldungen.
+Post Form-View mit Meldungsformular.
 
-Dieses Modul enthält die PostForm-Klasse, die das UI für
-Vermisst-/Gefunden-Meldungen bereitstellt.
+Enthält UI-Komposition und koordiniert Post Form-Features.
 """
 
-import os
-import asyncio
-from datetime import datetime, date
-from typing import Callable, Optional
+from __future__ import annotations
+
+from typing import Callable, Optional, Dict, Any, List
 
 import flet as ft
 
 from services.posts.references import ReferenceService
 from services.posts import PostService, PostRelationsService, PostStorageService
 from services.ai.pet_recognition import get_recognition_service
-from utils.validators import (
-    validate_not_empty,
-    validate_length,
-    validate_list_not_empty,
-    validate_date_format,
-    sanitize_string,
-)
 from utils.logging_config import get_logger
 from ui.constants import (
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
-    MIN_DESCRIPTION_LENGTH,
-    MAX_LOCATION_LENGTH,
+    DATE_FORMAT,
+    NO_SELECTION_VALUE,
 )
 from ui.components import show_validation_dialog, show_success_dialog, show_error_dialog
+from ui.helpers import get_theme_colors
 
-from ui.constants import (
-    VALID_IMAGE_TYPES,
-    DATE_FORMAT,
-    ALLOWED_POST_STATUSES,
-    NO_SELECTION_VALUE,
-    NO_SELECTION_LABEL,
-)
-
-logger = get_logger(__name__)
-from ui.post_form.photo_manager import (
-    cleanup_local_file,
-    get_upload_path,
-)
-from ui.post_form.form_fields import (
+from .components import (
     create_meldungsart_button,
     create_photo_preview,
     create_name_field,
@@ -56,10 +35,23 @@ from ui.post_form.form_fields import (
     create_location_field,
     create_date_field,
     create_status_text,
-    populate_dropdown_options,
     create_ai_recognition_button,
     create_ai_result_container,
 )
+from .features.photo_upload import handle_pick_photo, handle_remove_photo
+from .features.form_validation import validate_form_fields
+from .features.post_upload import handle_save_post, reset_form_fields
+from ui.helpers import parse_date
+from .features.references import load_and_populate_references, update_breeds_dropdown
+from .features.ai_recognition import (
+    handle_start_ai_recognition,
+    show_consent_dialog,
+    perform_ai_recognition,
+    show_ai_result,
+    show_ai_suggestion_dialog,
+)
+
+logger = get_logger(__name__)
 
 
 class PostForm:
@@ -84,21 +76,20 @@ class PostForm:
         self.recognition_service = get_recognition_service()
         
         # KI-Erkennungs-State
-        self.ai_result = None
-        self.ai_consent_given = False
-        self.ai_recognition_cancelled = False
+        self.ai_result: Optional[Dict[str, Any]] = None
+        self.ai_recognition_cancelled = {"cancelled": False}
         
         # Referenzdaten
-        self.post_statuses = []
-        self.species_list = []
-        self.breeds_by_species = {}
-        self.colors_list = []
-        self.sex_list = []
+        self.post_statuses: List[Dict[str, Any]] = []
+        self.species_list: List[Dict[str, Any]] = []
+        self.breeds_by_species: Dict[int, List[Dict[str, Any]]] = {}
+        self.colors_list: List[Dict[str, Any]] = []
+        self.sex_list: List[Dict[str, Any]] = []
         
         # Ausgewählte Werte
-        self.selected_farben = []
-        self.farben_checkboxes = {}
-        self.selected_photo = {"path": None, "name": None, "url": None, "base64": None}
+        self.selected_farben: List[int] = []
+        self.farben_checkboxes: Dict[int, ft.Checkbox] = {}
+        self.selected_photo: Dict[str, Any] = {"path": None, "name": None, "url": None, "base64": None}
         self.farben_panel_visible = True
         
         # UI-Elemente initialisieren
@@ -107,9 +98,9 @@ class PostForm:
         # Daten laden
         self.page.run_task(self._load_refs)
     
-    # ════════════════════════════════════════════════════════════════════
-    # UI-INITIALISIERUNG
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # UI-Initialisierung
+    # ─────────────────────────────────────────────────────────────
     
     def _init_ui_elements(self):
         """Initialisiert alle UI-Elemente."""
@@ -122,37 +113,29 @@ class PostForm:
         # Name/Überschrift
         self.title_label = create_title_label()
         self.name_tf = create_name_field()
-        # Dynamischer Zeichenzähler für Name
         self.name_tf.on_change = self._update_name_counter
         
         # Dropdowns
         self.species_dd = create_species_dropdown()
         self.breed_dd = create_breed_dropdown()
         self.sex_dd = create_sex_dropdown()
-        
-        # Species-Dropdown Event
         self.species_dd.on_change = lambda _: self.page.run_task(self._update_breeds)
         
-        # Farben-Container (werden in _load_refs gefüllt)
+        # Farben-Container
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
         
-        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
-        panel_surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
-        panel_outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+        # Theme-Farben holen
+        theme_colors = get_theme_colors(self.page)
         
         self.farben_panel = ft.Container(
             content=self.farben_container,
             padding=12,
             visible=True,
-            bgcolor=panel_surface_color,
+            bgcolor=theme_colors["surface"],
             border_radius=8,
-            border=ft.border.all(1, panel_outline_color) if panel_outline_color else None,
+            border=ft.border.all(1, theme_colors["outline"]) if theme_colors["outline"] else None,
         )
-        
-        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
-        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
-        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
         
         self.farben_header = ft.Container(
             content=ft.Row(
@@ -167,8 +150,8 @@ class PostForm:
             padding=8,
             on_click=self._toggle_farben_panel,
             border_radius=8,
-            bgcolor=surface_color,
-            border=ft.border.all(1, outline_color) if outline_color else None,
+            bgcolor=theme_colors["surface"],
+            border=ft.border.all(1, theme_colors["outline"]) if theme_colors["outline"] else None,
         )
         
         # Beschreibung & Standort
@@ -178,10 +161,17 @@ class PostForm:
         
         # Status-Nachricht
         self.status_text = create_status_text()
+        
+        # KI-Button und Container
+        self.ai_button = create_ai_recognition_button(
+            lambda _: self.page.run_task(self._start_ai_recognition)
+        )
+        self.ai_result_container = create_ai_result_container()
+        self.ai_hint_badge: Optional[ft.Control] = None
     
-    # ════════════════════════════════════════════════════════════════════
-    # EVENT HANDLER
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # Event Handler
+    # ─────────────────────────────────────────────────────────────
     
     def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
         """Zeigt eine Statusnachricht an."""
@@ -194,7 +184,7 @@ class PostForm:
         self.status_text.value = message
         self.page.update()
     
-    def _show_validation_dialog(self, title: str, message: str, items: list):
+    def _show_validation_dialog(self, title: str, message: str, items: List[str]):
         """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
         show_validation_dialog(self.page, title, message, items)
     
@@ -241,31 +231,6 @@ class PostForm:
         self.info_tf.counter_text = f"{length} / {MAX_DESCRIPTION_LENGTH}"
         self.page.update()
 
-    def _open_date_picker(self):
-        """Öffnet den DatePicker (kompatibel mit verschiedenen Flet-Versionen)."""
-        # Ältere Flet-Versionen nutzen das 'open'-Flag statt pick_date()
-        try:
-            # Versuchen, über open-Flag zu öffnen
-            self.date_picker.open = True
-            self.page.update()
-        except Exception:
-            # Wenn das nicht funktioniert, ignorieren wir den Fehler still
-            pass
-
-    def _on_date_picked(self, e):
-        """Wird aufgerufen, wenn im DatePicker ein Datum gewählt wird."""
-        # Je nach Flet-Version kann das Event verschiedene Typen haben;
-        # wir greifen defensiv auf control.value zu.
-        if getattr(e, "control", None) and getattr(e.control, "value", None):
-            try:
-                # value ist vom Typ date
-                picked_date = e.control.value
-                self.date_tf.value = picked_date.strftime(DATE_FORMAT)
-                self.page.update()
-            except Exception:
-                # Fallback: nichts tun, Feld bleibt wie es ist
-                pass
-
     def _on_color_change(self, color_id: int, is_selected: bool):
         """Handler für Farbänderungen."""
         if is_selected:
@@ -275,315 +240,56 @@ class PostForm:
             if color_id in self.selected_farben:
                 self.selected_farben.remove(color_id)
     
-    # ════════════════════════════════════════════════════════════════════
-    # KI-RASSENERKENNUNG
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # KI-Rassenerkennung
+    # ─────────────────────────────────────────────────────────────
     
     async def _start_ai_recognition(self):
-        """Startet die KI-Rassenerkennung mit Einverständnisabfrage."""
-        # Prüfe ob Foto vorhanden
-        if not self.selected_photo.get("path"):
-            show_error_dialog(
-                self.page,
-                "Kein Foto",
-                "Bitte laden Sie zuerst ein Foto hoch, bevor Sie die KI-Erkennung starten."
-            )
-            return
-        
-        # Prüfe ob "Fundtier" ausgewählt ist
-        selected_id = list(self.meldungsart.selected)[0] if self.meldungsart.selected else None
-        selected_status = None
-        for status in self.post_statuses:
-            if str(status["id"]) == selected_id:
-                selected_status = status["name"].lower()
-                break
-        
-        if selected_status != "fundtier":
-            show_error_dialog(
-                self.page,
-                "Nur für Fundtiere",
-                "Die KI-Rassenerkennung ist nur für gefundene Tiere verfügbar. "
-                "Besitzer vermisster Tiere kennen in der Regel die Rasse ihres Tieres bereits."
-            )
-            return
-        
-        # Einverständnisdialog anzeigen
-        await self._show_consent_dialog()
-    
-    async def _show_consent_dialog(self):
-        """Zeigt den Einverständnisdialog für die KI-Erkennung."""
-        def on_accept(e):
-            self.ai_consent_given = True
-            self.page.close(dlg)
-            self.page.run_task(self._perform_ai_recognition)
-        
-        def on_decline(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.PURPLE_600, size=24),
-                    ft.Text("KI-Rassenerkennung", size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text(
-                            "Einverständniserklärung:",
-                            size=14,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                        ft.Text(
-                            "Das hochgeladene Bild wird durch eine KI analysiert, um die Tierart und Rasse zu erkennen. "
-                            "Die Analyse erfolgt lokal und das Bild wird nicht an externe Dienste gesendet.",
-                            size=12,
-                            color=ft.Colors.GREY_700,
-                        ),
-                        ft.Divider(),
-                        ft.Text(
-                            "Wichtige Hinweise:",
-                            size=14,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                        ft.Text(
-                            "• Die KI-Erkennung dient nur als Vorschlag\n"
-                            "• Es gibt keine Garantie für die Richtigkeit\n"
-                            "• Sie können den Vorschlag ablehnen und selbst eintragen\n"
-                            "• Bei Unsicherheit kontaktieren Sie ein Tierheim",
-                            size=12,
-                            color=ft.Colors.GREY_700,
-                        ),
-                    ],
-                    spacing=8,
-                    tight=True,
-                ),
-                width=400,
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=on_decline),
-                ft.FilledButton("Akzeptieren & Starten", on_click=on_accept),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        """Startet die KI-Rassenerkennung."""
+        await handle_start_ai_recognition(
+            page=self.page,
+            selected_photo=self.selected_photo,
+            post_statuses=self.post_statuses,
+            meldungsart=self.meldungsart,
+            show_consent_dialog_callback=lambda: self.page.run_task(self._show_consent_dialog_wrapper),
         )
-        
-        self.page.open(dlg)
+    
+    async def _show_consent_dialog_wrapper(self):
+        """Wrapper für Consent-Dialog."""
+        await show_consent_dialog(
+            page=self.page,
+            on_accept=lambda: self.page.run_task(self._perform_ai_recognition),
+        )
     
     async def _perform_ai_recognition(self):
         """Führt die KI-Erkennung durch."""
-        try:
-            # Reset Cancel-Flag
-            self.ai_recognition_cancelled = False
-            
-            # Zeige Fortschrittsdialog, damit Nutzer den Status erkennt
-            self._show_progress_dialog("KI analysiert das Bild...")
-            self._show_status("KI analysiert das Bild...", is_loading=True)
-            # Kurz yield, damit der Dialog sichtbar wird, bevor die Analyse startet
-            await asyncio.sleep(0.05)
-            
-            # Prüfe auf Abbruch
-            if self.ai_recognition_cancelled:
-                return
-            
-            # Hole Bilddaten vom Storage
-            if not self.selected_photo.get("path"):
-                self._show_status("Kein Bild vorhanden", is_error=True)
-                try:
-                    if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                        self.page.close(self._progress_dlg)
-                        self._progress_dlg = None
-                except Exception:
-                    pass
-                return
-            
-            # Lade Bild von Supabase über Service
-            try:
-                image_data = self.post_storage_service.download_post_image(self.selected_photo["path"])
-                if not image_data:
-                    self._show_status("Fehler beim Laden des Bildes", is_error=True)
-                    try:
-                        if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                            self.page.close(self._progress_dlg)
-                            self._progress_dlg = None
-                    except Exception:
-                        pass
-                    return
-            except Exception as ex:
-                self._show_status(f"Fehler beim Laden des Bildes: {ex}", is_error=True)
-                try:
-                    if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                        self.page.close(self._progress_dlg)
-                        self._progress_dlg = None
-                except Exception:
-                    pass
-                return
-            
-            # Prüfe erneut auf Abbruch vor der Analyse
-            if self.ai_recognition_cancelled:
-                try:
-                    if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                        self.page.close(self._progress_dlg)
-                        self._progress_dlg = None
-                except Exception:
-                    pass
-                return
-            
-            # Führe Erkennung in einem Executor aus, damit wir währenddessen auf Abbruch prüfen können
-            import concurrent.futures
-            
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(self.recognition_service.recognize_pet, image_data)
-            
-            # Warte auf das Ergebnis und prüfe periodisch auf Abbruch
-            result = None
-            while not future.done():
-                await asyncio.sleep(0.1)
-                if self.ai_recognition_cancelled:
-                    # Abbruch wurde angefordert
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    try:
-                        if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                            self.page.close(self._progress_dlg)
-                            self._progress_dlg = None
-                    except Exception:
-                        pass
-                    return
-            
-            # Hole das Ergebnis
-            result = future.result()
-            executor.shutdown(wait=False)
-            
-            # Finale Abbruch-Prüfung nach der Erkennung
-            if self.ai_recognition_cancelled:
-                try:
-                    if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                        self.page.close(self._progress_dlg)
-                        self._progress_dlg = None
-                except Exception:
-                    pass
-                return
-            
-            if result["success"]:
-                self.ai_result = result
-                self._show_ai_result(result)
-                self._show_status("Erkennung abgeschlossen!", is_error=False)
-            else:
-                # Wenn es einen Vorschlag gibt, biete Übernahme in die Beschreibung an
-                suggested_breed = result.get("suggested_breed")
-                suggested_species = result.get("suggested_species")
-                if suggested_breed:
-                    self._show_ai_suggestion_dialog(
-                        result.get("error") or "Die KI konnte das Tier nicht sicher erkennen.",
-                        suggested_breed,
-                        suggested_species,
-                        result.get("confidence", 0.0),
-                    )
-                else:
-                    show_error_dialog(
-                        self.page,
-                        "Erkennung fehlgeschlagen",
-                        result.get("error") or "Die KI konnte das Tier nicht sicher erkennen. "
-                        "Bitte versuchen Sie ein anderes Bild oder tragen Sie die Rasse manuell ein. "
-                        "Sie können auch das Tierheim kontaktieren und das Tier beschreiben."
-                    )
-                self._show_status("", is_error=False)
-            # Fortschrittsdialog schließen
-            try:
-                if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                    self.page.close(self._progress_dlg)
-                    self._progress_dlg = None
-            except Exception:
-                pass
-                
-        except Exception as ex:
-            self._show_status(f"Fehler: {ex}", is_error=True)
-            try:
-                if hasattr(self, "_progress_dlg") and self._progress_dlg:
-                    self.page.close(self._progress_dlg)
-                    self._progress_dlg = None
-            except Exception:
-                pass
-    
-    def _show_ai_result(self, result: dict):
-        """Zeigt das KI-Erkennungsergebnis an."""
-        confidence_percent = int(result["confidence"] * 100)
-        
-        # Erstelle Ergebnis-UI
-        result_content = ft.Column(
-            [
-                ft.Row(
-                    [
-                        ft.Icon(ft.Icons.AUTO_AWESOME, color=ft.Colors.PURPLE_600, size=20),
-                        ft.Text(
-                            "KI-Erkennungsergebnis",
-                            size=14,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.PURPLE_900,
-                        ),
-                    ],
-                    spacing=8,
-                ),
-                ft.Divider(height=10, color=ft.Colors.PURPLE_200),
-                ft.Text(
-                    f"Tierart: {result['species']}",
-                    size=13,
-                    weight=ft.FontWeight.W_600,
-                ),
-                ft.Text(
-                    f"Rasse: {result['breed']}",
-                    size=13,
-                    weight=ft.FontWeight.W_600,
-                ),
-                ft.Text(
-                    f"Konfidenz: {confidence_percent}%",
-                    size=12,
-                    color=ft.Colors.GREY_700,
-                ),
-                ft.Container(
-                    content=ft.Text(
-                        "Hinweis: Dies ist nur ein KI-Vorschlag ohne Garantie auf Richtigkeit.",
-                        size=11,
-                        color=ft.Colors.ORANGE_800,
-                        italic=True,
-                    ),
-                    padding=8,
-                    bgcolor=ft.Colors.ORANGE_50,
-                    border_radius=4,
-                ),
-                ft.Divider(height=10, color=ft.Colors.PURPLE_200),
-                ft.Row(
-                    [
-                        ft.TextButton(
-                            "Ablehnen",
-                            icon=ft.Icons.CLOSE,
-                            on_click=lambda _: self._reject_ai_result(),
-                        ),
-                        ft.FilledButton(
-                            "Übernehmen",
-                            icon=ft.Icons.CHECK,
-                            on_click=lambda _: self._accept_ai_result(),
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.END,
-                    spacing=10,
-                ),
-            ],
-            spacing=8,
+        await perform_ai_recognition(
+            page=self.page,
+            recognition_service=self.recognition_service,
+            post_storage_service=self.post_storage_service,
+            selected_photo=self.selected_photo,
+            ai_recognition_cancelled_ref=self.ai_recognition_cancelled,
+            show_status_callback=self._show_status,
+            show_ai_result_callback=self._show_ai_result_wrapper,
+            show_ai_suggestion_callback=self._show_ai_suggestion_wrapper,
         )
-        
-        self.ai_result_container.content = result_content
-        self.ai_result_container.visible = True
-        self.page.update()
+    
+    def _show_ai_result_wrapper(self, result: Dict[str, Any]):
+        """Wrapper für AI-Ergebnis anzeigen."""
+        self.ai_result = result
+        show_ai_result(
+            ai_result_container=self.ai_result_container,
+            result=result,
+            on_accept=self._accept_ai_result,
+            on_reject=self._reject_ai_result,
+            page=self.page,
+        )
     
     def _accept_ai_result(self):
         """Übernimmt das KI-Erkennungsergebnis in die Formularfelder."""
         if not self.ai_result:
             return
         
-        # Finde Tierart-ID
         species_name = self.ai_result["species"]
         species_id = None
         for species in self.species_list:
@@ -591,12 +297,10 @@ class PostForm:
                 species_id = species["id"]
                 break
         
-        # Setze Tierart
         if species_id:
             self.species_dd.value = str(species_id)
             self.page.run_task(self._update_breeds)
         
-        # Finde Rasse-ID (nach einem kurzen Delay, damit Breeds geladen sind)
         async def set_breed():
             await self._update_breeds()
             
@@ -612,7 +316,6 @@ class PostForm:
             if breed_id:
                 self.breed_dd.value = str(breed_id)
             
-            # Füge Erkennungsinfo zur Beschreibung hinzu
             confidence_percent = int(self.ai_result["confidence"] * 100)
             ai_info = f"[KI-Erkennung: {species_name}, Rasse: {breed_name} ({confidence_percent}% Konfidenz)]"
             
@@ -635,153 +338,62 @@ class PostForm:
         self._show_status("KI-Vorschlag abgelehnt. Bitte tragen Sie die Daten manuell ein.", is_error=False)
         self.page.update()
     
-    # ════════════════════════════════════════════════════════════════════
-    # FOTO-MANAGEMENT
-    # ════════════════════════════════════════════════════════════════════
+    def _show_ai_suggestion_wrapper(self, error_message: str, suggested_breed: Optional[str], suggested_species: Optional[str], confidence: float):
+        """Wrapper für AI-Vorschlag anzeigen."""
+        def on_accept(breed: str, species: Optional[str]):
+            # Ähnlich wie _accept_ai_result, aber mit niedrigerer Konfidenz
+            pass
+        
+        show_ai_suggestion_dialog(
+            page=self.page,
+            error_message=error_message,
+            suggested_breed=suggested_breed or "",
+            suggested_species=suggested_species,
+            confidence=confidence,
+            on_accept=on_accept,
+        )
+    
+    # ─────────────────────────────────────────────────────────────
+    # Foto-Management
+    # ─────────────────────────────────────────────────────────────
     
     async def _pick_photo(self):
-        """Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch."""
-        
-        def on_result(ev: ft.FilePickerResultEvent):
-            if ev.files:
-                f = ev.files[0]
-                self.selected_photo["name"] = f.name
-                
-                fp.upload([ft.FilePickerUploadFile(
-                    f.name,
-                    upload_url=self.page.get_upload_url(f.name, 60)
-                )])
-        
-        def on_upload(ev: ft.FilePickerUploadEvent):
-            if ev.progress == 1.0:
-                try:
-                    # Versuche beide mögliche Pfade (mit und ohne Session-ID)
-                    upload_path_with_session = get_upload_path(ev.file_name, self.page.session_id)
-                    upload_path_direct = get_upload_path(ev.file_name, None)
-                    
-                    print(f"[DEBUG] Prüfe Pfad mit Session: {upload_path_with_session}")
-                    print(f"[DEBUG] Existiert: {os.path.exists(upload_path_with_session)}")
-                    print(f"[DEBUG] Prüfe Pfad ohne Session: {upload_path_direct}")
-                    print(f"[DEBUG] Existiert: {os.path.exists(upload_path_direct)}")
-                    
-                    # Wähle den Pfad der existiert
-                    if os.path.exists(upload_path_with_session):
-                        upload_path = upload_path_with_session
-                    elif os.path.exists(upload_path_direct):
-                        upload_path = upload_path_direct
-                    else:
-                        # Liste alle Dateien im Upload-Verzeichnis
-                        import glob
-                        all_files = glob.glob(os.path.join(get_upload_path("", None), "**", "*.*"), recursive=True)
-                        print(f"[DEBUG] Alle Dateien im Upload-Verzeichnis: {all_files}")
-                        self._show_status(f"Datei nicht gefunden: {ev.file_name}", is_error=True)
-                        return
-                    
-                    print(f"[DEBUG] Verwende Pfad: {upload_path}")
-                    
-                    # Bild hochladen und komprimieren über Service
-                    print(f"[DEBUG] Starte Upload zu Supabase...")
-                    result = self.post_storage_service.upload_post_image(upload_path, ev.file_name)
-                    print(f"[DEBUG] Upload-Ergebnis: url={result.get('url') is not None}")
-                    
-                    if result["url"]:
-                        self.selected_photo["path"] = result["path"]
-                        self.selected_photo["base64"] = result["base64"]
-                        self.selected_photo["url"] = result["url"]
-                        
-                        self.photo_preview.src_base64 = result["base64"]
-                        self.photo_preview.visible = True
-                        self._show_status(f"Bild hochgeladen: {ev.file_name}")
-                    else:
-                        self._show_status("Fehler beim Hochladen", is_error=True)
-                    
-                    # Lokale Datei aufräumen
-                    cleanup_local_file(upload_path)
-                    
-                except Exception as ex:
-                    self._show_status(f"Fehler: {ex}", is_error=True)
-        
-        fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
-        self.page.overlay.append(fp)
-        self.page.update()
-        fp.pick_files(allow_multiple=False, allowed_extensions=VALID_IMAGE_TYPES)
+        """Öffnet Dateiauswahl und lädt Bild hoch."""
+        await handle_pick_photo(
+            page=self.page,
+            post_storage_service=self.post_storage_service,
+            selected_photo=self.selected_photo,
+            photo_preview=self.photo_preview,
+            show_status_callback=self._show_status,
+        )
     
     def _remove_photo(self):
-        """Entfernt das Foto aus der Vorschau und aus Supabase Storage."""
-        self.post_storage_service.remove_post_image(self.selected_photo.get("path"))
-        
-        self.selected_photo = {"path": None, "name": None, "url": None, "base64": None}
-        self.photo_preview.visible = False
-        self.status_text.value = ""
-        self.page.update()
+        """Entfernt das Foto."""
+        handle_remove_photo(
+            post_storage_service=self.post_storage_service,
+            selected_photo=self.selected_photo,
+            photo_preview=self.photo_preview,
+            status_text=self.status_text,
+            page=self.page,
+        )
     
-    # ════════════════════════════════════════════════════════════════════
-    # SPEICHERN
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # Speichern
+    # ─────────────────────────────────────────────────────────────
     
     async def _save_post(self, _=None):
         """Speichert die Meldung in der Datenbank."""
-        
-        # Validierung mit zentralen Validatoren
-        errors = []
-        
-        # Name/Überschrift validieren
-        name_valid, name_error = validate_not_empty(self.name_tf.value, "Name/Überschrift")
-        if not name_valid:
-            errors.append(f"• {name_error}")
-        else:
-            # Länge prüfen (max. MAX_HEADLINE_LENGTH Zeichen)
-            name_length_valid, name_length_error = validate_length(
-                self.name_tf.value, max_length=MAX_HEADLINE_LENGTH, field_name="Name/Überschrift"
-            )
-            if not name_length_valid:
-                errors.append(f"• {name_length_error}")
-        
-        # Tierart validieren
-        if not self.species_dd.value:
-            errors.append("• Tierart ist erforderlich")
-        
-        # Farben validieren
-        colors_valid, colors_error = validate_list_not_empty(
-            self.selected_farben, "Farben", min_items=1
+        is_valid, errors = validate_form_fields(
+            name_value=self.name_tf.value,
+            species_value=self.species_dd.value,
+            selected_farben=self.selected_farben,
+            description_value=self.info_tf.value,
+            location_value=self.location_tf.value,
+            date_value=self.date_tf.value,
+            photo_url=self.selected_photo.get("url"),
         )
-        if not colors_valid:
-            errors.append(f"• {colors_error}")
         
-        # Beschreibung validieren
-        desc_valid, desc_error = validate_not_empty(self.info_tf.value, "Beschreibung")
-        if not desc_valid:
-            errors.append(f"• {desc_error}")
-        else:
-            # Beschreibung sollte mindestens MIN_DESCRIPTION_LENGTH Zeichen haben
-            desc_length_valid, desc_length_error = validate_length(
-                self.info_tf.value, min_length=MIN_DESCRIPTION_LENGTH, max_length=MAX_DESCRIPTION_LENGTH, field_name="Beschreibung"
-            )
-            if not desc_length_valid:
-                errors.append(f"• {desc_length_error}")
-        
-        # Ort validieren
-        location_valid, location_error = validate_not_empty(self.location_tf.value, "Ort")
-        if not location_valid:
-            errors.append(f"• {location_error}")
-        else:
-            # Ort sollte max. MAX_LOCATION_LENGTH Zeichen haben
-            location_length_valid, location_length_error = validate_length(
-                self.location_tf.value, max_length=MAX_LOCATION_LENGTH, field_name="Ort"
-            )
-            if not location_length_valid:
-                errors.append(f"• {location_length_error}")
-        
-        # Datum validieren
-        date_valid, date_error = validate_date_format(self.date_tf.value, DATE_FORMAT)
-        if not date_valid:
-            errors.append(f"• {date_error}")
-        
-        # Foto validieren
-        if not self.selected_photo.get("url"):
-            errors.append("• Foto ist erforderlich")
-        
-        if errors:
+        if not is_valid:
             self._show_validation_dialog(
                 "Pflichtfelder fehlen",
                 "Bitte korrigiere folgende Fehler:",
@@ -789,169 +401,79 @@ class PostForm:
             )
             return
         
-        # Datum parsen (nach Validierung)
-        try:
-            event_date = datetime.strptime(self.date_tf.value.strip(), DATE_FORMAT).date()
-        except ValueError:
-            # Sollte nicht passieren nach Validierung, aber als Fallback
-            self._show_validation_dialog(
-                "Ungültiges Format",
-                "Das Datum hat ein falsches Format.",
-                ["• Bitte verwende: TT.MM.YYYY", "• Beispiel: 04.01.2026"]
-            )
-            return
-
-        # Datum darf nicht in der Zukunft liegen
-        today = date.today()
-        if event_date > today:
-            self._show_validation_dialog(
-                "Ungültiges Datum",
-                "Das Datum darf nicht in der Zukunft liegen.",
-                ["• Bitte ein Datum wählen, das heute oder in der Vergangenheit liegt."]
-            )
-            return
+        await handle_save_post(
+            page=self.page,
+            sb=self.sb,
+            post_service=self.post_service,
+            post_relations_service=self.post_relations_service,
+            meldungsart=self.meldungsart,
+            name_tf=self.name_tf,
+            species_dd=self.species_dd,
+            breed_dd=self.breed_dd,
+            sex_dd=self.sex_dd,
+            info_tf=self.info_tf,
+            location_tf=self.location_tf,
+            date_tf=self.date_tf,
+            selected_farben=self.selected_farben,
+            selected_photo=self.selected_photo,
+            show_status_callback=self._show_status,
+            show_validation_dialog_callback=self._show_validation_dialog,
+            parse_event_date=parse_date,
+            on_saved_callback=self.on_saved_callback,
+        )
         
-        # Eingeloggten Benutzer holen
-        try:
-            from services.account import ProfileService
-            profile_service = ProfileService(self.sb)
-            user_id = profile_service.get_user_id()
-            if not user_id:
-                show_error_dialog(self.page, "Nicht eingeloggt", "Bitte melden Sie sich an, um eine Meldung zu erstellen.")
-                return
-        except Exception as e:
-            show_error_dialog(self.page, "Fehler", f"Fehler beim Abrufen des Benutzers: {e}")
-            return
-        
-        try:
-            self._show_status("Erstelle Meldung...", is_loading=True)
-            
-            # Input sanitizen vor dem Speichern
-            headline = sanitize_string(self.name_tf.value, max_length=MAX_HEADLINE_LENGTH)
-            description = sanitize_string(self.info_tf.value, max_length=MAX_DESCRIPTION_LENGTH)
-            location = sanitize_string(self.location_tf.value, max_length=MAX_LOCATION_LENGTH)
-            
-            post_data = {
-                "user_id": user_id,
-                "post_status_id": int(list(self.meldungsart.selected)[0]),
-                "headline": headline,
-                "description": description,
-                "species_id": int(self.species_dd.value),
-                "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != NO_SELECTION_VALUE else None,
-                "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != NO_SELECTION_VALUE else None,
-                "event_date": event_date.isoformat(),
-                "location_text": location,
-            }
-            
-            new_post = self.post_service.create(post_data)
-            post_id = new_post["id"]
-            
-            # Farben verknüpfen
-            for color_id in self.selected_farben:
-                self.post_relations_service.add_color(post_id, color_id)
-            
-            # Bild verknüpfen
-            if self.selected_photo.get("url"):
-                self.post_relations_service.add_photo(post_id, self.selected_photo["url"])
-            
-            self._show_status("")
-            show_success_dialog(self.page, "Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
-            
-            self._reset_form()
-            
-            if self.on_saved_callback:
-                self.on_saved_callback(post_id)
-                
-        except Exception as ex:
-            self._show_status("")
-            show_error_dialog(self.page, "Speichern fehlgeschlagen", f"Fehler beim Erstellen der Meldung: {ex}")
+        # Formular zurücksetzen
+        reset_form_fields(
+            post_statuses=self.post_statuses,
+            meldungsart=self.meldungsart,
+            name_tf=self.name_tf,
+            species_dd=self.species_dd,
+            breed_dd=self.breed_dd,
+            sex_dd=self.sex_dd,
+            info_tf=self.info_tf,
+            location_tf=self.location_tf,
+            date_tf=self.date_tf,
+            title_label=self.title_label,
+            selected_farben=self.selected_farben,
+            farben_checkboxes=self.farben_checkboxes,
+            selected_photo=self.selected_photo,
+            photo_preview=self.photo_preview,
+            status_text=self.status_text,
+            species_list=self.species_list,
+            breeds_by_species=self.breeds_by_species,
+            ai_hint_badge=self.ai_hint_badge,
+            page=self.page,
+        )
     
-    def _reset_form(self):
-        """Setzt das Formular auf Standardwerte zurück."""
-        if self.post_statuses:
-            self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
-        self.name_tf.value = ""
-        if self.species_list:
-            self.species_dd.value = str(self.species_list[0]["id"])
-            # Rassen für die ausgewählte Tierart laden
-            species_id = self.species_list[0]["id"]
-            breeds = self.breeds_by_species.get(species_id, [])
-            self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)] + [
-                ft.dropdown.Option(str(b["id"]), b["name"]) for b in breeds
-            ]
-        self.breed_dd.value = NO_SELECTION_VALUE
-        self.sex_dd.value = NO_SELECTION_VALUE
-        self.info_tf.value = ""
-        self.location_tf.value = ""
-        self.date_tf.value = ""
-        
-        self.selected_farben.clear()
-        for cb in self.farben_checkboxes.values():
-            cb.value = False
-        
-        self.selected_photo = {"path": None, "name": None, "url": None, "base64": None}
-        self.photo_preview.visible = False
-        self.title_label.value = "Name﹡"
-        self.status_text.value = ""
-        
-        self.page.update()
-        # KI-Hinweis-Badge zurücksetzen
-        self.ai_hint_badge.visible = False
-    
-    # ════════════════════════════════════════════════════════════════════
-    # DATEN LADEN
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # Daten laden
+    # ─────────────────────────────────────────────────────────────
     
     async def _load_refs(self, _=None):
         """Lädt alle Referenzdaten aus der Datenbank."""
         try:
-            # Meldungsarten laden
-            all_statuses = self.ref_service.get_post_statuses()
-            self.post_statuses = [
-                s for s in all_statuses
-                if s["name"].lower() in ALLOWED_POST_STATUSES
-            ]
-            self.meldungsart.segments = [
-                ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
-                for s in self.post_statuses
-            ]
-            if self.post_statuses:
-                self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
+            result = await load_and_populate_references(
+                ref_service=self.ref_service,
+                meldungsart=self.meldungsart,
+                species_dd=self.species_dd,
+                sex_dd=self.sex_dd,
+                farben_container=self.farben_container,
+                farben_checkboxes=self.farben_checkboxes,
+                selected_farben=self.selected_farben,
+                on_color_change_callback=self._on_color_change,
+                page=self.page,
+            )
             
-            # Andere Referenzdaten laden
-            self.species_list = self.ref_service.get_species()
-            self.breeds_by_species = self.ref_service.get_breeds_by_species()
-            self.colors_list = self.ref_service.get_colors()
-            self.sex_list = self.ref_service.get_sex()
-            
-            # Species Dropdown füllen
-            populate_dropdown_options(self.species_dd, self.species_list)
-            
-            # Geschlecht Dropdown mit "Keine Angabe"
-            populate_dropdown_options(self.sex_dd, self.sex_list, with_none_option=True)
-            
-            # Farben-Checkboxes erstellen
-            self.farben_container.controls = []
-            for color in self.colors_list:
-                def on_color_change(e, c_id=color["id"]):
-                    self._on_color_change(c_id, e.control.value)
-                
-                cb = ft.Checkbox(label=color["name"], value=False, on_change=on_color_change)
-                self.farben_checkboxes[color["id"]] = cb
-                self.farben_container.controls.append(
-                    ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
-                )
-            
-            if self.species_list:
-                self.species_dd.value = str(self.species_list[0]["id"])
-            
-            self.page.update()
+            self.post_statuses = result["post_statuses"]
+            self.species_list = result["species_list"]
+            self.breeds_by_species = result["breeds_by_species"]
+            self.colors_list = result["colors_list"]
+            self.sex_list = result["sex_list"]
             
             if self.species_list:
                 await self._update_breeds()
                 self.page.update()
             
-            # Initiale KI-Button-Sichtbarkeit basierend auf der Meldungsart setzen
             self._update_title_label()
                 
         except Exception as ex:
@@ -959,41 +481,25 @@ class PostForm:
     
     async def _update_breeds(self, _=None):
         """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
-        try:
-            sid = int(self.species_dd.value) if self.species_dd.value else None
-            if sid and sid in self.breeds_by_species:
-                self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)]
-                self.breed_dd.options += [
-                    ft.dropdown.Option(str(b["id"]), b["name"])
-                    for b in self.breeds_by_species[sid]
-                ]
-                self.breed_dd.value = NO_SELECTION_VALUE
-            else:
-                self.breed_dd.options = [ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)]
-                self.breed_dd.value = NO_SELECTION_VALUE
-            self.page.update()
-        except Exception as ex:
-            logger.error(f"Fehler beim Aktualisieren der Rassen: {ex}", exc_info=True)
+        update_breeds_dropdown(
+            breed_dd=self.breed_dd,
+            species_value=self.species_dd.value,
+            breeds_by_species=self.breeds_by_species,
+            page=self.page,
+        )
     
-    # ════════════════════════════════════════════════════════════════════
-    # BUILD - Erstellt das UI
-    # ════════════════════════════════════════════════════════════════════
+    # ─────────────────────────────────────────────────────────────
+    # Build - Erstellt das UI
+    # ─────────────────────────────────────────────────────────────
     
     def build(self) -> ft.Column:
         """Baut und gibt das Formular-Layout zurück."""
+        # Theme-Farben holen
+        theme_colors = get_theme_colors(self.page)
+        text_color = theme_colors["text"]
+        icon_color = theme_colors["icon"]
+        border_color = theme_colors["border"]
         
-        # Theme-Farben für Light/Dark Mode
-        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
-        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
-        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
-        on_surface_variant = getattr(ft.Colors, "ON_SURFACE_VARIANT", None)
-        
-        # Text-Farben basierend auf Theme
-        text_color = on_surface_variant if on_surface_variant else (ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_700)
-        icon_color = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_500
-        border_color = outline_color if outline_color else (ft.Colors.GREY_600 if is_dark else ft.Colors.GREY_300)
-        
-        # Foto-Upload Bereich
         photo_area = ft.Container(
             content=ft.Column([
                 ft.Container(
@@ -1016,15 +522,11 @@ class PostForm:
             [
                 ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
                 ft.Divider(height=20),
-
+                
                 ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 photo_area,
                 ft.Divider(height=20),
                 
-                ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
-                photo_area,
-                ft.Divider(height=20),
-
                 self.title_label,
                 self.name_tf,
                 ft.Row([self.species_dd, self.breed_dd, self.sex_dd], spacing=15, wrap=True),
@@ -1033,8 +535,10 @@ class PostForm:
                 self.farben_panel,
                 ft.Divider(height=20),
                 
-                ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 self.info_tf,
+                self.ai_button,
+                self.ai_result_container,
                 ft.Divider(height=20),
                 
                 ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),

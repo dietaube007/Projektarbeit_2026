@@ -419,7 +419,7 @@ class DiscoverView:
         
         self._empty_state_card = create_empty_state_card(
             message="Noch keine Meldungen",
-            subtitle="Passen Sie Ihre Filter an.",
+            subtitle="",
         )
         
         self._list_view.controls = [self._empty_state_card]

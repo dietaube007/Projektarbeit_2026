@@ -101,48 +101,6 @@ def show_confirm_dialog(
 # BADGES
 # ══════════════════════════════════════════════════════════════════════
 
-def status_badge(text: str, bgcolor: Optional[str] = None) -> ft.Container:
-    """Erstellt ein Status-Badge.
-    
-    Args:
-        text: Badge-Text
-        bgcolor: Optionaler Hintergrundfarbe (Standard: aus STATUS_COLORS)
-    
-    Returns:
-        Container mit Status-Badge
-    """
-    if bgcolor is None:
-        bgcolor = STATUS_COLORS.get(text.lower(), ft.Colors.GREY_300)
-    
-    return ft.Container(
-        content=ft.Text(text, size=11, weight=ft.FontWeight.W_600),
-        bgcolor=bgcolor,
-        padding=ft.padding.symmetric(horizontal=8, vertical=4),
-        border_radius=12,
-    )
-
-
-def species_badge(text: str, bgcolor: Optional[str] = None) -> ft.Container:
-    """Erstellt ein Tierart-Badge.
-    
-    Args:
-        text: Badge-Text
-        bgcolor: Optionaler Hintergrundfarbe (Standard: aus SPECIES_COLORS)
-    
-    Returns:
-        Container mit Tierart-Badge
-    """
-    if bgcolor is None:
-        bgcolor = SPECIES_COLORS.get(text.lower(), ft.Colors.GREY_300)
-    
-    return ft.Container(
-        content=ft.Text(text, size=11, weight=ft.FontWeight.W_600),
-        bgcolor=bgcolor,
-        padding=ft.padding.symmetric(horizontal=8, vertical=4),
-        border_radius=12,
-    )
-
-
 def badge_for_typ(typ: str) -> ft.Control:
     """Erstellt ein Badge für den Meldungstyp (Vermisst/Fundtier).
     
@@ -483,7 +441,13 @@ def meta_row(icon: str, text: str) -> ft.Control:
 # ══════════════════════════════════════════════════════════════════════
 
 def filter_chip(text: str, color: str = ft.Colors.BLUE_100) -> ft.Container:
-    """Erstellt einen Filter-Chip.
+    """Erstellt einen rechteckigen Filter-Chip für Filter-Anzeigen.
+    
+    Unterschied zu chip() aus theme.py:
+    - Rechteckige Form (border_radius=12) statt Pille-Form
+    - Dunkler Text (GREY_800) statt weißer Text
+    - Größere Schrift (12px) und anderes Padding
+    - Verwendet für Filter-Darstellung in gespeicherten Suchen
     
     Args:
         text: Text des Chips
@@ -577,3 +541,32 @@ def show_login_required_snackbar(
         open=True,
     )
     page.update()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# PROGRESS DIALOGS
+# ══════════════════════════════════════════════════════════════════════
+
+def show_progress_dialog(page: ft.Page, message: str = "Lädt...") -> ft.AlertDialog:
+    """Zeigt einen modalen Fortschrittsdialog an.
+    
+    Args:
+        page: Flet Page-Instanz
+        message: Nachricht die angezeigt werden soll
+    
+    Returns:
+        AlertDialog-Instanz (zum Schließen mit page.close())
+    """
+    dlg = ft.AlertDialog(
+        modal=True,
+        content=ft.Row(
+            [
+                ft.ProgressRing(width=24, height=24),
+                ft.Text(message, size=14),
+            ],
+            spacing=20,
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+    )
+    page.open(dlg)
+    return dlg

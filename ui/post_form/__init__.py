@@ -5,10 +5,9 @@ Dieses Modul enthält die PostForm-Klasse und zugehörige Komponenten
 für das Erstellen von Tier-Meldungen (vermisst/gefunden).
 
 Struktur:
-- view.py: Hauptklasse PostForm
-- photo_manager.py: Foto-Upload und Komprimierung
-- form_fields.py: UI-Komponenten für das Formular
-- constants.py: Konstanten (Bildgrößen, Limits)
+- view.py: Hauptklasse PostForm (UI-Komposition und Koordinierung)
+- components.py: Gemeinsame UI-Komponenten (statische Builder)
+- features/: Feature-Module (AI Recognition, Photo Upload, Post Upload, Validation, References)
 """
 
 # Re-export der Hauptklasse für einfachen Import

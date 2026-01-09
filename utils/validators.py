@@ -171,6 +171,41 @@ def validate_date_format(date_str: Optional[str], format_str: str = "%d.%m.%Y") 
         return False, f"Datum muss im Format {format_str} sein (z.B. 01.01.2025)"
 
 
+def validate_date_not_future(date_str: Optional[str], format_str: str = "%d.%m.%Y") -> tuple[bool, Optional[str]]:
+    """Validiert, dass ein Datum nicht in der Zukunft liegt.
+    
+    Validiert zunächst das Format, dann ob das Datum nicht in der Zukunft liegt.
+    
+    Args:
+        date_str: Zu validierender Datumsstring
+        format_str: Erwartetes Format (Standard: TT.MM.YYYY)
+    
+    Returns:
+        Tuple (is_valid, error_message)
+    """
+    # Zuerst Format validieren
+    format_valid, format_error = validate_date_format(date_str, format_str)
+    if not format_valid:
+        return format_valid, format_error
+    
+    # Format ist gültig, prüfen ob Datum in der Zukunft liegt
+    if not date_str:
+        return False, "Datum ist erforderlich"
+    
+    try:
+        from datetime import datetime, date
+        date_obj = datetime.strptime(date_str.strip(), format_str).date()
+        today = date.today()
+        
+        if date_obj > today:
+            return False, "Das Datum darf nicht in der Zukunft liegen."
+        
+        return True, None
+    except ValueError:
+        # Sollte nicht passieren nach validate_date_format, aber als Fallback
+        return False, f"Datum muss im Format {format_str} sein (z.B. 01.01.2025)"
+
+
 # ════════════════════════════════════════════════════════════════════
 # LISTEN-VALIDIERUNG
 # ════════════════════════════════════════════════════════════════════

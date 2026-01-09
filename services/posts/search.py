@@ -7,7 +7,8 @@ from supabase import Client
 
 from utils.logging_config import get_logger
 from utils.constants import MAX_POSTS_LIMIT, MAX_SEARCH_QUERY_LENGTH
-from utils.filters import (
+from utils.validators import sanitize_string
+from .filters import (
     filter_by_search,
     filter_by_colors,
     sort_by_event_date,
@@ -171,12 +172,9 @@ class SearchService:
             Liste von Post-Dictionaries mit is_favorite Flag und user_display_name.
             Leere Liste bei Fehler.
         """
-        # Input-Validierung
+        # Input-Validierung und Sanitization
         if search_query:
-            search_query = search_query.strip()
-            if len(search_query) > MAX_SEARCH_QUERY_LENGTH:
-                logger.warning(f"Suchbegriff zu lang ({len(search_query)} Zeichen), wird gekürzt")
-                search_query = search_query[:MAX_SEARCH_QUERY_LENGTH]
+            search_query = sanitize_string(search_query, max_length=MAX_SEARCH_QUERY_LENGTH)
             if not search_query:
                 search_query = None
 

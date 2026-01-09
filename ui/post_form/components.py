@@ -1,12 +1,7 @@
 """
-Form Fields - UI-Komponenten für das Meldungsformular.
+Gemeinsame UI-Komponenten für das Meldungsformular.
 
-Enthält Funktionen zum Erstellen von:
-- Meldungsart SegmentedButton
-- Eingabefelder (Name, Beschreibung, Ort, Datum)
-- Dropdowns (Tierart, Rasse, Geschlecht)
-- Farben-Panel mit Checkboxes
-- Foto-Upload Bereich
+Enthält statische Komponenten-Builder-Funktionen.
 """
 
 from __future__ import annotations
@@ -337,27 +332,3 @@ def create_ai_result_container() -> ft.Container:
     )
 
 
-def populate_dropdown_options(
-    dropdown: ft.Dropdown,
-    items: List[Dict[str, Any]],
-    with_none_option: bool = False
-) -> None:
-    """Füllt ein Dropdown mit Optionen.
-    
-    Args:
-        dropdown: Dropdown-Widget das befüllt werden soll
-        items: Liste von Dictionaries mit 'id' und 'name'
-        with_none_option: Ob "Keine Angabe"-Option hinzugefügt werden soll
-    """
-    options = []
-    
-    if with_none_option:
-        options.append(ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL))
-    
-    for item in items:
-        options.append(ft.dropdown.Option(str(item["id"]), item["name"]))
-    
-    dropdown.options = options
-    
-    if with_none_option:
-        dropdown.value = NO_SELECTION_VALUE
