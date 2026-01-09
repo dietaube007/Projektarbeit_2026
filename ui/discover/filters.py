@@ -96,13 +96,27 @@ def create_farben_panel(
     return farben_container, toggle_icon, panel
 
 
-def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Container:
+def create_farben_header(toggle_icon: ft.Icon, on_click: Callable, is_dark: bool = False) -> ft.Container:
     """Erstellt den Header für das Farben-Panel."""
+    # Defaults folgen dem Theme; nur Light bekommt explizit hellen Hintergrund
+    if is_dark:
+        text_color = None
+        icon_color = None
+        toggle_icon.color = None
+        bg_color = None  # durchsichtig -> erbt dunklen Parent-Hintergrund
+        border_color = None
+    else:
+        text_color = ft.Colors.GREY_900
+        icon_color = ft.Colors.BLUE_700
+        toggle_icon.color = ft.Colors.GREY_800
+        bg_color = ft.Colors.GREY_100
+        border_color = ft.Colors.GREY_300
+
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18),
-                ft.Text("Farben wählen", size=14),
+                ft.Icon(ft.Icons.PALETTE, size=18, color=icon_color),
+                ft.Text("Farben wählen", size=14, color=text_color),
                 ft.Container(expand=True),
                 toggle_icon,
             ],
@@ -111,8 +125,8 @@ def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Contain
         padding=8,
         on_click=on_click,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-        border=ft.border.all(1, ft.Colors.GREY_200),
+        bgcolor=bg_color,
+        border=ft.border.all(1, border_color),
     )
 
 

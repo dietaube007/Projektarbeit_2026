@@ -86,6 +86,7 @@ class PetBuddyApp:
         self.page.snack_bar.open = True
         self.page.update()
     
+    
     # ════════════════════════════════════════════════════════════════════
     # DIALOGE
     # ════════════════════════════════════════════════════════════════════
@@ -236,7 +237,12 @@ class PetBuddyApp:
         
         # Login-Banner für nicht eingeloggte Benutzer
         if not self.is_logged_in:
-            controls.append(create_login_banner(lambda _: self._show_login()))
+            controls.append(
+                create_login_banner(
+                    lambda _: self._show_login(),
+                    theme_mode=self.page.theme_mode,
+                )
+            )
         
         controls.extend([
             soft_card(

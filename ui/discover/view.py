@@ -102,7 +102,7 @@ class DiscoverView:
 
         # Filter Dropdowns
         self.filter_typ = create_dropdown(
-            label="Kategorie",
+            label="Meldungsart",
             on_change=lambda _: self.page.run_task(self.load_posts),
         )
 
@@ -137,6 +137,7 @@ class DiscoverView:
         self.farben_header = create_farben_header(
             toggle_icon=self.farben_toggle_icon,
             on_click=self._toggle_farben_panel,
+            is_dark=self.page.theme_mode != ft.ThemeMode.LIGHT,
         )
 
         # Buttons
@@ -168,8 +169,8 @@ class DiscoverView:
             ft.Column(
                 [
                     ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Noch keine Meldungen", weight=ft.FontWeight.W_600),
-                    ft.Text("Passe deine Filter an oder melde ein Tier.", color=ft.Colors.GREY_700),
+                    ft.Text("Keine Ergebnisse", weight=ft.FontWeight.W_600),
+                    ft.Text("Keine Meldungen gefunden.", color=ft.Colors.GREY_700),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=8,
@@ -209,7 +210,8 @@ class DiscoverView:
 
             # Farben Checkboxen
             self.farben_filter_container.controls = []
-            for c in self.ref_service.get_colors() or []:
+            colors = self.ref_service.get_colors() or []
+            for c in colors:
                 c_id = c["id"]
 
                 def on_color_change(e, color_id=c_id):
@@ -279,7 +281,7 @@ class DiscoverView:
                 self.on_login_required()
             else:
                 self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
+                    ft.Text("Bitte einloggen, um Favoriten zu speichern."),
                     open=True,
                 )
                 self.page.update()
@@ -326,7 +328,7 @@ class DiscoverView:
             content=ft.Column(
                 [
                     ft.ProgressRing(width=40, height=40),
-                    ft.Text("Meldungen werden geladen…", size=14, color=ft.Colors.GREY_600),
+                    ft.Text("Laden...", size=14, color=ft.Colors.GREY_600),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=12,
@@ -384,8 +386,8 @@ class DiscoverView:
                 ft.Column(
                     [
                         ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-                        ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-                        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
+                        ft.Text("Keine Ergebnisse", weight=ft.FontWeight.W_600),
+                        ft.Text("Keine Meldungen gefunden.", color=ft.Colors.GREY_700),
                         ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,

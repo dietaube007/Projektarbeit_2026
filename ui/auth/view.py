@@ -228,8 +228,13 @@ class AuthView:
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         
-        # Icons aktualisieren
-        self._theme_icon.icon = ft.Icons.DARK_MODE if is_dark else ft.Icons.LIGHT_MODE
+        # Icon/Tooltip zeigen die Aktion (Gegenmodus)
+        self._theme_icon.icon = ft.Icons.LIGHT_MODE if is_dark else ft.Icons.DARK_MODE
+        self._theme_icon.tooltip = "Zu Hellmodus wechseln" if is_dark else "Zu Dunkelmodus wechseln"
+        try:
+            self._theme_icon.semantic_label = self._theme_icon.tooltip
+        except Exception:
+            pass
         self._theme_icon.icon_color = ft.Colors.WHITE if is_dark else TEXT_SECONDARY
         
         # Farben aktualisieren
@@ -243,7 +248,7 @@ class AuthView:
         self._subtitle_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
         
         self.page.update()
-
+    
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
         # Login-Felder deaktivieren damit Tab nicht dorthin springt
@@ -418,11 +423,11 @@ class AuthView:
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Container(expand=True),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
-                # Theme-Toggle oben rechts
+                # Theme-Toggle oben rechts (als Positioned-Container im Stack)
                 ft.Container(
-                    content=self._theme_icon,
-                    alignment=ft.alignment.top_right,
-                    padding=ft.padding.only(top=16, right=16),
+                    content=ft.Row([self._theme_icon], spacing=8),
+                    top=16,
+                    right=16,
                 ),
             ]),
             bgcolor=ft.Colors.GREY_900 if is_dark else BACKGROUND_COLOR,

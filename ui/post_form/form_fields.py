@@ -206,6 +206,30 @@ def create_save_button(on_click: Callable) -> ft.FilledButton:
     )
 
 
+def create_ai_recognition_button(on_click: Callable) -> ft.ElevatedButton:
+    """Erstellt den Button für die KI-Rassenerkennung."""
+    return ft.ElevatedButton(
+        "🤖 KI-Rassenerkennung starten",
+        icon=ft.Icons.AUTO_AWESOME,
+        on_click=on_click,
+        style=ft.ButtonStyle(
+            color=ft.Colors.WHITE,
+            bgcolor=ft.Colors.PURPLE_600,
+        )
+    )
+
+
+def create_ai_result_container() -> ft.Container:
+    """Erstellt den Container für KI-Erkennungsergebnisse."""
+    return ft.Container(
+        visible=False,
+        padding=15,
+        border=ft.border.all(2, ft.Colors.PURPLE_200),
+        border_radius=8,
+        bgcolor=ft.Colors.PURPLE_50,
+    )
+
+
 def populate_dropdown_options(
     dropdown: ft.Dropdown,
     items: List[Dict],
