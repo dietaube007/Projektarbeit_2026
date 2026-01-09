@@ -7,11 +7,15 @@ Enthält Funktionen für:
 - Foto-Entfernung aus Storage
 """
 
+from __future__ import annotations
+
 import os
 import io
 import base64
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any
+
+from supabase import Client
 
 from PIL import Image
 
@@ -21,15 +25,18 @@ from ui.post_form.constants import (
     STORAGE_BUCKET,
 )
 
-# Berechne absoluten Upload-Pfad relativ zum Projektverzeichnis
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-UPLOAD_DIR = os.path.join(_PROJECT_ROOT, "image_uploads")
-
 
 def compress_image(file_path: str) -> Tuple[bytes, str]:
-    """
-    Komprimiert ein Bild für schnelleres Laden.
+    """Komprimiert ein Bild für schnelleres Laden.
+    
     Konvertiert das Bild zu JPEG und passt die Größe an.
+    Behält das Seitenverhältnis bei.
+    
+    Args:
+        file_path: Pfad zur Bilddatei
+    
+    Returns:
+        Tuple mit (komprimierte Bytes, Dateiendung)
     """
     with Image.open(file_path) as img:
         # EXIF-Orientierung beibehalten, zu RGB konvertieren
@@ -47,11 +54,25 @@ def compress_image(file_path: str) -> Tuple[bytes, str]:
 
 
 def upload_to_storage(
-    sb,
+    sb: Client,
     file_path: str,
     original_filename: str
 ) -> Dict[str, Optional[str]]:
-    """Komprimiert und lädt ein Bild zu Supabase Storage hoch."""
+    """Komprimiert und lädt ein Bild zu Supabase Storage hoch.
+    
+    Args:
+        sb: Supabase Client-Instanz
+        file_path: Pfad zur lokalen Bilddatei
+        original_filename: Original-Dateiname
+    
+    Returns:
+        Dictionary mit:
+        - path: Storage-Pfad
+        - base64: Base64-kodierte Bilddaten
+        - url: Öffentliche URL
+        - name: Original-Dateiname
+        Alle Werte sind None bei Fehler
+    """
     try:
         print(f"[DEBUG upload_to_storage] file_path: {file_path}")
         print(f"[DEBUG upload_to_storage] Datei existiert: {os.path.exists(file_path)}")
@@ -89,14 +110,20 @@ def upload_to_storage(
         }
         
     except Exception as ex:
-        print(f"[ERROR upload_to_storage] Fehler beim Upload: {type(ex).__name__}: {ex}")
-        import traceback
-        traceback.print_exc()
+        print(f"Fehler beim Upload: {ex}")
         return {"path": None, "base64": None, "url": None, "name": None}
 
 
-def remove_from_storage(sb, storage_path: Optional[str]) -> bool:
-    """Entfernt ein Bild aus Supabase Storage."""
+def remove_from_storage(sb: Client, storage_path: Optional[str]) -> bool:
+    """Entfernt ein Bild aus Supabase Storage.
+    
+    Args:
+        sb: Supabase Client-Instanz
+        storage_path: Pfad zum Bild im Storage (oder None)
+    
+    Returns:
+        True bei Erfolg, False bei Fehler
+    """
     if not storage_path:
         return True
         
@@ -104,31 +131,28 @@ def remove_from_storage(sb, storage_path: Optional[str]) -> bool:
         sb.storage.from_(STORAGE_BUCKET).remove([storage_path])
         return True
     except Exception as ex:
-        print(f"Fehler beim Löschen aus Storage: {ex}")
+        logger.error(f"Fehler beim Löschen aus Storage ({storage_path}): {ex}", exc_info=True)
         return False
 
 
 def cleanup_local_file(file_path: str) -> bool:
-    """Löscht eine lokale temporäre Datei."""
+    """Löscht eine lokale temporäre Datei.
+    
+    Args:
+        file_path: Pfad zur zu löschenden Datei
+    
+    Returns:
+        True bei Erfolg, False bei Fehler
+    """
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
         return True
     except Exception as ex:
-        print(f"Fehler beim Löschen der lokalen Datei: {ex}")
+        logger.warning(f"Fehler beim Löschen der lokalen Datei {file_path}: {ex}", exc_info=True)
         return False
 
 
-def get_upload_path(filename: str, session_id: Optional[str] = None) -> str:
-    """Erstellt den lokalen Upload-Pfad für eine Datei.
-
-    Berücksichtigt den Flet-Session-Unterordner, wenn `session_id` angegeben ist.
-    """
-    # Stelle sicher, dass das Upload-Verzeichnis existiert
-    if session_id:
-        session_dir = os.path.join(UPLOAD_DIR, session_id)
-        os.makedirs(session_dir, exist_ok=True)
-        return os.path.join(session_dir, filename)
-    else:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        return os.path.join(UPLOAD_DIR, filename)
+def get_upload_path(filename: str) -> str:
+    """Erstellt den lokalen Upload-Pfad für eine Datei."""
+    return f"{UPLOAD_DIR}/{filename}"

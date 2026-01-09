@@ -1,100 +1,147 @@
 """Referenzdaten-Management.
 
-Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank, die für Dropdowns, Filter und die Formularvalidierung benötigt werden
+Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank,
+die für Dropdowns, Filter und die Formularvalidierung benötigt werden.
 
 """
 
+from __future__ import annotations
+
 from supabase import Client
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class ReferenceService:
-    # Service-Klasse für das Laden von Referenzdaten aus der Datenbank.
-    
-    def __init__(self, sb: Client):
-        # Initialisiert den Service mit dem Supabase-Client.
+    """Service-Klasse für das Laden von Referenzdaten aus der Datenbank."""
+
+    def __init__(self, sb: Client) -> None:
+        """Initialisiert den Service mit dem Supabase-Client.
+
+        Args:
+            sb: Supabase Client-Instanz
+        """
         self.sb = sb
-        
+
         # Cache für Referenzdaten
-        self._post_statuses = None
-        self._species = None
-        self._breeds_by_species = None
-        self._colors = None
-        self._sex = None
+        self._post_statuses: Optional[List[Dict[str, Any]]] = None
+        self._species: Optional[List[Dict[str, Any]]] = None
+        self._breeds_by_species: Optional[Dict[int, List[Dict[str, Any]]]] = None
+        self._colors: Optional[List[Dict[str, Any]]] = None
+        self._sex: Optional[List[Dict[str, Any]]] = None
     
     def get_post_statuses(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        # Lädt alle verfügbaren Post-Statuses/Kategorien.
+        """Lädt alle verfügbaren Post-Statuses/Kategorien.
+
+        Args:
+            use_cache: Ob gecachte Daten verwendet werden sollen
+
+        Returns:
+            Liste mit Post-Status-Dictionaries, leere Liste bei Fehler
+        """
         if use_cache and self._post_statuses is not None:
             return self._post_statuses
-        
+
         try:
             res = self.sb.table("post_status").select("*").execute()
             self._post_statuses = res.data or []
             return self._post_statuses
         except Exception as ex:
-            print(f"Fehler beim Laden von Meldungstypen: {ex}")
+            logger.error(f"Fehler beim Laden von Meldungstypen: {ex}", exc_info=True)
             return []
     
     def get_species(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        # Lädt alle verfügbaren Tierarten.
+        """Lädt alle verfügbaren Tierarten.
+
+        Args:
+            use_cache: Ob gecachte Daten verwendet werden sollen
+
+        Returns:
+            Liste mit Tierart-Dictionaries, leere Liste bei Fehler
+        """
         if use_cache and self._species is not None:
             return self._species
-        
+
         try:
             res = self.sb.table("species").select("*").execute()
             self._species = res.data or []
             return self._species
         except Exception as ex:
-            print(f"Fehler beim Laden von Tierarten: {ex}")
+            logger.error(f"Fehler beim Laden von Tierarten: {ex}", exc_info=True)
             return []
     
     def get_breeds_by_species(self, use_cache: bool = True) -> Dict[int, List[Dict[str, Any]]]:
-        # Lädt alle Rassen und gruppiert sie nach Tierart.
+        """Lädt alle Rassen und gruppiert sie nach Tierart.
+
+        Args:
+            use_cache: Ob gecachte Daten verwendet werden sollen
+
+        Returns:
+            Dictionary mit species_id als Key und Liste von Rassen als Value,
+            leeres Dictionary bei Fehler
+        """
         if use_cache and self._breeds_by_species is not None:
             return self._breeds_by_species
-        
+
         try:
             res = self.sb.table("breed").select("*").execute()
-            grouped = {}
+            grouped: Dict[int, List[Dict[str, Any]]] = {}
             for breed in res.data or []:
                 sid = breed.get("species_id")
-                if sid is not None:
+                if sid is not None and isinstance(sid, int):
                     if sid not in grouped:
                         grouped[sid] = []
                     grouped[sid].append(breed)
             self._breeds_by_species = grouped
             return self._breeds_by_species
         except Exception as ex:
-            print(f"Fehler beim Laden von Rassen: {ex}")
+            logger.error(f"Fehler beim Laden von Rassen: {ex}", exc_info=True)
             return {}
     
     def get_colors(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        # Lädt alle verfügbaren Farb-Beschreibungen.
+        """Lädt alle verfügbaren Farb-Beschreibungen.
+
+        Args:
+            use_cache: Ob gecachte Daten verwendet werden sollen
+
+        Returns:
+            Liste mit Farb-Dictionaries, leere Liste bei Fehler
+        """
         if use_cache and self._colors is not None:
             return self._colors
-        
+
         try:
             res = self.sb.table("color").select("*").execute()
             self._colors = res.data or []
             return self._colors
         except Exception as ex:
-            print(f"Fehler beim Laden von Farben: {ex}")
+            logger.error(f"Fehler beim Laden von Farben: {ex}", exc_info=True)
             return []
-    
+
     def get_sex(self, use_cache: bool = True) -> List[Dict[str, Any]]:
-        # Lädt alle verfügbaren Geschlechts-Optionen.
+        """Lädt alle verfügbaren Geschlechts-Optionen.
+
+        Args:
+            use_cache: Ob gecachte Daten verwendet werden sollen
+
+        Returns:
+            Liste mit Geschlechts-Dictionaries, leere Liste bei Fehler
+        """
         if use_cache and self._sex is not None:
             return self._sex
-        
+
         try:
             res = self.sb.table("sex").select("*").execute()
             self._sex = res.data or []
             return self._sex
         except Exception as ex:
-            print(f"Fehler beim Laden von Geschlechtern: {ex}")
+            logger.error(f"Fehler beim Laden von Geschlechtern: {ex}", exc_info=True)
             return []
-    
-    def clear_cache(self):
-        # Löscht alle gecachten Daten.
+
+    def clear_cache(self) -> None:
+        """Löscht alle gecachten Daten."""
         self._post_statuses = None
         self._species = None
         self._breeds_by_species = None

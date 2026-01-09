@@ -7,6 +7,12 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from ui.theme import soft_card
+from ui.constants import STATUS_COLORS, SPECIES_COLORS
+from ui.components import loading_indicator
+from ui.helpers import extract_item_data
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_favorite_card(
@@ -14,34 +20,21 @@ def build_favorite_card(
     on_remove: Callable[[int], None],
 ) -> ft.Control:
     """Erstellt eine Karte für eine favorisierte Meldung."""
-    # Daten extrahieren
+    # Daten extrahieren (zentrale Funktion)
     post_id = post.get("id")
-    title = post.get("headline") or "Ohne Namen"
-    
-    post_status = post.get("post_status") or {}
-    typ = post_status.get("name", "Unbekannt") if isinstance(post_status, dict) else "Unbekannt"
-    
-    species = post.get("species") or {}
-    art = species.get("name", "Unbekannt") if isinstance(species, dict) else "Unbekannt"
-    
-    breed = post.get("breed") or {}
-    rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
-    
-    post_colors = post.get("post_color") or []
-    farben_namen = [
-        pc.get("color", {}).get("name", "")
-        for pc in post_colors
-        if pc.get("color")
-    ]
-    farbe = ", ".join(farben_namen) if farben_namen else ""
-    
-    ort = post.get("location_text") or ""
-    when = (post.get("event_date") or post.get("created_at") or "")[:10]
-    status = "Aktiv" if post.get("is_active") else "Inaktiv"
-    
-    # Bild
-    post_images = post.get("post_image") or []
-    img_src = post_images[0].get("url") if post_images else None
+    data = extract_item_data(post)
+
+    title = data["title"]
+    typ = data["typ"] or "Unbekannt"
+    typ_lower = typ.lower()
+    art = data["art"] or "Unbekannt"
+    art_lower = art.lower()
+    rasse = data["rasse"]
+    farbe = data["farbe"]
+    ort = data["ort"]
+    when = data["when"]
+    status = data["status"]
+    img_src = data["img_src"]
     
     if img_src:
         visual_content = ft.Image(
@@ -78,10 +71,13 @@ def build_favorite_card(
             bgcolor=color,
         )
     
+    status_color = STATUS_COLORS.get(typ_lower, ft.Colors.GREY_300)
+    species_color = SPECIES_COLORS.get(art_lower, ft.Colors.GREY_300)
+
     badges = ft.Row(
         [
-            badge(typ, "#C5CAE9"),
-            badge(art, "#B2DFDB"),
+            badge(typ, status_color),
+            badge(art, species_color),
         ],
         spacing=8,
         wrap=True,
@@ -189,7 +185,7 @@ async def load_favorites(sb, user_id: str) -> List[dict]:
         return posts_res.data or []
         
     except Exception as e:
-        print(f"Fehler beim Laden der Favoriten: {e}")
+        logger.error(f"Fehler beim Laden der Favoriten (User {user_id}): {e}", exc_info=True)
         return []
 
 
@@ -205,7 +201,7 @@ def remove_favorite(sb, user_id: str, post_id: int) -> bool:
         )
         return True
     except Exception as e:
-        print(f"Fehler beim Entfernen aus Favoriten: {e}")
+        logger.error(f"Fehler beim Entfernen aus Favoriten (User {user_id}, Post {post_id}): {e}", exc_info=True)
         return False
 
 
@@ -227,8 +223,8 @@ def render_favorites_list(
             ft.Column(
                 [
                     ft.Icon(ft.Icons.FAVORITE_BORDER, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Du hast noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600),
-                    ft.Text("Klicke auf ❤️ bei einer Meldung, um sie hier zu speichern.", 
+                    ft.Text("Sie haben noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600),
+                    ft.Text("Klicken Sie auf das Herz-Symbol bei einer Meldung, um sie hier zu speichern.",
                            size=12, color=ft.Colors.GREY_500),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -238,3 +234,78 @@ def render_favorites_list(
     else:
         for post in favorites_items:
             favorites_list.controls.append(build_favorite_card(post, on_remove))
+
+
+class ProfileFavoritesMixin:
+    """Mixin-Klasse für Favoriten-Funktionalität in ProfileView.
+    
+    Enthält Methoden für:
+    - Favoriten laden
+    - Favorit entfernen
+    """
+    
+    async def _load_favorites(self):
+        """Lädt alle favorisierten Meldungen des aktuellen Benutzers."""
+        try:
+            self.favorites_list.controls = [loading_indicator("Favoriten werden geladen...")]
+            self.page.update()
+
+            user_resp = self.sb.auth.get_user()
+            if not user_resp or not user_resp.user:
+                self.favorites_items = []
+                render_favorites_list(
+                    self.favorites_list,
+                    self.favorites_items,
+                    self._remove_favorite,
+                    not_logged_in=True,
+                )
+                self.page.update()
+                return
+
+            user_id = user_resp.user.id
+            self.favorites_items = await load_favorites(self.sb, user_id)
+            render_favorites_list(
+                self.favorites_list,
+                self.favorites_items,
+                self._remove_favorite,
+            )
+            self.page.update()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Favoriten: {e}", exc_info=True)
+            self.favorites_items = []
+            render_favorites_list(
+                self.favorites_list,
+                self.favorites_items,
+                self._remove_favorite,
+            )
+            self.page.update()
+
+    def _remove_favorite(self, post_id: int):
+        """Entfernt einen Post aus den Favoriten."""
+        try:
+            user_resp = self.sb.auth.get_user()
+            if not user_resp or not user_resp.user:
+                return
+
+            user_id = user_resp.user.id
+
+            # Aus Datenbank löschen
+            if remove_favorite(self.sb, user_id, post_id):
+                # Lokal entfernen
+                self.favorites_items = [
+                    p for p in self.favorites_items if p.get("id") != post_id
+                ]
+                render_favorites_list(
+                    self.favorites_list,
+                    self.favorites_items,
+                    self._remove_favorite,
+                )
+                self.page.update()
+
+                # Startseite informieren
+                if self.on_favorites_changed:
+                    self.on_favorites_changed()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Entfernen aus Favoriten (Post {post_id}): {e}", exc_info=True)

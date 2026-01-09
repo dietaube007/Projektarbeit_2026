@@ -8,6 +8,13 @@ import flet as ft
 
 from ui.theme import soft_card
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
+from ui.components import loading_indicator
+from ui.helpers import extract_item_data
+from services.posts import PostService
+from utils.logging_config import get_logger
+from .edit_post import EditPostDialog
+
+logger = get_logger(__name__)
 
 
 def _show_post_details(page: ft.Page, post: dict) -> None:
@@ -36,9 +43,14 @@ def _show_post_details(page: ft.Page, post: dict) -> None:
     farbe = ", ".join(farben_namen) if farben_namen else "—"
     
     ort = post.get("location_text") or "—"
-    event_date = (post.get("event_date") or "")[:10]
-    created_at = (post.get("created_at") or "")[:10]
+    event_date_raw = (post.get("event_date") or "")[:10]
+    created_at_raw = (post.get("created_at") or "")[:10]
     is_active = post.get("is_active", True)
+
+    # Datum formatieren (TT.MM.JJ)
+    from ui.helpers import format_date
+    event_date = format_date(event_date_raw)
+    created_at = format_date(created_at_raw)
     
     # Bild
     post_images = post.get("post_image") or []
@@ -156,25 +168,19 @@ def build_my_post_card(
     on_delete: Optional[Callable[[int], None]] = None,
 ) -> ft.Control:
     """Erstellt eine kompakte Karte für eine eigene Meldung."""
-    # Daten extrahieren
+    # Daten extrahieren (zentrale Funktion)
     post_id = post.get("id")
-    title = post.get("headline") or "Ohne Namen"
-    
-    post_status = post.get("post_status") or {}
-    typ = post_status.get("name", "Unbekannt") if isinstance(post_status, dict) else "Unbekannt"
+    data = extract_item_data(post)
+
+    title = data["title"]
+    typ = data["typ"] or "Unbekannt"
     typ_lower = typ.lower()
-    
-    species = post.get("species") or {}
-    art = species.get("name", "Unbekannt") if isinstance(species, dict) else "Unbekannt"
+    art = data["art"] or "Unbekannt"
     art_lower = art.lower()
-    
-    ort = post.get("location_text") or "—"
-    event_date = (post.get("event_date") or "")[:10]
+    ort = data["ort"] or "—"
+    event_date = data["when"]
     is_active = post.get("is_active", True)
-    
-    # Bild (kleines Thumbnail)
-    post_images = post.get("post_image") or []
-    img_src = post_images[0].get("url") if post_images else None
+    img_src = data["img_src"]
     
     if img_src:
         thumbnail = ft.Container(
@@ -331,39 +337,28 @@ async def load_my_posts(sb, user_id: str) -> List[dict]:
         )
         return res.data or []
     except Exception as e:
-        print(f"Fehler beim Laden der eigenen Meldungen: {e}")
+        logger.error(f"Fehler beim Laden der eigenen Meldungen (User {user_id}): {e}", exc_info=True)
         return []
 
 
 def delete_post(sb, post_id: int) -> bool:
-    """Löscht einen Post und alle verknüpften Daten inkl. Storage-Bilder."""
+    """Löscht einen Post und alle verknüpften Daten inkl. Storage-Bilder.
+    
+    Diese Funktion verwendet PostService.delete() für konsistente Löschlogik.
+    
+    Args:
+        sb: Supabase Client-Instanz
+        post_id: ID des zu löschenden Posts (int wird zu str konvertiert)
+    
+    Returns:
+        True bei Erfolg, False bei Fehler
+    """
     try:
-        STORAGE_BUCKET = "pet-images"
-        
-        # 1. Hole die Bild-URLs
-        images_res = sb.table("post_image").select("url").eq("post_id", post_id).execute()
-        image_urls = [img["url"] for img in (images_res.data or [])]
-        
-        # 2. Lösche Bilder aus Supabase Storage
-        for url in image_urls:
-            try:
-                if STORAGE_BUCKET in url:
-                    parts = url.split(f"{STORAGE_BUCKET}/")
-                    if len(parts) > 1:
-                        file_path = parts[1].split("?")[0]
-                        sb.storage.from_(STORAGE_BUCKET).remove([file_path])
-            except Exception:
-                pass  # Weitermachen auch wenn Storage-Löschung fehlschlägt
-        
-        # 3. Lösche verknüpfte Daten aus der Datenbank
-        sb.table("post_image").delete().eq("post_id", post_id).execute()
-        sb.table("post_color").delete().eq("post_id", post_id).execute()
-        
-        # 4. Lösche den Post selbst
-        sb.table("post").delete().eq("id", post_id).execute()
-        return True
+        # PostService verwendet str für post_id, daher konvertieren
+        post_service = PostService(sb)
+        return post_service.delete(str(post_id))
     except Exception as e:
-        print(f"Fehler beim Löschen des Posts: {e}")
+        logger.error(f"Fehler beim Löschen des Posts {post_id}: {e}", exc_info=True)
         return False
 
 
@@ -380,16 +375,16 @@ def render_my_posts_list(
     
     if not_logged_in:
         posts_list.controls.append(
-            ft.Text("Bitte einloggen um deine Meldungen zu sehen.", color=ft.Colors.GREY_600)
+            ft.Text("Bitte einloggen um Ihre Meldungen zu sehen.", color=ft.Colors.GREY_600)
         )
     elif not posts_items:
         posts_list.controls.append(
             ft.Column(
                 [
                     ft.Icon(ft.Icons.ARTICLE_OUTLINED, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Du hast noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
+                    ft.Text("Sie haben noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
                     ft.Text(
-                        "Erstelle eine Meldung über den 'Melden'-Tab.",
+                        "Erstellen Sie eine Meldung über den 'Melden'-Tab.",
                         size=12,
                         color=ft.Colors.GREY_500,
                     ),
@@ -403,3 +398,130 @@ def render_my_posts_list(
             posts_list.controls.append(
                 build_my_post_card(post, page=page, on_edit=on_edit, on_delete=on_delete)
             )
+
+
+class ProfileMyPostsMixin:
+    """Mixin-Klasse für My Posts-Funktionalität in ProfileView.
+    
+    Enthält Methoden für:
+    - Meine Posts laden
+    - Post bearbeiten
+    - Post löschen
+    """
+    
+    async def _load_my_posts(self):
+        """Lädt alle eigenen Meldungen des aktuellen Benutzers."""
+        try:
+            self.my_posts_list.controls = [loading_indicator("Meldungen werden geladen...")]
+            self.page.update()
+
+            user_resp = self.sb.auth.get_user()
+            if not user_resp or not user_resp.user:
+                self.my_posts_items = []
+                render_my_posts_list(
+                    self.my_posts_list,
+                    self.my_posts_items,
+                    page=self.page,
+                    on_edit=self._edit_post,
+                    on_delete=self._confirm_delete_post,
+                    not_logged_in=True,
+                )
+                self.page.update()
+                return
+
+            user_id = user_resp.user.id
+            self.my_posts_items = await load_my_posts(self.sb, user_id)
+            render_my_posts_list(
+                self.my_posts_list,
+                self.my_posts_items,
+                page=self.page,
+                on_edit=self._edit_post,
+                on_delete=self._confirm_delete_post,
+            )
+            self.page.update()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der eigenen Meldungen: {e}", exc_info=True)
+            self.my_posts_items = []
+            render_my_posts_list(
+                self.my_posts_list,
+                self.my_posts_items,
+                page=self.page,
+                on_edit=self._edit_post,
+                on_delete=self._confirm_delete_post,
+            )
+            self.page.update()
+
+    def _edit_post(self, post: dict):
+        """Bearbeiten einer Meldung."""
+        def on_save():
+            # Meldungen neu laden
+            self.page.run_task(self._load_my_posts)
+            # Startseite aktualisieren
+            if self.on_posts_changed:
+                self.on_posts_changed()
+        
+        # Bearbeitungsdialog öffnen
+        dialog = EditPostDialog(
+            page=self.page,
+            sb=self.sb,
+            post=post,
+            on_save_callback=on_save,
+        )
+        dialog.show()
+
+    def _confirm_delete_post(self, post_id: int):
+        """Zeigt Bestätigungsdialog zum Löschen."""
+        def on_confirm(e):
+            self.page.close(dialog)
+            self._delete_post(post_id)
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Meldung löschen?"),
+            content=ft.Text(
+                "Möchten Sie diese Meldung wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=on_cancel),
+                ft.ElevatedButton(
+                    "Löschen",
+                    bgcolor=ft.Colors.RED_600,
+                    color=ft.Colors.WHITE,
+                    on_click=on_confirm,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
+    def _delete_post(self, post_id: int):
+        """Löscht einen Post."""
+        try:
+            if delete_post(self.sb, post_id):
+                # Lokal entfernen
+                self.my_posts_items = [
+                    p for p in self.my_posts_items if p.get("id") != post_id
+                ]
+                render_my_posts_list(
+                    self.my_posts_list,
+                    self.my_posts_items,
+                    page=self.page,
+                    on_edit=self._edit_post,
+                    on_delete=self._confirm_delete_post,
+                )
+                self._show_success_dialog("Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
+                self.page.update()
+
+                # Startseite aktualisieren
+                if self.on_posts_changed:
+                    self.on_posts_changed()
+            else:
+                self._show_error_dialog("Löschen fehlgeschlagen", "Die Meldung konnte nicht gelöscht werden.")
+                self.page.update()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Löschen des Posts {post_id}: {e}", exc_info=True)

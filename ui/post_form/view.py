@@ -7,15 +7,12 @@ Vermisst-/Gefunden-Meldungen bereitstellt.
 
 import os
 from datetime import datetime
-import re
-import asyncio
 from typing import Callable, Optional
 
 import flet as ft
 
 from services.references import ReferenceService
 from services.posts import PostService
-from services.pet_recognition import get_recognition_service
 
 from ui.post_form.constants import (
     VALID_IMAGE_TYPES,
@@ -106,6 +103,8 @@ class PostForm:
         # Name/Überschrift
         self.title_label = create_title_label()
         self.name_tf = create_name_field()
+        # Dynamischer Zeichenzähler für Name
+        self.name_tf.on_change = self._update_name_counter
         
         # Dropdowns
         self.species_dd = create_species_dropdown()
@@ -119,11 +118,22 @@ class PostForm:
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
         
+        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+        panel_surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        panel_outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+        
         self.farben_panel = ft.Container(
             content=self.farben_container,
             padding=12,
             visible=True,
+            bgcolor=panel_surface_color,
+            border_radius=8,
+            border=ft.border.all(1, panel_outline_color) if panel_outline_color else None,
         )
+        
+        # Theme-Farben für Light/Dark Mode (sicherer Zugriff mit Fallback)
+        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
         
         self.farben_header = ft.Container(
             content=ft.Row(
@@ -138,37 +148,14 @@ class PostForm:
             padding=8,
             on_click=self._toggle_farben_panel,
             border_radius=8,
-            bgcolor=ft.Colors.GREY_100,
+            bgcolor=surface_color,
+            border=ft.border.all(1, outline_color) if outline_color else None,
         )
         
         # Beschreibung & Standort
         self.info_tf = create_description_field()
-        # KI-Hinweis-Badge über der Beschreibung
-        def on_remove_hint(_=None):
-            self._remove_ai_hint()
-        self.ai_hint_badge = ft.Container(
-            visible=False,
-            padding=6,
-            bgcolor=ft.Colors.BLUE_50,
-            border_radius=16,
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=ft.Colors.BLUE_700),
-                    ft.Text("KI‑Hinweis eingefügt", size=12, color=ft.Colors.BLUE_800, weight=ft.FontWeight.W_600),
-                    ft.Container(expand=True),
-                    ft.TextButton("Hinweis entfernen", icon=ft.Icons.CLOSE, on_click=on_remove_hint),
-                ],
-                spacing=8,
-            ),
-        )
         self.location_tf = create_location_field()
         self.date_tf = create_date_field()
-        
-        # KI-Rassenerkennung
-        self.ai_button = create_ai_recognition_button(
-            lambda _: self.page.run_task(self._start_ai_recognition)
-        )
-        self.ai_result_container = create_ai_result_container()
         
         # Status-Nachricht
         self.status_text = create_status_text()
@@ -190,36 +177,7 @@ class PostForm:
     
     def _show_validation_dialog(self, title: str, message: str, items: list):
         """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Column(
-                [
-                    ft.Text(message, size=13, color=ft.Colors.GREY_700),
-                    ft.Column(
-                        [ft.Text(item, size=12, color=ft.Colors.GREY_800) for item in items],
-                        spacing=2,
-                    ),
-                ],
-                spacing=8,
-                tight=True,
-            ),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
+        show_validation_dialog(self.page, title, message, items)
     
     def _show_success_dialog(self, title: str, message: str):
         """Zeigt einen Erfolgs-Dialog an."""
@@ -244,35 +202,6 @@ class PostForm:
         
         self.page.open(dlg)
     
-    def _show_progress_dialog(self, message: str):
-        """Zeigt einen modalen Fortschrittsdialog mit Lade-Indikator an."""
-        try:
-            def on_cancel(e):
-                # Setze Abbruch-Flag und schließe Dialog
-                self.ai_recognition_cancelled = True
-                self.page.close(dlg)
-                self._show_status("❌ KI-Erkennung abgebrochen", is_error=True)
-            dlg = ft.AlertDialog(
-                modal=True,
-                title=ft.Row([
-                    ft.Icon(ft.Icons.HOURGLASS_TOP, color=ft.Colors.BLUE_600, size=22),
-                    ft.Text("Bitte kurz warten", size=16, weight=ft.FontWeight.W_600),
-                ], spacing=8),
-                content=ft.Row([
-                    ft.ProgressRing(width=20, height=20),
-                    ft.Text(message, size=13, color=ft.Colors.GREY_700),
-                ], spacing=10),
-                actions=[ft.TextButton("Abbrechen", on_click=on_cancel)],
-                actions_alignment=ft.MainAxisAlignment.END,
-            )
-            # Speichere Referenz, um später schließen zu können
-            self._progress_dlg = dlg
-            self.page.open(dlg)
-            self.page.update()
-        except Exception as _:
-            # Fallback: Statusleiste verwenden
-            self._show_status(message, is_loading=True)
-
     def _show_error_dialog(self, title: str, message: str):
         """Zeigt einen Fehler-Dialog an."""
         def close_dialog(e):
@@ -295,83 +224,6 @@ class PostForm:
         )
         
         self.page.open(dlg)
-
-    def _show_ai_suggestion_dialog(self, error_text: str, suggested_breed: str, suggested_species: str | None, confidence: float):
-        """Zeigt einen Dialog an, der bei unsicheren Ergebnissen nur einen Hinweis in die Beschreibung einfügt."""
-        def accept_to_description(e):
-            self.page.close(dlg)
-            # Hinweis-Text in Beschreibung einfügen
-            self._insert_or_update_ai_hint(suggested_species, suggested_breed, confidence)
-        
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text("Erkennung fehlgeschlagen", size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Column(
-                [
-                    ft.Text(error_text, size=13, color=ft.Colors.GREY_700),
-                    ft.Container(height=8),
-                    ft.Text(
-                        "Option: Hinweis in die Beschreibung einfügen (Felder bleiben unverändert).",
-                        size=12,
-                        color=ft.Colors.GREY_700,
-                    ),
-                ],
-                tight=True,
-                spacing=6,
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=close_dialog),
-                ft.FilledButton("Nur Hinweis einfügen", icon=ft.Icons.NOTE_ADD, on_click=accept_to_description),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
-
-    # ───────────────────────────────────────────────────────────────────
-    # KI-Hinweis Helpers
-    # ───────────────────────────────────────────────────────────────────
-    def _build_ai_hint_text(self, species: Optional[str], breed: str, confidence: float) -> str:
-        conf_percent = int((confidence or 0) * 100)
-        if species:
-            return f"[KI-Vorschlag (unsicher): {species}, Rasse: {breed} ({conf_percent}% Konfidenz)]"
-        return f"[KI-Vorschlag (unsicher): {breed} ({conf_percent}% Konfidenz)]"
-
-    def _insert_or_update_ai_hint(self, species: Optional[str], breed: str, confidence: float):
-        """Fügt den KI-Hinweis am Anfang der Beschreibung ein oder aktualisiert ihn (Duplikat-Schutz)."""
-        hint = self._build_ai_hint_text(species, breed, confidence)
-        current = self.info_tf.value or ""
-        # Suche nach existierendem Hint am Anfang
-        pattern = r"^\[KI-Vorschlag \(unsicher\):.*?\]\n\n"
-        if re.match(pattern, current):
-            # Ersetze bestehenden Hinweis
-            new_value = re.sub(pattern, hint + "\n\n", current, count=1)
-            self.info_tf.value = new_value
-        else:
-            # Präfix hinzufügen
-            self.info_tf.value = f"{hint}\n\n{current}" if current else hint
-        # Badge zeigen
-        self.ai_hint_badge.visible = True
-        self._show_status("Hinweis aus KI übernommen.", is_error=False)
-        self.page.update()
-
-    def _remove_ai_hint(self):
-        """Entfernt den KI-Hinweis am Anfang der Beschreibung, falls vorhanden."""
-        current = self.info_tf.value or ""
-        pattern = r"^\[KI-Vorschlag \(unsicher\):.*?\]\n\n?"
-        new_value = re.sub(pattern, "", current, count=1)
-        self.info_tf.value = new_value
-        self.ai_hint_badge.visible = False
-        self.page.update()
     
     def _toggle_farben_panel(self, _):
         """Toggle für das Farben-Panel."""
@@ -401,7 +253,46 @@ class PostForm:
             self.ai_button.visible = True
         
         self.page.update()
-    
+
+    def _update_name_counter(self, _=None):
+        """Aktualisiert den Zeichenzähler für das Name/Überschrift-Feld."""
+        text = self.name_tf.value or ""
+        length = len(text)
+        self.name_tf.counter_text = f"{length} / {MAX_HEADLINE_LENGTH}"
+        self.page.update()
+
+    def _update_description_counter(self, _=None):
+        """Aktualisiert den Zeichenzähler für das Beschreibungsfeld."""
+        text = self.info_tf.value or ""
+        length = len(text)
+        self.info_tf.counter_text = f"{length} / {MAX_DESCRIPTION_LENGTH}"
+        self.page.update()
+
+    def _open_date_picker(self):
+        """Öffnet den DatePicker (kompatibel mit verschiedenen Flet-Versionen)."""
+        # Ältere Flet-Versionen nutzen das 'open'-Flag statt pick_date()
+        try:
+            # Versuchen, über open-Flag zu öffnen
+            self.date_picker.open = True
+            self.page.update()
+        except Exception:
+            # Wenn das nicht funktioniert, ignorieren wir den Fehler still
+            pass
+
+    def _on_date_picked(self, e):
+        """Wird aufgerufen, wenn im DatePicker ein Datum gewählt wird."""
+        # Je nach Flet-Version kann das Event verschiedene Typen haben;
+        # wir greifen defensiv auf control.value zu.
+        if getattr(e, "control", None) and getattr(e.control, "value", None):
+            try:
+                # value ist vom Typ date
+                picked_date = e.control.value
+                self.date_tf.value = picked_date.strftime(DATE_FORMAT)
+                self.page.update()
+            except Exception:
+                # Fallback: nichts tun, Feld bleibt wie es ist
+                pass
+
     def _on_color_change(self, color_id: int, is_selected: bool):
         """Handler für Farbänderungen."""
         if is_selected:
@@ -818,17 +709,14 @@ class PostForm:
                         
                         self.photo_preview.src_base64 = result["base64"]
                         self.photo_preview.visible = True
-                        self._show_status(f"✓ Hochgeladen: {ev.file_name}")
+                        self._show_status(f"Bild hochgeladen: {ev.file_name}")
                     else:
-                        self._show_status("❌ Fehler beim Hochladen", is_error=True)
+                        self._show_status("Fehler beim Hochladen", is_error=True)
                     
                     # Lokale Datei aufräumen
                     cleanup_local_file(upload_path)
                     
                 except Exception as ex:
-                    print(f"[DEBUG] Exception im on_upload: {type(ex).__name__}: {ex}")
-                    import traceback
-                    traceback.print_exc()
                     self._show_status(f"❌ Fehler: {ex}", is_error=True)
         
         fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
@@ -852,39 +740,92 @@ class PostForm:
     async def _save_post(self, _=None):
         """Speichert die Meldung in der Datenbank."""
         
-        # Validierung
+        # Validierung mit zentralen Validatoren
         errors = []
-        if not self.name_tf.value or not self.name_tf.value.strip():
-            errors.append("• Name/Überschrift")
+        
+        # Name/Überschrift validieren
+        name_valid, name_error = validate_not_empty(self.name_tf.value, "Name/Überschrift")
+        if not name_valid:
+            errors.append(f"• {name_error}")
+        else:
+            # Länge prüfen (max. MAX_HEADLINE_LENGTH Zeichen)
+            name_length_valid, name_length_error = validate_length(
+                self.name_tf.value, max_length=MAX_HEADLINE_LENGTH, field_name="Name/Überschrift"
+            )
+            if not name_length_valid:
+                errors.append(f"• {name_length_error}")
+        
+        # Tierart validieren
         if not self.species_dd.value:
-            errors.append("• Tierart")
-        if not self.selected_farben:
-            errors.append("• Mindestens eine Farbe")
-        if not self.info_tf.value or not self.info_tf.value.strip():
-            errors.append("• Beschreibung")
-        if not self.location_tf.value or not self.location_tf.value.strip():
-            errors.append("• Ort")
-        if not self.date_tf.value or not self.date_tf.value.strip():
-            errors.append("• Datum")
+            errors.append("• Tierart ist erforderlich")
+        
+        # Farben validieren
+        colors_valid, colors_error = validate_list_not_empty(
+            self.selected_farben, "Farben", min_items=1
+        )
+        if not colors_valid:
+            errors.append(f"• {colors_error}")
+        
+        # Beschreibung validieren
+        desc_valid, desc_error = validate_not_empty(self.info_tf.value, "Beschreibung")
+        if not desc_valid:
+            errors.append(f"• {desc_error}")
+        else:
+            # Beschreibung sollte mindestens MIN_DESCRIPTION_LENGTH Zeichen haben
+            desc_length_valid, desc_length_error = validate_length(
+                self.info_tf.value, min_length=MIN_DESCRIPTION_LENGTH, max_length=MAX_DESCRIPTION_LENGTH, field_name="Beschreibung"
+            )
+            if not desc_length_valid:
+                errors.append(f"• {desc_length_error}")
+        
+        # Ort validieren
+        location_valid, location_error = validate_not_empty(self.location_tf.value, "Ort")
+        if not location_valid:
+            errors.append(f"• {location_error}")
+        else:
+            # Ort sollte max. MAX_LOCATION_LENGTH Zeichen haben
+            location_length_valid, location_length_error = validate_length(
+                self.location_tf.value, max_length=MAX_LOCATION_LENGTH, field_name="Ort"
+            )
+            if not location_length_valid:
+                errors.append(f"• {location_length_error}")
+        
+        # Datum validieren
+        date_valid, date_error = validate_date_format(self.date_tf.value, DATE_FORMAT)
+        if not date_valid:
+            errors.append(f"• {date_error}")
+        
+        # Foto validieren
         if not self.selected_photo.get("url"):
-            errors.append("• Foto")
+            errors.append("• Foto ist erforderlich")
         
         if errors:
             self._show_validation_dialog(
                 "Pflichtfelder fehlen",
-                "Bitte fülle folgende Felder aus:",
+                "Bitte korrigiere folgende Fehler:",
                 errors
             )
             return
         
-        # Datum parsen
+        # Datum parsen (nach Validierung)
         try:
             event_date = datetime.strptime(self.date_tf.value.strip(), DATE_FORMAT).date()
         except ValueError:
+            # Sollte nicht passieren nach Validierung, aber als Fallback
             self._show_validation_dialog(
                 "Ungültiges Format",
                 "Das Datum hat ein falsches Format.",
                 ["• Bitte verwende: TT.MM.YYYY", "• Beispiel: 04.01.2026"]
+            )
+            return
+
+        # Datum darf nicht in der Zukunft liegen
+        today = date.today()
+        if event_date > today:
+            self._show_validation_dialog(
+                "Ungültiges Datum",
+                "Das Datum darf nicht in der Zukunft liegen.",
+                ["• Bitte ein Datum wählen, das heute oder in der Vergangenheit liegt."]
             )
             return
         
@@ -892,7 +833,7 @@ class PostForm:
         try:
             user_response = self.sb.auth.get_user()
             if not user_response or not user_response.user:
-                self._show_error_dialog("Nicht eingeloggt", "Bitte melde dich an, um eine Meldung zu erstellen.")
+                self._show_error_dialog("Nicht eingeloggt", "Bitte melden Sie sich an, um eine Meldung zu erstellen.")
                 return
             user_id = user_response.user.id
         except Exception as e:
@@ -900,18 +841,23 @@ class PostForm:
             return
         
         try:
-            self._show_status("⏳ Erstelle Meldung...", is_loading=True)
+            self._show_status("Erstelle Meldung...", is_loading=True)
+            
+            # Input sanitizen vor dem Speichern
+            headline = sanitize_string(self.name_tf.value, max_length=MAX_HEADLINE_LENGTH)
+            description = sanitize_string(self.info_tf.value, max_length=MAX_DESCRIPTION_LENGTH)
+            location = sanitize_string(self.location_tf.value, max_length=MAX_LOCATION_LENGTH)
             
             post_data = {
                 "user_id": user_id,
                 "post_status_id": int(list(self.meldungsart.selected)[0]),
-                "headline": self.name_tf.value.strip(),
-                "description": self.info_tf.value.strip(),
+                "headline": headline,
+                "description": description,
                 "species_id": int(self.species_dd.value),
                 "breed_id": int(self.breed_dd.value) if self.breed_dd.value and self.breed_dd.value != NO_SELECTION_VALUE else None,
                 "sex_id": int(self.sex_dd.value) if self.sex_dd.value and self.sex_dd.value != NO_SELECTION_VALUE else None,
                 "event_date": event_date.isoformat(),
-                "location_text": self.location_tf.value.strip(),
+                "location_text": location,
             }
             
             new_post = self.post_service.create(post_data)
@@ -926,7 +872,7 @@ class PostForm:
                 self.post_service.add_photo(post_id, self.selected_photo["url"])
             
             self._show_status("")
-            self._show_success_dialog("Meldung erstellt", "Deine Meldung wurde erfolgreich veröffentlicht!")
+            self._show_success_dialog("Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
             
             self._reset_form()
             
@@ -1026,7 +972,7 @@ class PostForm:
             self._update_title_label()
                 
         except Exception as ex:
-            print(f"Fehler beim Laden der Referenzdaten: {ex}")
+            logger.error(f"Fehler beim Laden der Referenzdaten: {ex}", exc_info=True)
     
     async def _update_breeds(self, _=None):
         """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
@@ -1044,7 +990,7 @@ class PostForm:
                 self.breed_dd.value = NO_SELECTION_VALUE
             self.page.update()
         except Exception as ex:
-            print(f"Fehler beim Aktualisieren der Rassen: {ex}")
+            logger.error(f"Fehler beim Aktualisieren der Rassen: {ex}", exc_info=True)
     
     # ════════════════════════════════════════════════════════════════════
     # BUILD - Erstellt das UI
@@ -1053,17 +999,28 @@ class PostForm:
     def build(self) -> ft.Column:
         """Baut und gibt das Formular-Layout zurück."""
         
+        # Theme-Farben für Light/Dark Mode
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+        on_surface_variant = getattr(ft.Colors, "ON_SURFACE_VARIANT", None)
+        
+        # Text-Farben basierend auf Theme
+        text_color = on_surface_variant if on_surface_variant else (ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_700)
+        icon_color = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_500
+        border_color = outline_color if outline_color else (ft.Colors.GREY_600 if is_dark else ft.Colors.GREY_300)
+        
         # Foto-Upload Bereich
         photo_area = ft.Container(
             content=ft.Column([
                 ft.Container(
                     content=ft.Column([
-                        ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=ft.Colors.GREY_500),
-                        ft.Text("Foto hochladen (Tippen)", color=ft.Colors.GREY_700, size=12),
+                        ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=icon_color),
+                        ft.Text("Foto hochladen (Tippen)", color=text_color, size=12),
                     ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     width=400,
                     height=150,
-                    border=ft.border.all(2, ft.Colors.GREY_300),
+                    border=ft.border.all(2, border_color),
                     border_radius=8,
                     on_click=lambda _: self.page.run_task(self._pick_photo),
                 ),
@@ -1076,19 +1033,15 @@ class PostForm:
             [
                 ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
                 ft.Divider(height=20),
-                
-                self.meldungsart,
+
+                ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
+                photo_area,
                 ft.Divider(height=20),
                 
                 ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
                 photo_area,
-                
-                # KI-Rassenerkennung Button (nur für Fundtiere)
-                self.ai_button,
-                self.ai_result_container,
-                
                 ft.Divider(height=20),
-                
+
                 self.title_label,
                 self.name_tf,
                 ft.Row([self.species_dd, self.breed_dd, self.sex_dd], spacing=15, wrap=True),
@@ -1098,11 +1051,10 @@ class PostForm:
                 ft.Divider(height=20),
                 
                 ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
-                self.ai_hint_badge,
                 self.info_tf,
                 ft.Divider(height=20),
                 
-                ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
                 self.location_tf,
                 self.date_tf,
                 ft.Divider(height=20),

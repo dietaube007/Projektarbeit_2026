@@ -6,10 +6,10 @@ Willkommen bei PetBuddy! Diese Anleitung hilft dir, die App schnell zu verstehen
 
 PetBuddy ist eine Plattform für vermisste und gefundene Haustiere. Du kannst:
 
-- 🐕 Dein vermisstes Tier melden
-- 🐈 Ein gefundenes Tier registrieren
-- 🔍 Nach Meldungen in deiner Nähe suchen
-- 📱 Mit anderen Nutzern in Kontakt treten
+- Dein vermisstes Tier melden
+- Ein gefundenes Tier registrieren
+- Nach Meldungen in deiner Nähe suchen
+- Mit anderen Nutzern in Kontakt treten
 
 ## App starten
 

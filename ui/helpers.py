@@ -2,11 +2,21 @@
 Hilfsfunktionen für Datenverarbeitung und Formatierung.
 """
 
-from typing import Optional
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional, Dict, Any, List
 
 
-def extract_item_data(item: dict) -> dict:
-    """Extrahiert und formatiert Daten aus einem Post-Item."""
+def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Extrahiert und formatiert Daten aus einem Post-Item.
+
+    Args:
+        item: Post-Dictionary mit Rohdaten aus der Datenbank
+
+    Returns:
+        Dictionary mit formatierten Anzeigewerten
+    """
     post_images = item.get("post_image") or []
     img_src = post_images[0].get("url") if post_images else None
 
@@ -30,8 +40,18 @@ def extract_item_data(item: dict) -> dict:
     farbe = ", ".join([x for x in farben_namen if x]) if farben_namen else ""
 
     ort = item.get("location_text") or ""
-    when = (item.get("event_date") or item.get("created_at") or "")[:10]
+    when_raw = (item.get("event_date") or item.get("created_at") or "")[:10]
+    when = format_date(when_raw)
     status = "Aktiv" if item.get("is_active") else "Inaktiv"
+
+    # Benutzer-Informationen (aus separater Abfrage)
+    username = item.get("user_display_name") or ""
+    if not username:
+        username = "Nutzer"
+
+    # Erstellungsdatum (wann gepostet)
+    created_at_raw = (item.get("created_at") or "")[:10]
+    created_at = format_date(created_at_raw)
 
     return {
         "img_src": img_src,
@@ -43,18 +63,43 @@ def extract_item_data(item: dict) -> dict:
         "ort": ort,
         "when": when,
         "status": status,
+        "username": username,
+        "created_at": created_at,
     }
 
 
 def format_date(date_str: Optional[str]) -> str:
-    """Formatiert ein Datum aus ISO-Format."""
-    if not date_str:
+    """Formatiert ein Datum aus ISO-Format ins Anzeigeformat TT.MM.JJJJ.
+
+    Args:
+        date_str: Datumsstring im ISO-Format (YYYY-MM-DD)
+
+    Returns:
+        Formatiertes Datum (TT.MM.JJJJ) oder "—" wenn leer
+    """
+    if not date_str or not date_str.strip():
         return "—"
-    return date_str[:10]
+    
+    try:
+        # ISO-Format parsen (YYYY-MM-DD)
+        date_obj = datetime.strptime(date_str[:10], "%Y-%m-%d")
+        # Formatieren als TT.MM.JJJJ
+        return date_obj.strftime("%d.%m.%Y")
+    except (ValueError, TypeError):
+        # Fallback: Original zurückgeben wenn Parsing fehlschlägt
+        return date_str[:10] if date_str else "—"
 
 
 def truncate_text(text: str, max_length: int = 100) -> str:
-    """Kürzt Text auf maximale Länge."""
+    """Kürzt Text auf maximale Länge.
+
+    Args:
+        text: Zu kürzender Text
+        max_length: Maximale Länge (Standard: 100)
+
+    Returns:
+        Gekürzter Text mit "..." oder Original wenn kürzer
+    """
     if not text:
         return ""
     if len(text) <= max_length:
@@ -62,11 +107,18 @@ def truncate_text(text: str, max_length: int = 100) -> str:
     return text[:max_length - 3] + "..."
 
 
-def get_color_names(post_colors: list) -> str:
-    """Extrahiert Farbnamen aus post_color Liste. """
+def get_color_names(post_colors: List[Dict[str, Any]]) -> str:
+    """Extrahiert Farbnamen aus post_color Liste.
+
+    Args:
+        post_colors: Liste von post_color Dictionaries
+
+    Returns:
+        Komma-separierte Farbnamen oder leerer String
+    """
     if not post_colors:
         return ""
-    
+
     farben_namen = [
         pc.get("color", {}).get("name", "")
         for pc in post_colors
@@ -75,9 +127,18 @@ def get_color_names(post_colors: list) -> str:
     return ", ".join([x for x in farben_namen if x])
 
 
-def get_nested_value(data: dict, *keys, default="") -> str:
-    """Holt verschachtelte Werte sicher aus einem Dictionary. """
-    current = data
+def get_nested_value(data: Dict[str, Any], *keys, default: str = "") -> str:
+    """Holt verschachtelte Werte sicher aus einem Dictionary.
+
+    Args:
+        data: Quell-Dictionary
+        *keys: Verschachtelte Schlüssel (z.B. "species", "name")
+        default: Standardwert bei Fehler
+
+    Returns:
+        Gefundener Wert oder default
+    """
+    current: Any = data
     for key in keys:
         if isinstance(current, dict):
             current = current.get(key)
@@ -85,4 +146,4 @@ def get_nested_value(data: dict, *keys, default="") -> str:
             return default
         if current is None:
             return default
-    return current if current else default
+    return str(current) if current else default

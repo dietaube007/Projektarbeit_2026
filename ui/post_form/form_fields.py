@@ -9,7 +9,9 @@ Enthält Funktionen zum Erstellen von:
 - Foto-Upload Bereich
 """
 
-from typing import List, Dict, Callable, Optional
+from __future__ import annotations
+
+from typing import List, Dict, Callable, Optional, Any, Tuple
 
 import flet as ft
 
@@ -21,10 +23,22 @@ from ui.post_form.constants import (
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
 )
+from ui.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+)
 
 
-def create_meldungsart_button(on_change: Callable) -> ft.SegmentedButton:
-    """Erstellt den SegmentedButton für die Meldungsart."""
+def create_meldungsart_button(on_change: Callable[[ft.ControlEvent], None]) -> ft.SegmentedButton:
+    """Erstellt den SegmentedButton für die Meldungsart.
+    
+    Args:
+        on_change: Callback-Funktion die bei Änderung aufgerufen wird
+    
+    Returns:
+        Konfigurierter SegmentedButton für Meldungsart
+    """
     return ft.SegmentedButton(
         selected={"1"},
         segments=[ft.Segment(value="1", label=ft.Text("Vermisst"))],
@@ -35,7 +49,11 @@ def create_meldungsart_button(on_change: Callable) -> ft.SegmentedButton:
 
 
 def create_photo_preview() -> ft.Image:
-    """Erstellt das Image-Element für die Foto-Vorschau."""
+    """Erstellt das Image-Element für die Foto-Vorschau.
+    
+    Returns:
+        Image-Widget für Foto-Vorschau (initial unsichtbar)
+    """
     return ft.Image(
         width=FIELD_WIDTH_MEDIUM,
         height=250,
@@ -46,12 +64,25 @@ def create_photo_preview() -> ft.Image:
 
 
 def create_name_field() -> ft.TextField:
-    """Erstellt das Eingabefeld für Name/Überschrift."""
-    return ft.TextField(width=FIELD_WIDTH_MEDIUM)
+    """Erstellt das Eingabefeld für Name/Überschrift.
+    
+    Returns:
+        TextField für Name/Überschrift-Eingabe
+    """
+    return ft.TextField(
+        width=FIELD_WIDTH_MEDIUM,
+        max_length=MAX_HEADLINE_LENGTH,
+        counter_text=f"0 / {MAX_HEADLINE_LENGTH}",
+        helper_text=f"Max. {MAX_HEADLINE_LENGTH} Zeichen",
+    )
 
 
 def create_title_label() -> ft.Text:
-    """Erstellt das Label für Name/Überschrift."""
+    """Erstellt das Label für Name/Überschrift.
+    
+    Returns:
+        Text-Widget als Label (zeigt "Name﹡" oder "Überschrift﹡")
+    """
     return ft.Text(
         "Name﹡",
         size=14,
@@ -61,7 +92,11 @@ def create_title_label() -> ft.Text:
 
 
 def create_species_dropdown() -> ft.Dropdown:
-    """Erstellt das Dropdown für die Tierart."""
+    """Erstellt das Dropdown für die Tierart.
+    
+    Returns:
+        Dropdown-Widget für Tierart-Auswahl
+    """
     return ft.Dropdown(
         label="Tierart﹡",
         text_size=14,
@@ -70,7 +105,11 @@ def create_species_dropdown() -> ft.Dropdown:
 
 
 def create_breed_dropdown() -> ft.Dropdown:
-    """Erstellt das Dropdown für die Rasse."""
+    """Erstellt das Dropdown für die Rasse.
+    
+    Returns:
+        Dropdown-Widget für Rassen-Auswahl (optional)
+    """
     return ft.Dropdown(
         label="Rasse (optional)",
         width=FIELD_WIDTH_SMALL
@@ -78,7 +117,11 @@ def create_breed_dropdown() -> ft.Dropdown:
 
 
 def create_sex_dropdown() -> ft.Dropdown:
-    """Erstellt das Dropdown für das Geschlecht."""
+    """Erstellt das Dropdown für das Geschlecht.
+    
+    Returns:
+        Dropdown-Widget für Geschlechts-Auswahl (optional)
+    """
     return ft.Dropdown(
         label="Geschlecht (optional)",
         width=FIELD_WIDTH_SMALL
@@ -86,17 +129,28 @@ def create_sex_dropdown() -> ft.Dropdown:
 
 
 def create_description_field() -> ft.TextField:
-    """Erstellt das mehrzeilige Beschreibungsfeld."""
+    """Erstellt das mehrzeilige Beschreibungsfeld.
+    
+    Returns:
+        Mehrzeiliges TextField für Beschreibung (2-4 Zeilen)
+    """
     return ft.TextField(
         multiline=True,
         max_lines=4,
         width=FIELD_WIDTH_LARGE,
         min_lines=2,
+        max_length=MAX_DESCRIPTION_LENGTH,
+        counter_text=f"0 / {MAX_DESCRIPTION_LENGTH}",
+        helper_text=f"Min. {MIN_DESCRIPTION_LENGTH}, max. {MAX_DESCRIPTION_LENGTH} Zeichen",
     )
 
 
 def create_location_field() -> ft.TextField:
-    """Erstellt das Eingabefeld für den Ort."""
+    """Erstellt das Eingabefeld für den Ort.
+    
+    Returns:
+        TextField für Orts-Eingabe
+    """
     return ft.TextField(
         label="Ort﹡",
         width=FIELD_WIDTH_LARGE
@@ -104,7 +158,11 @@ def create_location_field() -> ft.TextField:
 
 
 def create_date_field() -> ft.TextField:
-    """Erstellt das Eingabefeld für das Datum."""
+    """Erstellt das Eingabefeld für das Datum.
+    
+    Returns:
+        TextField für Datums-Eingabe (Format: TT.MM.YYYY)
+    """
     return ft.TextField(
         label="Datum﹡ (TT.MM.YYYY)",
         width=FIELD_WIDTH_SMALL,
@@ -113,15 +171,32 @@ def create_date_field() -> ft.TextField:
 
 
 def create_status_text() -> ft.Text:
-    """Erstellt das Status-Text Element für Meldungen."""
+    """Erstellt das Status-Text Element für Meldungen.
+    
+    Returns:
+        Text-Widget für Status-Nachrichten (Fehler, Erfolg, etc.)
+    """
     return ft.Text("", color=ft.Colors.BLUE, size=12)
 
 
 def create_farben_panel(
-    colors_list: List[Dict],
+    colors_list: List[Dict[str, Any]],
     on_color_change: Callable[[int, bool], None]
-) -> tuple[ft.ResponsiveRow, ft.Container, ft.Container, ft.Icon, Dict[int, ft.Checkbox]]:
-    """Erstellt das Farben-Panel mit Checkboxes."""
+) -> Tuple[ft.ResponsiveRow, ft.Container, ft.Container, ft.Icon, Dict[int, ft.Checkbox]]:
+    """Erstellt das Farben-Panel mit Checkboxes.
+    
+    Args:
+        colors_list: Liste von Farb-Dictionaries mit 'id' und 'name'
+        on_color_change: Callback-Funktion (color_id, is_selected)
+    
+    Returns:
+        Tuple mit:
+        - ResponsiveRow mit Checkboxes
+        - Container für Panel
+        - Container für Header
+        - Icon für Toggle
+        - Dictionary mit Checkbox-Referenzen
+    """
     farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
     farben_checkboxes: Dict[int, ft.Checkbox] = {}
     
@@ -170,10 +245,19 @@ def create_farben_panel(
 
 def create_photo_upload_area(
     photo_preview: ft.Image,
-    on_pick_photo: Callable,
-    on_remove_photo: Callable
+    on_pick_photo: Callable[[ft.ControlEvent], None],
+    on_remove_photo: Callable[[ft.ControlEvent], None]
 ) -> ft.Container:
-    """Erstellt den Foto-Upload Bereich."""
+    """Erstellt den Foto-Upload Bereich.
+    
+    Args:
+        photo_preview: Image-Widget für Vorschau
+        on_pick_photo: Callback für Foto-Auswahl
+        on_remove_photo: Callback für Foto-Entfernung
+    
+    Returns:
+        Container mit Upload-Bereich und Vorschau
+    """
     return ft.Container(
         content=ft.Column([
             ft.Container(
@@ -197,8 +281,15 @@ def create_photo_upload_area(
     )
 
 
-def create_save_button(on_click: Callable) -> ft.FilledButton:
-    """Erstellt den Speichern-Button."""
+def create_save_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.FilledButton:
+    """Erstellt den Speichern-Button.
+    
+    Args:
+        on_click: Callback-Funktion für Button-Klick
+    
+    Returns:
+        FilledButton zum Speichern der Meldung
+    """
     return ft.FilledButton(
         "Meldung erstellen",
         width=200,
@@ -232,10 +323,16 @@ def create_ai_result_container() -> ft.Container:
 
 def populate_dropdown_options(
     dropdown: ft.Dropdown,
-    items: List[Dict],
+    items: List[Dict[str, Any]],
     with_none_option: bool = False
 ) -> None:
-    """Füllt ein Dropdown mit Optionen."""
+    """Füllt ein Dropdown mit Optionen.
+    
+    Args:
+        dropdown: Dropdown-Widget das befüllt werden soll
+        items: Liste von Dictionaries mit 'id' und 'name'
+        with_none_option: Ob "Keine Angabe"-Option hinzugefügt werden soll
+    """
     options = []
     
     if with_none_option:

@@ -8,19 +8,33 @@ Diese Klasse steuert:
 - UI-Bereiche (Start, Melden, Profil)
 """
 
+from __future__ import annotations
+
 import os
+from typing import Optional, Callable
 import flet as ft
 
 from services.supabase_client import get_client
+from supabase import Client
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 from ui.theme import ThemeManager, soft_card
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
 from ui.auth import AuthView
+from ui.constants import (
+    WINDOW_MIN_WIDTH,
+    WINDOW_DEFAULT_WIDTH,
+    WINDOW_DEFAULT_HEIGHT,
+    PRIMARY_COLOR,
+)
 
 from app.dialogs import (
     create_login_required_dialog,
     create_favorite_login_dialog,
+    create_saved_search_login_dialog,
     create_login_banner,
 )
 from app.navigation import (
@@ -35,24 +49,28 @@ from app.navigation import (
 class PetBuddyApp:
     """Hauptklasse der PetBuddy-Anwendung."""
     
-    def __init__(self, page: ft.Page):
-        """Initialisiert die Anwendung."""
-        self.page = page
-        self.current_tab = TAB_START
-        self.sb = None
-        self.theme_manager = None
-        self.is_logged_in = False
+    def __init__(self, page: ft.Page) -> None:
+        """Initialisiert die Anwendung.
+        
+        Args:
+            page: Flet Page-Instanz
+        """
+        self.page: ft.Page = page
+        self.current_tab: int = TAB_START
+        self.sb: Optional[Client] = None
+        self.theme_manager: Optional[ThemeManager] = None
+        self.is_logged_in: bool = False
         # Merkt sich gewünschten Tab nach Login
-        self.pending_tab_after_login = None
+        self.pending_tab_after_login: Optional[int] = None
         
         # UI-Komponenten
-        self.body = ft.Container(padding=16, expand=True)
-        self.nav = None
-        self.start_section = None
-        self.post_form = None
-        self.discover_view = None
-        self.profile_view = None
-        self.auth_view = None
+        self.body: ft.Container = ft.Container(padding=16, expand=True)
+        self.nav: Optional[ft.NavigationBar] = None
+        self.start_section: Optional[ft.Control] = None
+        self.post_form: Optional[PostForm] = None
+        self.discover_view: Optional[DiscoverView] = None
+        self.profile_view: Optional[ProfileView] = None
+        self.auth_view: Optional[AuthView] = None
     
     # ════════════════════════════════════════════════════════════════════
     # INITIALISIERUNG
@@ -63,10 +81,13 @@ class PetBuddyApp:
         try:
             self.page.title = "PetBuddy"
             self.page.padding = 0
-            self.page.scroll = ft.ScrollMode.ADAPTIVE
-            self.page.window_min_width = 420
-            self.page.window_width = 1100
-            self.page.window_height = 820
+            self.page.scroll = ft.ScrollMode.AUTO
+            self.page.window_min_width = WINDOW_MIN_WIDTH
+            self.page.window_width = WINDOW_DEFAULT_WIDTH
+            self.page.window_height = WINDOW_DEFAULT_HEIGHT
+
+            # Routing einrichten
+            self.page.on_route_change = self._handle_route_change
             
             # Theme anwenden
             self.theme_manager = ThemeManager(self.page)
@@ -74,14 +95,127 @@ class PetBuddyApp:
             
             # Supabase-Client initialisieren
             self.sb = get_client()
+
+
             return True
             
         except Exception as e:
             self._show_error(f"Fehler beim Laden: {str(e)}")
             return False
     
-    def _show_error(self, message: str):
-        """Zeigt eine Fehlermeldung in der Snackbar."""
+    def _handle_route_change(self, e: ft.RouteChangeEvent) -> None:
+        """Behandelt Routenänderungen.
+        
+        Args:
+            e: RouteChangeEvent mit der neuen Route
+        """
+        route = e.route or "/"
+        logger.info(f"Route geändert: {route}")
+        
+        # Route verarbeiten
+        self._navigate_to(route)
+    
+    def _navigate_to(self, route: str) -> None:
+        """Navigiert zu einer bestimmten Route.
+        
+        Args:
+            route: Die Ziel-Route (kann Query-Parameter enthalten)
+        """
+        # Route normalisieren
+        if not route or route == "":
+            route = "/"
+        
+        # Route normalisieren
+        route_path = route
+        if "?" in route:
+            route_path = route.split("?")[0]
+        
+        logger.info(f"Navigiere zu: {route_path} (Query-Parameter: {'Ja' if '?' in route else 'Nein'})")
+        
+        # Route-Handler aufrufen
+        if route_path == "/" or route_path == "/home":
+            # Startseite leitet zu /discover weiter
+            self.page.go("/discover")
+            return
+        elif route_path == "/login":
+            self._show_login()
+        elif route_path == "/discover":
+            self._show_discover()
+        elif route_path == "/profile":
+            self._show_profile()
+        elif route_path == "/post/new":
+            self._show_new_post()
+        else:
+            # 404 - Route nicht gefunden
+            logger.warning(f"Unbekannte Route: {route_path}")
+            self.page.go("/discover")  # Fallback zu Discover
+    
+    def _show_home(self) -> None:
+        """Zeigt die Startseite (Home) mit Discover-View."""
+        if not self.discover_view:
+            if not self.build_ui():
+                return
+        
+        self.current_tab = TAB_START
+        if self.nav:
+            self.nav.selected_index = TAB_START
+        
+        self._show_main_app()
+    
+    def _show_discover(self) -> None:
+        """Zeigt die Discover-Seite."""
+        if not self.discover_view:
+            if not self.build_ui():
+                return
+
+        self.current_tab = TAB_START
+        if self.nav:
+            self.nav.selected_index = TAB_START
+
+        self._show_main_app()
+
+        # Gespeicherten Suchauftrag anwenden falls vorhanden
+        saved_search = self.page.session.get("apply_saved_search")
+        if saved_search and self.discover_view:
+            self.page.session.remove("apply_saved_search")
+            self.discover_view.apply_saved_search(saved_search)
+    
+    def _show_profile(self) -> None:
+        """Zeigt die Profil-Seite."""
+        if not self.is_logged_in:
+            self.page.go("/login")
+            return
+        
+        if not self.profile_view:
+            if not self.build_ui():
+                return
+        
+        self.current_tab = TAB_PROFIL
+        if self.nav:
+            self.nav.selected_index = TAB_PROFIL
+        self._show_main_app()
+    
+    def _show_new_post(self) -> None:
+        """Zeigt die Seite zum Erstellen eines neuen Posts."""
+        if not self.is_logged_in:
+            self.page.go("/login")
+            return
+        
+        if not self.post_form:
+            if not self.build_ui():
+                return
+        
+        self.current_tab = TAB_MELDEN
+        if self.nav:
+            self.nav.selected_index = TAB_MELDEN
+        self._show_main_app()
+
+    def _show_error(self, message: str) -> None:
+        """Zeigt eine Fehlermeldung in der Snackbar.
+        
+        Args:
+            message: Fehlermeldung die angezeigt werden soll
+        """
         self.page.snack_bar = ft.SnackBar(ft.Text(message))
         self.page.snack_bar.open = True
         self.page.update()
@@ -91,14 +225,18 @@ class PetBuddyApp:
     # DIALOGE
     # ════════════════════════════════════════════════════════════════════
     
-    def _show_login_required_dialog(self, target_tab: int):
-        """Zeigt ein Pop-up Dialog für nicht eingeloggte Benutzer."""
-        def on_login_click(e):
+    def _show_login_required_dialog(self, target_tab: int) -> None:
+        """Zeigt ein Pop-up Dialog für nicht eingeloggte Benutzer.
+        
+        Args:
+            target_tab: Tab-Index zu dem navigiert werden soll
+        """
+        def on_login_click(e: ft.ControlEvent) -> None:
             self.page.close(dialog)
             self.pending_tab_after_login = target_tab
             self._show_login()
         
-        def on_cancel_click(e):
+        def on_cancel_click(e: ft.ControlEvent) -> None:
             self.page.close(dialog)
             # Navigation zurücksetzen auf Start
             if self.nav:
@@ -110,16 +248,30 @@ class PetBuddyApp:
         )
         self.page.open(dialog)
     
-    def _show_favorite_login_dialog(self):
+    def _show_favorite_login_dialog(self) -> None:
         """Zeigt ein Pop-up Dialog wenn Gast auf Favorit klickt."""
-        def on_login_click(e):
+        def on_login_click(e: ft.ControlEvent) -> None:
             self.page.close(dialog)
             self._show_login()
         
-        def on_cancel_click(e):
+        def on_cancel_click(e: ft.ControlEvent) -> None:
             self.page.close(dialog)
         
         dialog = create_favorite_login_dialog(
+            self.page, on_login_click, on_cancel_click
+        )
+        self.page.open(dialog)
+    
+    def _show_saved_search_login_dialog(self) -> None:
+        """Zeigt ein Pop-up Dialog wenn Gast auf 'Suche speichern' klickt."""
+        def on_login_click(e: ft.ControlEvent) -> None:
+            self.page.close(dialog)
+            self._show_login()
+        
+        def on_cancel_click(e: ft.ControlEvent) -> None:
+            self.page.close(dialog)
+        
+        dialog = create_saved_search_login_dialog(
             self.page, on_login_click, on_cancel_click
         )
         self.page.open(dialog)
@@ -128,7 +280,7 @@ class PetBuddyApp:
     # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
     
-    def render_tab(self):
+    def render_tab(self) -> None:
         """Rendert den aktuellen Tab."""
         self.body.content = {
             TAB_START: self.start_section,
@@ -137,27 +289,30 @@ class PetBuddyApp:
         }.get(self.current_tab, self.start_section)
         self.page.update()
     
-    def go_to_melden_tab(self, _=None):
+    def go_to_melden_tab(self, _: Optional[ft.ControlEvent] = None) -> None:
         """Navigiert zum Melden-Tab (prüft Login)."""
         if not self.is_logged_in:
-            self._show_login_required_dialog(TAB_MELDEN)
+            self.page.go("/login")
             return
-        self.current_tab = TAB_MELDEN
-        if self.nav:
-            self.nav.selected_index = TAB_MELDEN
-        self.render_tab()
+        self.page.go("/post/new")
     
-    def on_post_saved(self, post_id=None):
-        """Callback nach erfolgreicher Meldung."""
+    def on_post_saved(self, post_id: Optional[str] = None) -> None:
+        """Callback nach erfolgreicher Meldung.
+        
+        Args:
+            post_id: Optional ID des erstellten Posts
+        """
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
-        self.current_tab = TAB_START
-        if self.nav:
-            self.nav.selected_index = TAB_START
-        self.render_tab()
+        # Zur Startseite navigieren
+        self.page.go("/")
     
-    def _on_nav_change(self, e):
-        """Event-Handler für Navigationsänderung."""
+    def _on_nav_change(self, e: ft.ControlEvent) -> None:
+        """Event-Handler für Navigationsänderung.
+        
+        Args:
+            e: ControlEvent von der Navigation
+        """
         new_tab = e.control.selected_index
         
         # Login erforderlich für Melden und Profil
@@ -165,23 +320,27 @@ class PetBuddyApp:
             self._show_login_required_dialog(new_tab)
             return
         
+        # Navigation zu Routen
+        if new_tab == TAB_START:
+            self.page.go("/")
+        elif new_tab == TAB_MELDEN:
+            self.page.go("/post/new")
+        elif new_tab == TAB_PROFIL:
+            self.page.go("/profile")
+        
         self.current_tab = new_tab
         self.render_tab()
     
-    def _logout(self):
+    def _logout(self) -> None:
         """Meldet den Benutzer ab."""
         try:
             self.sb.auth.sign_out()
             self.is_logged_in = False
             
-            # Bei Logout im Profil: nach Login dorthin zurück
-            if self.current_tab == TAB_PROFIL:
-                self.pending_tab_after_login = TAB_PROFIL
-            else:
-                self.pending_tab_after_login = None
-            self._show_login()
+            # Zur Login-Seite navigieren
+            self.page.go("/login")
         except Exception as e:
-            print(f"Fehler beim Abmelden: {e}")
+            logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
     
     # ════════════════════════════════════════════════════════════════════
     # UI-BEREICHE LADEN
@@ -196,7 +355,8 @@ class PetBuddyApp:
                 sb=self.sb,
                 on_contact_click=None,
                 on_melden_click=self.go_to_melden_tab,
-                on_login_required=self._show_favorite_login_dialog
+                on_login_required=self._show_favorite_login_dialog,
+                on_save_search_login_required=self._show_saved_search_login_dialog,
             )
             
             # PostForm erstellen
@@ -221,12 +381,12 @@ class PetBuddyApp:
             self._show_error(f"Fehler beim Laden der UI: {str(e)}")
             return False
     
-    def _on_favorites_changed(self):
+    def _on_favorites_changed(self) -> None:
         """Callback wenn sich Favoriten ändern."""
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
     
-    def _on_posts_changed(self):
+    def _on_posts_changed(self) -> None:
         """Callback wenn Meldungen bearbeitet/gelöscht werden."""
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
@@ -263,7 +423,7 @@ class PetBuddyApp:
     # APP STARTEN
     # ════════════════════════════════════════════════════════════════════
     
-    def _show_main_app(self):
+    def _show_main_app(self) -> None:
         """Zeigt die Hauptanwendung."""
         if not self.build_ui():
             return
@@ -287,36 +447,22 @@ class PetBuddyApp:
         self.page.run_task(self.discover_view.load_posts)
         self.page.update()
     
-    def _show_login(self):
+    def _show_login(self) -> None:
         """Zeigt die Login-Maske."""
-        def on_login_success():
+        # Setze Route direkt, um Endlosschleife zu vermeiden
+        self.page.route = "/login"
+        
+        def on_login_success() -> None:
             self.is_logged_in = True
             self.pending_tab_after_login = None
-            self._show_main_app()
-            
-            # User in DiscoverView aktualisieren
-            if self.discover_view:
-                self.discover_view.refresh_user()
-                self.page.run_task(self.discover_view.load_posts)
-            
-            # Favoriten im Profil laden
-            if self.profile_view:
-                self.page.run_task(self.profile_view.load_favorites)
             
             # Zur Startseite navigieren
-            self.current_tab = TAB_START
-            if self.nav:
-                self.nav.selected_index = TAB_START
-            self.render_tab()
+            self.page.go("/")
         
-        def on_continue_without_account():
+        def on_continue_without_account() -> None:
             self.is_logged_in = False
             self.pending_tab_after_login = None
-            self._show_main_app()
-            self.current_tab = TAB_START
-            if self.nav:
-                self.nav.selected_index = TAB_START
-            self.render_tab()
+            self.page.go("/")
         
         self.auth_view = AuthView(
             page=self.page,
@@ -337,7 +483,7 @@ class PetBuddyApp:
         if not self.initialize():
             return
         
-        # Prüfen ob bereits eingeloggt
+        # Prüfen ob bereits eingeloggt (nur für is_logged_in Status)
         try:
             user = self.sb.auth.get_user()
             if user and user.user:
@@ -345,5 +491,10 @@ class PetBuddyApp:
         except Exception:
             self.is_logged_in = False
         
-        # Startseite zeigen
-        self._show_main_app()
+        # Initiale Route setzen und navigieren
+        initial_route = self.page.route or "/"
+        if not self.page.route:
+            self.page.route = initial_route
+        logger.info(f"Initiale Route beim Start: {self.page.route}")
+        self._navigate_to(initial_route)
+

@@ -30,7 +30,11 @@ from .forms import (
     create_theme_toggle,
     create_registration_modal,
     create_login_card,
+    create_password_reset_dialog,
 )
+from ui.components import show_success_dialog, show_error_dialog
+from utils.validators import validate_email
+from services.auth import AuthService, AuthResult
 
 
 class AuthView:
@@ -46,6 +50,7 @@ class AuthView:
         """Initialisiert die AuthView."""
         self.page = page
         self.sb = sb
+        self.auth_service = AuthService(sb)
         self.on_auth_success = on_auth_success
         self.on_continue_without_account = on_continue_without_account
         
@@ -82,23 +87,16 @@ class AuthView:
             self._show_login_message(error, ft.Colors.RED)
             return
         
-        try:
-            self._show_login_message("🔐 Anmeldung läuft...", ft.Colors.BLUE)
-            
-            res = self.sb.auth.sign_in_with_password({
-                "email": email, 
-                "password": password
-            })
-            
-            if res.user:
-                self._show_login_message("✅ Erfolgreich!", ft.Colors.GREEN)
-                if self.on_auth_success:
-                    self.on_auth_success()
-            else:
-                self._show_login_message("❌ Anmeldung fehlgeschlagen.", ft.Colors.RED)
-                
-        except Exception as ex:
-            self._handle_login_error(ex)
+        self._show_login_message("Anmeldung läuft...", ft.Colors.BLUE)
+
+        result: AuthResult = self.auth_service.login(email, password)
+
+        if result.success:
+            self._show_login_message("Erfolgreich!", ft.Colors.GREEN)
+            if self.on_auth_success:
+                self.on_auth_success()
+        else:
+            self._show_login_message(result.message or "Anmeldung fehlgeschlagen.", ft.Colors.RED)
 
     async def _register(self):
         """Führt die Registrierung durch."""
@@ -109,7 +107,7 @@ class AuthView:
         
         # Passwörter vergleichen
         if password != password_confirm:
-            self._show_reg_message("❌ Passwörter stimmen nicht überein.", ft.Colors.RED)
+            self._show_reg_message("Passwörter stimmen nicht überein.", ft.Colors.RED)
             return
         
         # Validierung
@@ -118,70 +116,87 @@ class AuthView:
             self._show_reg_message(error, ft.Colors.RED)
             return
         
-        try:
-            self._show_reg_message("📝 Registrierung läuft...", ft.Colors.BLUE)
-            
-            # Redirect URL für E-Mail-Bestätigung
-            redirect_url = "https://petbuddy.fly.dev/#/login"
-            
-            res = self.sb.auth.sign_up({
-                "email": email, 
-                "password": password,
-                "options": {
-                    "data": {
-                        "display_name": username
-                    },
-                    "email_redirect_to": redirect_url
-                }
-            })
-            
-            if res.user:
-                # Prüfen ob E-Mail bereits registriert ist
-                if not res.user.identities or len(res.user.identities) == 0:
-                    self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
-                    return
-                
-                # Prüfen ob E-Mail-Bestätigung erforderlich ist
-                if res.user.confirmed_at is None:
-                    self._show_success_dialog(
-                        "Bestätigungs-E-Mail gesendet! Bitte prüfe dein Postfach."
-                    )
-                    return
+        self._show_reg_message("Registrierung läuft...", ft.Colors.BLUE)
+
+        result: AuthResult = self.auth_service.register(
+            email=email,
+            password=password,
+            username=username,
+        )
+
+        if result.success:
+            if result.code == "confirm_email":
+                self._show_success_dialog(
+                    result.message
+                    or "Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihr Postfach."
+                )
             else:
-                self._show_reg_message("❌ Fehler!", ft.Colors.RED)
-                
-        except Exception as ex:
-            self._handle_register_error(ex)
+                self._show_success_dialog("Registrierung erfolgreich.")
+        else:
+            self._show_reg_message(result.message or "Fehler!", ft.Colors.RED)
 
     async def _logout(self):
         """Meldet den Benutzer ab."""
-        try:
-            self.sb.auth.sign_out()
-            self._show_login_message("✅ Abgemeldet.", ft.Colors.GREEN)
-        except Exception:
-            pass
+        result = self.auth_service.logout()
+        if result.success:
+            self._show_login_message(result.message or "Abgemeldet.", ft.Colors.GREEN)
 
     # ─────────────────────────────────────────────────────────────
-    # Error Handler
+    # Passwort vergessen
     # ─────────────────────────────────────────────────────────────
 
-    def _handle_login_error(self, ex: Exception):
-        """Behandelt Login-Fehler."""
-        error_str = str(ex).lower()
-        if "invalid login credentials" in error_str or "invalid credentials" in error_str:
-            self._show_login_message("❌ E-Mail oder Passwort falsch.", ft.Colors.RED)
-        elif "email not confirmed" in error_str:
-            self._show_login_message("❌ Bitte bestätige zuerst deine E-Mail.", ft.Colors.ORANGE)
-        else:
-            self._show_login_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+    def _show_forgot_password_dialog(self, e=None):
+        """Zeigt den Dialog zum Zurücksetzen des Passworts."""
+        import os
 
-    def _handle_register_error(self, ex: Exception):
-        """Behandelt Registrierungs-Fehler."""
-        error_str = str(ex).lower()
-        if "already registered" in error_str:
-            self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
-        else:
-            self._show_reg_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+        email_field = ft.TextField(
+            label="E-Mail-Adresse",
+            prefix_icon=ft.Icons.EMAIL,
+            keyboard_type=ft.KeyboardType.EMAIL,
+            width=300,
+            hint_text="Ihre registrierte E-Mail",
+        )
+
+        # Vorausfüllen mit Login-E-Mail falls vorhanden
+        if self._login_email and self._login_email.value:
+            email_field.value = self._login_email.value
+
+        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+
+        def on_send(e):
+            email = (email_field.value or "").strip()
+
+            # Validierung
+            is_valid, error_msg = validate_email(email)
+            if not is_valid:
+                error_text.value = error_msg or "Bitte gültige E-Mail eingeben."
+                error_text.visible = True
+                self.page.update()
+                return
+
+            result = self.auth_service.send_reset_password_email(email)
+            if result.success:
+                self.page.close(dialog)
+                show_success_dialog(
+                    self.page,
+                    "E-Mail gesendet",
+                    result.message,
+                )
+            else:
+                error_text.value = result.message or "Fehler beim Senden der E-Mail."
+                error_text.visible = True
+                self.page.update()
+
+        def on_cancel(e):
+            self.page.close(dialog)
+
+        dialog = create_password_reset_dialog(
+            email_field=email_field,
+            error_text=error_text,
+            on_send=on_send,
+            on_cancel=on_cancel,
+        )
+        self.page.open(dialog)
 
     # ─────────────────────────────────────────────────────────────
     # UI-Hilfsmethoden
@@ -201,23 +216,12 @@ class AuthView:
 
     def _show_success_dialog(self, message: str):
         """Zeigt einen Erfolgs-Dialog."""
-        def close_dialog(e):
-            dialog.open = False
-            self.page.update()
-            self._close_modal()
-
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("✅ Erfolg", size=18, weight=ft.FontWeight.BOLD),
-            content=ft.Text(message, size=14),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        show_success_dialog(
+            self.page,
+            "Erfolg",
+            message,
+            on_close=self._close_modal
         )
-        self.page.overlay.append(dialog)
-        dialog.open = True
-        self.page.update()
 
     def _toggle_theme(self, e):
         """Wechselt zwischen Hell- und Dunkelmodus."""
@@ -322,6 +326,9 @@ class AuthView:
         # Login-Formular Felder
         self._login_email = create_login_email_field()
         self._login_pwd = create_login_password_field()
+        # Enter-Taste für Login aktivieren
+        self._login_email.on_submit = lambda e: self.page.run_task(self._login)
+        self._login_pwd.on_submit = lambda e: self.page.run_task(self._login)
         self._login_info = ft.Text("", size=13, weight=ft.FontWeight.W_500)
         
         # Registrierungs-Formular Felder
@@ -364,6 +371,11 @@ class AuthView:
             lambda e: self.on_continue_without_account() if self.on_continue_without_account else None
         )
         logout_btn = create_logout_button(lambda e: self.page.run_task(self._logout))
+        forgot_password_btn = ft.TextButton(
+            "Passwort vergessen?",
+            on_click=self._show_forgot_password_dialog,
+            style=ft.ButtonStyle(color=PRIMARY_COLOR),
+        )
         
         # Login-Card
         self._form_card = create_login_card(
@@ -375,6 +387,7 @@ class AuthView:
             continue_btn=continue_btn,
             is_logged_in=self.is_logged_in(),
             logout_btn=logout_btn,
+            forgot_password_btn=forgot_password_btn,
             is_dark=is_dark,
         )
         
@@ -399,7 +412,7 @@ class AuthView:
             color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
         )
         self._subtitle_text = ft.Text(
-            "Melde dich an, um deine Haustierhilfe zu\nstarten 🐾",
+            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
             size=14,
             color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,
