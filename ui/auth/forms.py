@@ -183,7 +183,8 @@ def create_logout_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Text
 
 def create_theme_toggle(is_dark: bool, on_click: Callable) -> ft.IconButton:
     """Erstellt den Theme-Toggle-Button."""
-    return ft.IconButton(
+    tooltip = "Zu hellem Modus wechseln" if is_dark else "Zu dunklem Modus wechseln"
+    btn = ft.IconButton(
         icon=ft.Icons.DARK_MODE if is_dark else ft.Icons.LIGHT_MODE,
         on_click=on_click,
         tooltip=tooltip,

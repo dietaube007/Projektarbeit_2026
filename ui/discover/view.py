@@ -10,6 +10,7 @@ import flet as ft
 from supabase import Client
 
 from ui.constants import MAX_POSTS_LIMIT
+from ui.theme import soft_card
 from services.references import ReferenceService
 from services.profile import SavedSearchService, FavoritesService
 from services.discover import DiscoverService
@@ -17,9 +18,19 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-from .cards import show_detail_dialog
+from .cards import show_detail_dialog, build_small_card, build_big_card
 from .saved_search_dialog import show_save_search_dialog
-from .filters import reset_filters, apply_saved_search_filters, collect_current_filters
+from .filters import (
+    reset_filters,
+    apply_saved_search_filters,
+    collect_current_filters,
+    create_search_field,
+    create_dropdown,
+    create_farben_header,
+    create_reset_button,
+    create_view_toggle,
+    create_sort_dropdown,
+)
 from .references_loader import load_and_populate_references, update_breeds_dropdown
 from .item_renderer import render_items, create_empty_state_card
 from .ui_builder import build_discover_ui
@@ -134,6 +145,11 @@ class DiscoverView:
             on_click=self._toggle_farben_panel,
         )
 
+        # Sortier-Dropdown
+        self.sort_dropdown = create_sort_dropdown(
+            on_change=lambda _: self.page.run_task(self.load_posts)
+        )
+
         # Buttons
         self.reset_btn = create_reset_button(on_click=self._reset_filters)
 
@@ -158,7 +174,8 @@ class DiscoverView:
         # Ergebnisbereiche
         self.list_view = ft.Column(spacing=14, expand=True)
         self.grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12, visible=False)
-
+        
+        # Initial mit empty_state_card befüllen
         self.empty_state_card = soft_card(
             ft.Column(
                 [
@@ -172,6 +189,10 @@ class DiscoverView:
             elev=1,
             pad=24,
         )
+        
+        # Initial empty state anzeigen
+        self.list_view.controls = [self.empty_state_card]
+        self.list_view.visible = True
 
     def _on_view_change(self, e: ft.ControlEvent) -> None:
         val = next(iter(e.control.selected), "list")
@@ -184,18 +205,19 @@ class DiscoverView:
 
     async def _load_references(self):
         """Lädt alle Referenzen und befüllt die Dropdowns."""
-        self._all_breeds = load_and_populate_references(
-            ref_service=self.ref_service,
-            filter_typ=self.filter_typ,
-            filter_art=self.filter_art,
-            filter_geschlecht=self.filter_geschlecht,
-            filter_rasse=self.filter_rasse,
-            farben_filter_container=self.farben_filter_container,
-            selected_colors=self.selected_farben,
-            on_color_change_callback=lambda: None,  # Keine automatische Suche
-            page=self.page,
-        )
-        self._update_rassen_dropdown()
+        try:
+            self._all_breeds = load_and_populate_references(
+                ref_service=self.ref_service,
+                filter_typ=self.filter_typ,
+                filter_art=self.filter_art,
+                filter_geschlecht=self.filter_geschlecht,
+                filter_rasse=self.filter_rasse,
+                farben_filter_container=self.farben_filter_container,
+                selected_colors=self.selected_farben,
+                on_color_change_callback=lambda: None,  # Keine automatische Suche
+                page=self.page,
+            )
+            self._update_rassen_dropdown()
 
             # Farben Checkboxen
             self.farben_filter_container.controls = []
@@ -332,22 +354,22 @@ class DiscoverView:
         try:
             self.refresh_user()
 
-            # Filter-Werte sammeln
+            # Filter-Werte sammeln (mit Fallback auf "alle" wenn None)
             filters = {
-                "typ": self.filter_typ.value,
-                "art": self.filter_art.value,
-                "geschlecht": self.filter_geschlecht.value,
-                "rasse": self.filter_rasse.value,
+                "typ": self.filter_typ.value if self.filter_typ.value else "alle",
+                "art": self.filter_art.value if self.filter_art.value else "alle",
+                "geschlecht": self.filter_geschlecht.value if self.filter_geschlecht.value else "alle",
+                "rasse": self.filter_rasse.value if self.filter_rasse.value else "alle",
             }
 
             # Favoriten-IDs laden (für Markierung)
             favorite_ids = get_favorite_ids(self.sb, self.current_user_id)
 
             # Posts über DiscoverService laden
-            sort_option = self.sort_dropdown.value or "created_at_desc"
+            sort_option = self.sort_dropdown.value if self.sort_dropdown.value else "created_at_desc"
             items = self.discover_service.search_posts(
                 filters=filters,
-                search_query=self.search_q.value,
+                search_query=self.search_q.value if self.search_q.value else None,
                 selected_colors=set(self.selected_farben) if self.selected_farben else None,
                 sort_option=sort_option,
                 favorite_ids=favorite_ids,
@@ -358,6 +380,8 @@ class DiscoverView:
 
         except Exception as ex:
             logger.error(f"Fehler beim Laden der Daten: {ex}", exc_info=True)
+            import traceback
+            traceback.print_exc()
             self.current_items = []
             self.list_view.controls = [self.empty_state_card]
             self.grid_view.controls = []

@@ -164,21 +164,31 @@ class PetBuddyApp:
     
     def _show_discover(self) -> None:
         """Zeigt die Discover-Seite."""
-        if not self.discover_view:
-            if not self.build_ui():
-                return
+        try:
+            logger.info("_show_discover: Start")
+            if not self.discover_view:
+                logger.info("_show_discover: discover_view nicht vorhanden, rufe build_ui() auf")
+                if not self.build_ui():
+                    logger.error("_show_discover: build_ui() fehlgeschlagen")
+                    return
+                logger.info("_show_discover: build_ui() erfolgreich")
 
-        self.current_tab = TAB_START
-        if self.nav:
-            self.nav.selected_index = TAB_START
+            self.current_tab = TAB_START
+            if self.nav:
+                self.nav.selected_index = TAB_START
 
-        self._show_main_app()
+            logger.info("_show_discover: rufe _show_main_app() auf")
+            self._show_main_app()
 
-        # Gespeicherten Suchauftrag anwenden falls vorhanden
-        saved_search = self.page.session.get("apply_saved_search")
-        if saved_search and self.discover_view:
-            self.page.session.remove("apply_saved_search")
-            self.discover_view.apply_saved_search(saved_search)
+            # Gespeicherten Suchauftrag anwenden falls vorhanden
+            saved_search = self.page.session.get("apply_saved_search")
+            if saved_search and self.discover_view:
+                self.page.session.remove("apply_saved_search")
+                self.discover_view.apply_saved_search(saved_search)
+            
+            logger.info("_show_discover: Erfolgreich abgeschlossen")
+        except Exception as e:
+            logger.error(f"Fehler in _show_discover: {e}", exc_info=True)
     
     def _show_profile(self) -> None:
         """Zeigt die Profil-Seite."""
@@ -282,12 +292,29 @@ class PetBuddyApp:
     
     def render_tab(self) -> None:
         """Rendert den aktuellen Tab."""
-        self.body.content = {
-            TAB_START: self.start_section,
-            TAB_MELDEN: self.post_form.build() if self.post_form else None,
-            TAB_PROFIL: self.profile_view.build() if self.profile_view else None,
-        }.get(self.current_tab, self.start_section)
-        self.page.update()
+        try:
+            content = {
+                TAB_START: self.start_section,
+                TAB_MELDEN: self.post_form.build() if self.post_form else None,
+                TAB_PROFIL: self.profile_view.build() if self.profile_view else None,
+            }.get(self.current_tab, self.start_section)
+            
+            if content is None:
+                logger.error(f"Content für Tab {self.current_tab} ist None")
+                content = ft.Container(
+                    content=ft.Text("Fehler: Tab-Inhalt nicht verfügbar"),
+                    padding=20
+                )
+            
+            self.body.content = content
+            self.page.update()
+        except Exception as e:
+            logger.error(f"Fehler in render_tab: {e}", exc_info=True)
+            self.body.content = ft.Container(
+                content=ft.Text(f"Fehler beim Rendern: {str(e)}"),
+                padding=20
+            )
+            self.page.update()
     
     def go_to_melden_tab(self, _: Optional[ft.ControlEvent] = None) -> None:
         """Navigiert zum Melden-Tab (prüft Login)."""
@@ -349,7 +376,9 @@ class PetBuddyApp:
     def build_ui(self) -> bool:
         """Baut die UI-Bereiche auf."""
         try:
+            logger.info("build_ui: Start")
             # DiscoverView erstellen
+            logger.info("build_ui: Erstelle DiscoverView")
             self.discover_view = DiscoverView(
                 page=self.page,
                 sb=self.sb,
@@ -358,15 +387,19 @@ class PetBuddyApp:
                 on_login_required=self._show_favorite_login_dialog,
                 on_save_search_login_required=self._show_saved_search_login_dialog,
             )
+            logger.info("build_ui: DiscoverView erstellt")
             
             # PostForm erstellen
+            logger.info("build_ui: Erstelle PostForm")
             self.post_form = PostForm(
                 page=self.page,
                 sb=self.sb,
                 on_saved_callback=self.on_post_saved
             )
+            logger.info("build_ui: PostForm erstellt")
             
             # ProfileView erstellen
+            logger.info("build_ui: Erstelle ProfileView")
             self.profile_view = ProfileView(
                 page=self.page,
                 sb=self.sb,
@@ -374,10 +407,13 @@ class PetBuddyApp:
                 on_favorites_changed=self._on_favorites_changed,
                 on_posts_changed=self._on_posts_changed,
             )
+            logger.info("build_ui: ProfileView erstellt")
             
+            logger.info("build_ui: Erfolgreich abgeschlossen")
             return True
             
         except Exception as e:
+            logger.error(f"Fehler in build_ui: {e}", exc_info=True)
             self._show_error(f"Fehler beim Laden der UI: {str(e)}")
             return False
     
@@ -393,31 +429,51 @@ class PetBuddyApp:
     
     def _build_start_section(self) -> ft.Control:
         """Erstellt den Start-Tab mit Suchleiste und Liste."""
-        controls = []
-        
-        # Login-Banner für nicht eingeloggte Benutzer
-        if not self.is_logged_in:
-            controls.append(
-                create_login_banner(
-                    lambda _: self._show_login(),
-                    theme_mode=self.page.theme_mode,
+        try:
+            controls = []
+            
+            # Login-Banner für nicht eingeloggte Benutzer
+            if not self.is_logged_in:
+                controls.append(
+                    create_login_banner(
+                        lambda _: self._show_login(),
+                    )
                 )
+            
+            if not self.discover_view:
+                logger.error("discover_view ist None in _build_start_section")
+                return ft.Container(
+                    content=ft.Text("Fehler: Discover-View nicht initialisiert"),
+                    padding=20
+                )
+            
+            if not hasattr(self.discover_view, 'search_row'):
+                logger.error("discover_view.search_row existiert nicht")
+                return ft.Container(
+                    content=ft.Text("Fehler: search_row nicht initialisiert"),
+                    padding=20
+                )
+            
+            controls.extend([
+                soft_card(
+                    ft.Column([self.discover_view.search_row], spacing=8),
+                    pad=12,
+                    elev=2
+                ),
+                self.discover_view.build(),
+            ])
+            
+            return ft.Column(
+                controls,
+                spacing=14,
+                expand=True,
             )
-        
-        controls.extend([
-            soft_card(
-                ft.Column([self.discover_view.search_row], spacing=8),
-                pad=12,
-                elev=2
-            ),
-            self.discover_view.build(),
-        ])
-        
-        return ft.Column(
-            controls,
-            spacing=14,
-            expand=True,
-        )
+        except Exception as e:
+            logger.error(f"Fehler in _build_start_section: {e}", exc_info=True)
+            return ft.Container(
+                content=ft.Text(f"Fehler beim Laden: {str(e)}"),
+                padding=20
+            )
     
     # ════════════════════════════════════════════════════════════════════
     # APP STARTEN
@@ -425,27 +481,49 @@ class PetBuddyApp:
     
     def _show_main_app(self) -> None:
         """Zeigt die Hauptanwendung."""
-        if not self.build_ui():
-            return
-        
-        # Komponenten erstellen
-        self.start_section = self._build_start_section()
-        self.nav = create_navigation_bar(self.current_tab, self._on_nav_change)
-        
-        # Seite leeren und neu aufbauen
-        self.page.controls.clear()
-        self.page.appbar = create_app_bar(
-            self.is_logged_in,
-            lambda _: self._logout(),
-            self.theme_manager.create_toggle_button()
-        )
-        self.page.navigation_bar = self.nav
-        self.page.add(self.body)
-        
-        # Tab rendern und Daten laden
-        self.render_tab()
-        self.page.run_task(self.discover_view.load_posts)
-        self.page.update()
+        try:
+            logger.info("_show_main_app: Start")
+            if not self.build_ui():
+                logger.error("_show_main_app: build_ui() fehlgeschlagen")
+                return
+            
+            logger.info("_show_main_app: build_ui() erfolgreich")
+            
+            # Komponenten erstellen
+            self.start_section = self._build_start_section()
+            if self.start_section is None:
+                logger.error("_show_main_app: start_section ist None")
+                return
+            
+            logger.info("_show_main_app: start_section erstellt")
+            self.nav = create_navigation_bar(self.current_tab, self._on_nav_change)
+            
+            # Seite leeren und neu aufbauen
+            self.page.controls.clear()
+            self.page.appbar = create_app_bar(
+                self.is_logged_in,
+                lambda _: self._logout(),
+                self.theme_manager.create_toggle_button()
+            )
+            self.page.navigation_bar = self.nav
+            self.page.add(self.body)
+            
+            logger.info("_show_main_app: body zur Seite hinzugefügt")
+            
+            # Tab rendern und Daten laden
+            self.render_tab()
+            logger.info("_show_main_app: render_tab() aufgerufen")
+            
+            if self.discover_view:
+                self.page.run_task(self.discover_view.load_posts)
+                logger.info("_show_main_app: load_posts() gestartet")
+            else:
+                logger.error("_show_main_app: discover_view ist None")
+            
+            self.page.update()
+            logger.info("_show_main_app: page.update() aufgerufen")
+        except Exception as e:
+            logger.error(f"Fehler in _show_main_app: {e}", exc_info=True)
     
     def _show_login(self) -> None:
         """Zeigt die Login-Maske."""

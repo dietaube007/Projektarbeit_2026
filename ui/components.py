@@ -174,10 +174,10 @@ def login_banner(on_login_click: Callable) -> ft.Container:
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.INFO_OUTLINE, color=icon_color, size=20),
+                ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700, size=20),
                 ft.Text(
                     "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
-                    color=text_color,
+                    color=ft.Colors.BLUE_900,
                     size=14,
                     expand=True,
                 ),
@@ -185,16 +185,15 @@ def login_banner(on_login_click: Callable) -> ft.Container:
                     "Anmelden",
                     icon=ft.Icons.LOGIN,
                     on_click=on_login_click,
-                    style=ft.ButtonStyle(color=link_color),
                 ),
             ],
             spacing=12,
             alignment=ft.MainAxisAlignment.START,
         ),
         padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        bgcolor=bg_color,
+        bgcolor=ft.Colors.BLUE_50,
         border_radius=10,
-        border=ft.border.all(1, border_color),
+        border=ft.border.all(1, ft.Colors.BLUE_200),
     )
 
 

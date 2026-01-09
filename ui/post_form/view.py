@@ -6,13 +6,30 @@ Vermisst-/Gefunden-Meldungen bereitstellt.
 """
 
 import os
-from datetime import datetime
+import asyncio
+from datetime import datetime, date
 from typing import Callable, Optional
 
 import flet as ft
 
 from services.references import ReferenceService
 from services.posts import PostService
+from services.pet_recognition import get_recognition_service
+from utils.validators import (
+    validate_not_empty,
+    validate_length,
+    validate_list_not_empty,
+    validate_date_format,
+    sanitize_string,
+)
+from utils.logging_config import get_logger
+from ui.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+    MAX_LOCATION_LENGTH,
+)
+from ui.components import show_validation_dialog
 
 from ui.post_form.constants import (
     VALID_IMAGE_TYPES,
@@ -21,6 +38,8 @@ from ui.post_form.constants import (
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
 )
+
+logger = get_logger(__name__)
 from ui.post_form.photo_manager import (
     upload_to_storage,
     remove_from_storage,

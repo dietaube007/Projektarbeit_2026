@@ -146,8 +146,8 @@ def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Contain
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18, color=icon_color),
-                ft.Text("Farben wählen", size=14, color=text_color),
+                ft.Icon(ft.Icons.PALETTE, size=18, color=ft.Colors.GREY_700),
+                ft.Text("Farben wählen", size=14, color=ft.Colors.GREY_900),
                 ft.Container(expand=True),
                 toggle_icon,
             ],

@@ -1,5 +1,6 @@
 import flet as ft
 from datetime import datetime
+from typing import Optional
 
 class CommentSection(ft.Container):
     """
@@ -11,7 +12,8 @@ class CommentSection(ft.Container):
         self._page = page  # Verwende _page statt page um Konflikt zu vermeiden
         self.post_id = post_id  # UUID des Posts
         self.supabase = supabase
-        self.replying_to = None  # ID des Kommentars, auf den geantwortet wird
+        # Antwort-Funktion deaktiviert, da kein parent_comment_id im Schema
+        self.replying_to = None
         
         # Kommentar-Liste (scrollbar)
         self.comments_list = ft.Column(
@@ -107,6 +109,16 @@ class CommentSection(ft.Container):
             expand=True
         )
     
+    def _get_current_user_id(self) -> Optional[str]:
+        """Holt die aktuelle User-ID aus Supabase Auth."""
+        try:
+            user_resp = self.supabase.auth.get_user()
+            if user_resp and getattr(user_resp, "user", None):
+                return user_resp.user.id
+        except Exception:
+            pass
+        return None
+    
     def load_comments(self):
         """Lädt alle nicht gelöschten Kommentare für diesen Post"""
         self.loading.visible = True
@@ -119,8 +131,9 @@ class CommentSection(ft.Container):
         
         try:
             # Kommentare mit User-Daten laden (nur nicht gelöschte)
+            # Schema: comment referenziert user-Tabelle (nicht auth.users)
             response = self.supabase.table('comment') \
-                .select('id, post_id, user_id, content, created_at, is_deleted, parent_comment_id, user:user_id(username, profile_image)') \
+                .select('id, post_id, user_id, content, created_at, is_deleted, user:user_id(display_name, profile_image)') \
                 .eq('post_id', self.post_id) \
                 .eq('is_deleted', False) \
                 .order('created_at', desc=False) \
@@ -156,21 +169,11 @@ class CommentSection(ft.Container):
                     )
                 )
             else:
-                # Kommentare hierarchisch organisieren
-                root_comments = [c for c in comments if not c.get('parent_comment_id')]
-                
-                for comment in root_comments:
-                    # Hauptkommentar
+                # Kommentare einfach auflisten (keine hierarchische Struktur, da kein parent_comment_id im Schema)
+                for comment in comments:
                     self.comments_list.controls.append(
                         self.create_comment_card(comment, is_reply=False)
                     )
-                    
-                    # Antworten zu diesem Kommentar
-                    replies = [c for c in comments if c.get('parent_comment_id') == comment['id']]
-                    for reply in replies:
-                        self.comments_list.controls.append(
-                            self.create_comment_card(reply, is_reply=True)
-                        )
             
         except Exception as e:
             print(f"Fehler beim Laden der Kommentare: {e}")
@@ -197,21 +200,16 @@ class CommentSection(ft.Container):
     
     def create_comment_card(self, comment, is_reply=False):
         """Erstellt eine Kommentar-Karte"""
-        current_user_id = self._page.session.get("user_id")
+        current_user_id = self._get_current_user_id()
         is_author = (str(current_user_id) == str(comment.get('user_id')))
         
-        # User-Daten extrahieren
+        # User-Daten extrahieren (Schema: user-Tabelle hat display_name, nicht username)
         user_data = comment.get('user', {})
-        username = user_data.get('username', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
+        username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         profile_image = user_data.get('profile_image') if isinstance(user_data, dict) else None
         
-        # Antworten-Button (nur für Hauptkommentare)
-        reply_button = ft.TextButton(
-            "Antworten",
-            icon=ft.Icons.REPLY,
-            on_click=lambda e, c=comment: self.start_reply(c),
-            visible=not is_reply
-        ) if not is_reply else ft.Container(width=0)
+        # Antworten-Funktion entfernt, da kein parent_comment_id im Schema
+        reply_button = ft.Container(width=0)
         
         card_content = ft.Row([
             # Profilbild
@@ -279,9 +277,9 @@ class CommentSection(ft.Container):
         """Startet den Antwort-Modus für einen Kommentar"""
         self.replying_to = comment['id']
         
-        # Username extrahieren
+        # Username extrahieren (Schema: user-Tabelle hat display_name)
         user_data = comment.get('user', {})
-        username = user_data.get('username', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
+        username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         
         # Banner aktualisieren
         self.reply_banner.visible = True
@@ -306,7 +304,7 @@ class CommentSection(ft.Container):
         if not self.comment_input.value or not self.comment_input.value.strip():
             return
         
-        current_user_id = self._page.session.get("user_id")
+        current_user_id = self._get_current_user_id()
         
         # Login-Check
         if not current_user_id:
@@ -319,16 +317,13 @@ class CommentSection(ft.Container):
         
         try:
             # Kommentar-Daten vorbereiten
+            # Schema: id ist serial (auto-increment), kein parent_comment_id
             comment_data = {
                 'post_id': self.post_id,
                 'user_id': str(current_user_id),
                 'content': self.comment_input.value.strip(),
                 'is_deleted': False
             }
-            
-            # Wenn es eine Antwort ist, parent_comment_id hinzufügen
-            if self.replying_to:
-                comment_data['parent_comment_id'] = self.replying_to
             
             # Kommentar in Supabase speichern
             self.supabase.table('comment').insert(comment_data).execute()
