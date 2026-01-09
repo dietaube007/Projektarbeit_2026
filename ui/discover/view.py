@@ -461,6 +461,7 @@ class DiscoverView:
                     on_favorite_click=self._toggle_favorite,
                     on_card_click=self._show_detail_dialog,
                     on_contact_click=self.on_contact_click,
+                    supabase=self.sb,
                 )
                 for it in items
             ]

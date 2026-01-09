@@ -17,6 +17,7 @@ from ui.constants import (
     DEFAULT_PLACEHOLDER
 )
 from ui.helpers import extract_item_data
+from ui.comment_section import CommentSection
 
 
 def badge_for_typ(typ: str) -> ft.Control:
@@ -166,7 +167,8 @@ def build_big_card(
     page: ft.Page,
     on_favorite_click: Callable[[Dict[str, Any], ft.Control], None],
     on_card_click: Callable[[Dict[str, Any]], None],
-    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None
+    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
+    supabase=None,
 ) -> ft.Control:
     """Erstellt eine große Listen-Karte für die Listen-Ansicht.
     
@@ -176,6 +178,7 @@ def build_big_card(
         on_favorite_click: Callback (item, control) für Favoriten-Toggle
         on_card_click: Callback (item) für Karten-Klick
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
+        supabase: Supabase-Client für Kommentare
     
     Returns:
         Container mit großer Karten-Komponente
@@ -231,6 +234,71 @@ def build_big_card(
         wrap=True,
     )
 
+    # -----------------------------
+    # Kommentare - erst bei Bedarf laden
+    # -----------------------------
+    post_id = str(item.get("id") or "")
+    comment_section = None  # Wird erst beim Öffnen erstellt
+    
+    # Kommentar-Anzahl ermitteln
+    comment_count = 0
+    if supabase and post_id:
+        try:
+            response = supabase.table('comment') \
+                .select('id', count='exact') \
+                .eq('post_id', post_id) \
+                .eq('is_deleted', False) \
+                .execute()
+            comment_count = response.count or 0
+        except Exception as e:
+            print(f"Fehler beim Laden der Kommentar-Anzahl: {e}")
+
+    # Button-Text mit Anzahl
+    comment_button_text = f"Kommentare ({comment_count})" if comment_count > 0 else "Kommentare"
+    
+    # Container für Kommentare (anfangs leer - kein Ladebalken!)
+    comments_container = ft.Container(
+        content=ft.Container(),  # Leerer Container statt ProgressRing
+        height=400,
+        visible=False,
+        padding=ft.padding.only(top=8),
+    )
+
+    def toggle_comments(e):
+        """Öffnet/Schließt die Kommentar-Sektion"""
+        nonlocal comment_section
+        
+        comments_container.visible = not comments_container.visible
+        
+        # CommentSection erst beim ersten Öffnen erstellen
+        if comments_container.visible:
+            if comment_section is None and supabase and post_id:
+                # Zeige kurz Ladeindikator
+                comments_container.content = ft.Container(
+                    content=ft.Column([
+                        ft.ProgressRing(),
+                        ft.Text("Lade Kommentare...", size=12, color=ft.Colors.GREY_600)
+                    ], 
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=10),
+                    alignment=ft.alignment.center,
+                    padding=20
+                )
+                page.update()
+                
+                # CommentSection erstellen
+                comment_section = CommentSection(page, post_id, supabase)
+                comments_container.content = comment_section
+                comment_section.load_comments()
+            elif comment_section:
+                # Bereits existierende Section neu laden
+                comment_section.load_comments()
+        
+        page.update()
+
+    # -----------------------------
+    # Aktionen (Kontakt + Kommentar-Button)
+    # -----------------------------
     actions = ft.Row(
         [
             ft.FilledButton(
@@ -238,18 +306,23 @@ def build_big_card(
                 icon=ft.Icons.EMAIL,
                 on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
             ),
+            ft.OutlinedButton(
+                comment_button_text,
+                icon=ft.Icons.COMMENT,
+                on_click=toggle_comments,
+                disabled=(not supabase or not post_id),
+            ),
         ],
         spacing=10,
     )
 
-    card_inner = ft.Column([visual, header, line1, metas, actions], spacing=10)
+    card_inner = ft.Column([visual, header, line1, metas, actions, comments_container], spacing=10)
     card = soft_card(card_inner, pad=12, elev=3)
 
     wrapper = ft.Container(
         content=card,
         animate_scale=300,
         scale=ft.Scale(1.0),
-        on_click=lambda _, it=item: on_card_click(it),
     )
 
     def on_hover(e: ft.HoverEvent):
