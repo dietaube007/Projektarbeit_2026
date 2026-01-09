@@ -309,38 +309,6 @@ def build_my_post_card(
     return clickable_card
 
 
-async def load_my_posts(sb, user_id: str) -> List[dict]:
-    """Lädt alle Meldungen eines Benutzers."""
-    try:
-        res = (
-            sb.table("post")
-            .select(
-                """
-                id,
-                headline,
-                description,
-                location_text,
-                event_date,
-                created_at,
-                is_active,
-                post_status(id, name),
-                species(id, name),
-                breed(id, name),
-                sex(id, name),
-                post_image(url),
-                post_color(color(id, name))
-                """
-            )
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .execute()
-        )
-        return res.data or []
-    except Exception as e:
-        logger.error(f"Fehler beim Laden der eigenen Meldungen (User {user_id}): {e}", exc_info=True)
-        return []
-
-
 def delete_post(sb, post_id: int) -> bool:
     """Löscht einen Post und alle verknüpften Daten inkl. Storage-Bilder.
     
@@ -415,8 +383,11 @@ class ProfileMyPostsMixin:
             self.my_posts_list.controls = [loading_indicator("Meldungen werden geladen...")]
             self.page.update()
 
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
+            from services.account import ProfileService
+            profile_service = ProfileService(self.sb)
+            user_id = profile_service.get_user_id()
+            
+            if not user_id:
                 self.my_posts_items = []
                 render_my_posts_list(
                     self.my_posts_list,
@@ -429,8 +400,9 @@ class ProfileMyPostsMixin:
                 self.page.update()
                 return
 
-            user_id = user_resp.user.id
-            self.my_posts_items = await load_my_posts(self.sb, user_id)
+            # PostService nutzen
+            post_service = PostService(self.sb)
+            self.my_posts_items = post_service.get_my_posts(user_id)
             render_my_posts_list(
                 self.my_posts_list,
                 self.my_posts_items,

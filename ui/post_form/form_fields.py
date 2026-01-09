@@ -15,7 +15,7 @@ from typing import List, Dict, Callable, Optional, Any, Tuple
 
 import flet as ft
 
-from ui.post_form.constants import (
+from ui.constants import (
     FIELD_WIDTH_SMALL,
     FIELD_WIDTH_MEDIUM,
     FIELD_WIDTH_LARGE,

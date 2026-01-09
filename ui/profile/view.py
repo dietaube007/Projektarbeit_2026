@@ -21,8 +21,8 @@ from ui.constants import PRIMARY_COLOR, MAX_DISPLAY_NAME_LENGTH
 from utils.logging_config import get_logger
 from ui.components import show_success_dialog, show_error_dialog
 
-from services.profile import ProfileService
-from services.profile import SavedSearchService
+from services.account import ProfileService, AuthService, ProfileImageService, AccountDeletionService
+from services.posts import SavedSearchService
 
 from .favorites import (
     render_favorites_list,
@@ -158,6 +158,10 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
 
         # Services initialisieren
         self.profile_service = ProfileService(sb)
+        self.auth_service = AuthService(sb)
+        self.image_service = ProfileImageService(sb)
+        self.account_deletion_service = AccountDeletionService(sb)
+        self.profile_service = ProfileService(sb)
         self.saved_search_service = SavedSearchService(sb)
 
         self.user_data = None
@@ -285,7 +289,8 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
 
     def _logout(self):
         """Meldet den Benutzer ab."""
-        if self.profile_service.logout():
+        result = self.auth_service.logout()
+        if result.success:
             if self.on_logout:
                 self.on_logout()
 
@@ -311,12 +316,12 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
             show_error_dialog(self.page, "Fehler", "Keine E-Mail-Adresse gefunden.")
             return
 
-        success, error_msg = self.profile_service.send_password_reset(email)
+        result = self.auth_service.reset_password(email)
 
-        if success:
-            show_success_dialog(self.page, "E-Mail gesendet", f"Passwort-Reset-E-Mail wurde an {email} gesendet.")
+        if result.success:
+            show_success_dialog(self.page, "E-Mail gesendet", result.message or f"Passwort-Reset-E-Mail wurde an {email} gesendet.")
         else:
-            show_error_dialog(self.page, "Fehler", error_msg or "Unbekannter Fehler.")
+            show_error_dialog(self.page, "Fehler", result.message or "Unbekannter Fehler.")
 
     def _show_change_password_dialog(self):
         """Zeigt einen Dialog zum Ändern des Passworts."""
@@ -636,13 +641,6 @@ class ProfileView(ProfileFavoritesMixin, ProfileMyPostsMixin):
     # HELPER für Mixins
     # ════════════════════════════════════════════════════════════════════
 
-    def _show_success_dialog(self, title: str, message: str):
-        """Zeigt einen Erfolgs-Dialog."""
-        show_success_dialog(self.page, title, message)
-
-    def _show_error_dialog(self, title: str, message: str):
-        """Zeigt einen Fehler-Dialog."""
-        show_error_dialog(self.page, title, message)
 
     # ════════════════════════════════════════════════════════════════════
     # PUBLIC API

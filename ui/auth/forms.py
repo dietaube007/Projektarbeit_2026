@@ -8,13 +8,13 @@ from __future__ import annotations
 import flet as ft
 from typing import Callable, Optional
 
-from .constants import (
+from ui.constants import (
     PRIMARY_COLOR,
     CARD_COLOR,
     TEXT_SECONDARY,
     BORDER_COLOR,
-    MAX_DISPLAY_NAME_LENGTH,
 )
+from utils.constants import MAX_DISPLAY_NAME_LENGTH
 
 
 def create_login_email_field() -> ft.TextField:

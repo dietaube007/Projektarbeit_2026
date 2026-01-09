@@ -12,9 +12,9 @@ from typing import Callable, Optional
 
 import flet as ft
 
-from services.references import ReferenceService
-from services.posts import PostService
-from services.pet_recognition import get_recognition_service
+from services.posts.references import ReferenceService
+from services.posts import PostService, PostRelationsService, PostStorageService
+from services.ai.pet_recognition import get_recognition_service
 from utils.validators import (
     validate_not_empty,
     validate_length,
@@ -29,9 +29,9 @@ from ui.constants import (
     MIN_DESCRIPTION_LENGTH,
     MAX_LOCATION_LENGTH,
 )
-from ui.components import show_validation_dialog
+from ui.components import show_validation_dialog, show_success_dialog, show_error_dialog
 
-from ui.post_form.constants import (
+from ui.constants import (
     VALID_IMAGE_TYPES,
     DATE_FORMAT,
     ALLOWED_POST_STATUSES,
@@ -41,8 +41,6 @@ from ui.post_form.constants import (
 
 logger = get_logger(__name__)
 from ui.post_form.photo_manager import (
-    upload_to_storage,
-    remove_from_storage,
     cleanup_local_file,
     get_upload_path,
 )
@@ -81,6 +79,8 @@ class PostForm:
         # Services
         self.ref_service = ReferenceService(self.sb)
         self.post_service = PostService(self.sb)
+        self.post_relations_service = PostRelationsService(self.sb)
+        self.post_storage_service = PostStorageService(self.sb)
         self.recognition_service = get_recognition_service()
         
         # KI-Erkennungs-State
@@ -198,52 +198,6 @@ class PostForm:
         """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
         show_validation_dialog(self.page, title, message, items)
     
-    def _show_success_dialog(self, title: str, message: str):
-        """Zeigt einen Erfolgs-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color=ft.Colors.GREEN_600, size=28),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
-    
-    def _show_error_dialog(self, title: str, message: str):
-        """Zeigt einen Fehler-Dialog an."""
-        def close_dialog(e):
-            self.page.close(dlg)
-        
-        dlg = ft.AlertDialog(
-            modal=True,
-            title=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_600, size=24),
-                    ft.Text(title, size=16, weight=ft.FontWeight.W_600),
-                ],
-                spacing=8,
-            ),
-            content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
-            actions=[
-                ft.TextButton("OK", on_click=close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        
-        self.page.open(dlg)
-    
     def _toggle_farben_panel(self, _):
         """Toggle für das Farben-Panel."""
         self.farben_panel_visible = not self.farben_panel_visible
@@ -329,7 +283,8 @@ class PostForm:
         """Startet die KI-Rassenerkennung mit Einverständnisabfrage."""
         # Prüfe ob Foto vorhanden
         if not self.selected_photo.get("path"):
-            self._show_error_dialog(
+            show_error_dialog(
+                self.page,
                 "Kein Foto",
                 "Bitte lade zuerst ein Foto hoch, bevor du die KI-Erkennung startest."
             )
@@ -344,7 +299,8 @@ class PostForm:
                 break
         
         if selected_status != "fundtier":
-            self._show_error_dialog(
+            show_error_dialog(
+                self.page,
                 "Nur für Fundtiere",
                 "Die KI-Rassenerkennung ist nur für gefundene Tiere verfügbar. "
                 "Besitzer vermisster Tiere kennen in der Regel die Rasse ihres Tieres bereits."
@@ -424,7 +380,7 @@ class PostForm:
             
             # Zeige Fortschrittsdialog, damit Nutzer den Status erkennt
             self._show_progress_dialog("KI analysiert das Bild...")
-            self._show_status("🔄 KI analysiert das Bild...", is_loading=True)
+            self._show_status("KI analysiert das Bild...", is_loading=True)
             # Kurz yield, damit der Dialog sichtbar wird, bevor die Analyse startet
             await asyncio.sleep(0.05)
             
@@ -434,7 +390,7 @@ class PostForm:
             
             # Hole Bilddaten vom Storage
             if not self.selected_photo.get("path"):
-                self._show_status("❌ Kein Bild vorhanden", is_error=True)
+                self._show_status("Kein Bild vorhanden", is_error=True)
                 try:
                     if hasattr(self, "_progress_dlg") and self._progress_dlg:
                         self.page.close(self._progress_dlg)
@@ -443,14 +399,20 @@ class PostForm:
                     pass
                 return
             
-            # Lade Bild von Supabase
+            # Lade Bild von Supabase über Service
             try:
-                response = self.sb.storage.from_(self.post_service.STORAGE_BUCKET).download(
-                    self.selected_photo["path"]
-                )
-                image_data = response
+                image_data = self.post_storage_service.download_post_image(self.selected_photo["path"])
+                if not image_data:
+                    self._show_status("Fehler beim Laden des Bildes", is_error=True)
+                    try:
+                        if hasattr(self, "_progress_dlg") and self._progress_dlg:
+                            self.page.close(self._progress_dlg)
+                            self._progress_dlg = None
+                    except Exception:
+                        pass
+                    return
             except Exception as ex:
-                self._show_status(f"❌ Fehler beim Laden des Bildes: {ex}", is_error=True)
+                self._show_status(f"Fehler beim Laden des Bildes: {ex}", is_error=True)
                 try:
                     if hasattr(self, "_progress_dlg") and self._progress_dlg:
                         self.page.close(self._progress_dlg)
@@ -507,7 +469,7 @@ class PostForm:
             if result["success"]:
                 self.ai_result = result
                 self._show_ai_result(result)
-                self._show_status("✅ Erkennung abgeschlossen!", is_error=False)
+                self._show_status("Erkennung abgeschlossen!", is_error=False)
             else:
                 # Wenn es einen Vorschlag gibt, biete Übernahme in die Beschreibung an
                 suggested_breed = result.get("suggested_breed")
@@ -520,7 +482,8 @@ class PostForm:
                         result.get("confidence", 0.0),
                     )
                 else:
-                    self._show_error_dialog(
+                    show_error_dialog(
+                        self.page,
                         "Erkennung fehlgeschlagen",
                         result.get("error") or "Die KI konnte das Tier nicht sicher erkennen. "
                         "Bitte versuche ein anderes Bild oder trage die Rasse manuell ein. "
@@ -536,7 +499,7 @@ class PostForm:
                 pass
                 
         except Exception as ex:
-            self._show_status(f"❌ Fehler: {ex}", is_error=True)
+            self._show_status(f"Fehler: {ex}", is_error=True)
             try:
                 if hasattr(self, "_progress_dlg") and self._progress_dlg:
                     self.page.close(self._progress_dlg)
@@ -581,7 +544,7 @@ class PostForm:
                 ),
                 ft.Container(
                     content=ft.Text(
-                        "⚠️ Hinweis: Dies ist nur ein KI-Vorschlag ohne Garantie auf Richtigkeit.",
+                        "Hinweis: Dies ist nur ein KI-Vorschlag ohne Garantie auf Richtigkeit.",
                         size=11,
                         color=ft.Colors.ORANGE_800,
                         italic=True,
@@ -660,7 +623,7 @@ class PostForm:
                 self.info_tf.value = ai_info
             
             self.ai_result_container.visible = False
-            self._show_status("✅ KI-Vorschlag übernommen!", is_error=False)
+            self._show_status("KI-Vorschlag übernommen!", is_error=False)
             self.page.update()
         
         self.page.run_task(set_breed)
@@ -711,14 +674,14 @@ class PostForm:
                         import glob
                         all_files = glob.glob(os.path.join(get_upload_path("", None), "**", "*.*"), recursive=True)
                         print(f"[DEBUG] Alle Dateien im Upload-Verzeichnis: {all_files}")
-                        self._show_status(f"❌ Datei nicht gefunden: {ev.file_name}", is_error=True)
+                        self._show_status(f"Datei nicht gefunden: {ev.file_name}", is_error=True)
                         return
                     
                     print(f"[DEBUG] Verwende Pfad: {upload_path}")
                     
-                    # Bild hochladen und komprimieren
+                    # Bild hochladen und komprimieren über Service
                     print(f"[DEBUG] Starte Upload zu Supabase...")
-                    result = upload_to_storage(self.sb, upload_path, ev.file_name)
+                    result = self.post_storage_service.upload_post_image(upload_path, ev.file_name)
                     print(f"[DEBUG] Upload-Ergebnis: url={result.get('url') is not None}")
                     
                     if result["url"]:
@@ -736,7 +699,7 @@ class PostForm:
                     cleanup_local_file(upload_path)
                     
                 except Exception as ex:
-                    self._show_status(f"❌ Fehler: {ex}", is_error=True)
+                    self._show_status(f"Fehler: {ex}", is_error=True)
         
         fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
         self.page.overlay.append(fp)
@@ -745,7 +708,7 @@ class PostForm:
     
     def _remove_photo(self):
         """Entfernt das Foto aus der Vorschau und aus Supabase Storage."""
-        remove_from_storage(self.sb, self.selected_photo.get("path"))
+        self.post_storage_service.remove_post_image(self.selected_photo.get("path"))
         
         self.selected_photo = {"path": None, "name": None, "url": None, "base64": None}
         self.photo_preview.visible = False
@@ -850,13 +813,14 @@ class PostForm:
         
         # Eingeloggten Benutzer holen
         try:
-            user_response = self.sb.auth.get_user()
-            if not user_response or not user_response.user:
-                self._show_error_dialog("Nicht eingeloggt", "Bitte melden Sie sich an, um eine Meldung zu erstellen.")
+            from services.account import ProfileService
+            profile_service = ProfileService(self.sb)
+            user_id = profile_service.get_user_id()
+            if not user_id:
+                show_error_dialog(self.page, "Nicht eingeloggt", "Bitte melden Sie sich an, um eine Meldung zu erstellen.")
                 return
-            user_id = user_response.user.id
         except Exception as e:
-            self._show_error_dialog("Fehler", f"Fehler beim Abrufen des Benutzers: {e}")
+            show_error_dialog(self.page, "Fehler", f"Fehler beim Abrufen des Benutzers: {e}")
             return
         
         try:
@@ -884,14 +848,14 @@ class PostForm:
             
             # Farben verknüpfen
             for color_id in self.selected_farben:
-                self.post_service.add_color(post_id, color_id)
+                self.post_relations_service.add_color(post_id, color_id)
             
             # Bild verknüpfen
             if self.selected_photo.get("url"):
-                self.post_service.add_photo(post_id, self.selected_photo["url"])
+                self.post_relations_service.add_photo(post_id, self.selected_photo["url"])
             
             self._show_status("")
-            self._show_success_dialog("Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
+            show_success_dialog(self.page, "Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
             
             self._reset_form()
             
@@ -900,7 +864,7 @@ class PostForm:
                 
         except Exception as ex:
             self._show_status("")
-            self._show_error_dialog("Speichern fehlgeschlagen", f"Fehler beim Erstellen der Meldung: {ex}")
+            show_error_dialog(self.page, "Speichern fehlgeschlagen", f"Fehler beim Erstellen der Meldung: {ex}")
     
     def _reset_form(self):
         """Setzt das Formular auf Standardwerte zurück."""

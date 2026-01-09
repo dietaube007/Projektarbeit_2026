@@ -9,6 +9,7 @@ import flet as ft
 
 from utils.logging_config import get_logger
 from ui.components import show_success_dialog, show_error_dialog
+from services.account import ProfileImageService
 
 logger = get_logger(__name__)
 
@@ -75,7 +76,8 @@ async def handle_profile_image_upload(view: Any, e: ft.FilePickerResultEvent) ->
 
 async def process_profile_image(view: Any, file_path: str) -> None:
     """Verarbeitet und lädt ein Profilbild hoch."""
-    success, image_url, error_msg = view.profile_service.upload_profile_image(file_path)
+    image_service = ProfileImageService(view.sb)
+    success, image_url, error_msg = image_service.upload_profile_image(file_path)
 
     if success and image_url:
         update_avatar_image(view, image_url)
@@ -131,8 +133,10 @@ def confirm_delete_profile_image(view: Any) -> None:
 async def delete_profile_image(view: Any) -> None:
     """Löscht das Profilbild des Benutzers."""
     try:
-        # Bild aus Storage löschen
-        if view.profile_service.delete_profile_image():
+        image_service = ProfileImageService(view.sb)
+        success, error_msg = image_service.delete_profile_image()
+        
+        if success:
             # Avatar zurücksetzen
             update_avatar_image(view, None)
 
@@ -142,7 +146,7 @@ async def delete_profile_image(view: Any) -> None:
             show_success_dialog(view.page, "Erfolg", "Profilbild wurde gelöscht.")
         else:
             show_error_dialog(
-                view.page, "Fehler", "Profilbild konnte nicht gelöscht werden."
+                view.page, "Fehler", error_msg or "Profilbild konnte nicht gelöscht werden."
             )
     except Exception as e:
         logger.error(f"Fehler beim Löschen des Profilbilds: {e}", exc_info=True)

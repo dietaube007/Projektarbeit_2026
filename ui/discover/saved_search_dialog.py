@@ -7,7 +7,7 @@ import flet as ft
 
 from ui.constants import PRIMARY_COLOR
 from ui.components import show_success_dialog
-from services.profile import SavedSearchService
+from services.posts import SavedSearchService
 
 
 def show_save_search_dialog(

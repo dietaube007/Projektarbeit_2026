@@ -1,8 +1,21 @@
 """
-UI Konstanten - Zentrale Definition aller Farben, Größen und Limits.
+UI Konstanten - Zentrale Definition aller Farben, Größen und UI-spezifische Limits.
+
+App-weite Konstanten (Validierung, Text-Limits) sind in utils/constants.py
 """
 
 import flet as ft
+from utils.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+    MAX_LOCATION_LENGTH,
+    MAX_DISPLAY_NAME_LENGTH,
+    MAX_SEARCH_QUERY_LENGTH,
+    TRUNCATE_TEXT_LENGTH,
+    MAX_POSTS_LIMIT,
+    DEFAULT_POSTS_LIMIT,
+)
 
 # ══════════════════════════════════════════════════════════════════════
 # PRIMÄRFARBEN (App-weit verwendet)
@@ -46,14 +59,8 @@ WINDOW_DEFAULT_HEIGHT = 820
 """Standard-Fensterhöhe in Pixeln."""
 
 # ══════════════════════════════════════════════════════════════════════
-# GRÖSSSEN UND LIMITS
+# UI-GRÖSSEN (Bilder, Fenster)
 # ══════════════════════════════════════════════════════════════════════
-
-MAX_POSTS_LIMIT = 30
-"""Maximale Anzahl von Posts die auf einmal geladen werden."""
-
-DEFAULT_POSTS_LIMIT = 200
-"""Standard-Limit für Post-Abfragen in der Datenbank."""
 
 CARD_IMAGE_HEIGHT = 160
 """Höhe von Bildern in Karten-Ansicht (Grid)."""
@@ -65,32 +72,54 @@ DIALOG_IMAGE_HEIGHT = 280
 """Höhe von Bildern in Detail-Dialogen."""
 
 # ══════════════════════════════════════════════════════════════════════
-# TEXT-LÄNGEN-LIMITS
-# ══════════════════════════════════════════════════════════════════════
-
-MAX_HEADLINE_LENGTH = 50
-"""Maximale Länge für Post-Überschrift/Name."""
-
-MAX_DESCRIPTION_LENGTH = 2000
-"""Maximale Länge für Post-Beschreibung."""
-
-MAX_LOCATION_LENGTH = 200
-"""Maximale Länge für Ortsangabe."""
-
-MAX_DISPLAY_NAME_LENGTH = 50
-"""Maximale Länge für Anzeigename (Profil)."""
-
-MAX_SEARCH_QUERY_LENGTH = 200
-"""Maximale Länge für Suchbegriffe."""
-
-MIN_DESCRIPTION_LENGTH = 10
-"""Minimale Länge für Post-Beschreibung."""
-
-TRUNCATE_TEXT_LENGTH = 100
-"""Standard-Länge für Text-Kürzung in Vorschauen."""
-
-# ══════════════════════════════════════════════════════════════════════
 # PLATZHALTER
 # ══════════════════════════════════════════════════════════════════════
 
 DEFAULT_PLACEHOLDER = "—"
+
+# ══════════════════════════════════════════════════════════════════════
+# BILDFORMATE & UPLOAD
+# ══════════════════════════════════════════════════════════════════════
+
+VALID_IMAGE_TYPES: list[str] = ["jpg", "jpeg", "png", "gif", "webp"]
+"""Erlaubte Bildformate für Uploads."""
+
+PLACEHOLDER_IMAGE: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+"""1x1 transparentes Platzhalter-Bild als Base64."""
+
+# ══════════════════════════════════════════════════════════════════════
+# FORMULARLAYOUT
+# ══════════════════════════════════════════════════════════════════════
+
+FIELD_WIDTH_SMALL: int = 250
+"""Breite für kleine Formularfelder (z.B. Dropdowns)."""
+
+FIELD_WIDTH_MEDIUM: int = 400
+"""Breite für mittlere Formularfelder (z.B. Name)."""
+
+FIELD_WIDTH_LARGE: int = 500
+"""Breite für große Formularfelder (z.B. Beschreibung)."""
+
+# ══════════════════════════════════════════════════════════════════════
+# DATUMSFORMATE
+# ══════════════════════════════════════════════════════════════════════
+
+DATE_FORMAT: str = "%d.%m.%Y"
+"""Datumsformat für Eingabe (TT.MM.YYYY)."""
+
+# ══════════════════════════════════════════════════════════════════════
+# DROPDOWN-WERTE
+# ══════════════════════════════════════════════════════════════════════
+
+NO_SELECTION_VALUE: str = "none"
+"""Wert für "Keine Angabe" in Dropdowns."""
+
+NO_SELECTION_LABEL: str = "— Keine Angabe —"
+"""Anzeigetext für "Keine Angabe" in Dropdowns."""
+
+# ══════════════════════════════════════════════════════════════════════
+# MELDUNGSARTEN
+# ══════════════════════════════════════════════════════════════════════
+
+ALLOWED_POST_STATUSES: list[str] = ["vermisst", "fundtier"]
+"""Erlaubte Meldungsarten (von Post-Statuses in der DB)."""

@@ -105,9 +105,7 @@ def sanitize_string(value: Optional[str], max_length: Optional[int] = None) -> s
 # E-MAIL-VALIDIERUNG
 # ════════════════════════════════════════════════════════════════════
 
-EMAIL_REGEX = re.compile(
-    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-)
+from utils.constants import EMAIL_REGEX
 
 
 def validate_email(email: Optional[str]) -> tuple[bool, Optional[str]]:
@@ -229,6 +227,66 @@ def validate_id(value: Optional[str], field_name: str = "ID") -> tuple[bool, Opt
     # Für numerische IDs
     if value == 0 or value == "":
         return False, f"{field_name} ist erforderlich"
+    
+    return True, None
+
+
+# ════════════════════════════════════════════════════════════════════
+# PASSWORT-VALIDIERUNG
+# ════════════════════════════════════════════════════════════════════
+
+def validate_password(password: str) -> tuple[bool, Optional[str]]:
+    """Validiert ein Passwort nach den Sicherheitsanforderungen.
+    
+    Args:
+        password: Zu validierendes Passwort
+    
+    Returns:
+        Tuple (is_valid, error_message)
+    """
+    from utils.constants import MIN_PASSWORD_LENGTH, SPECIAL_CHARS
+    
+    if not password:
+        return False, "Passwort darf nicht leer sein."
+    
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return False, f"Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen haben."
+    
+    if not re.search(r"[A-Z]", password):
+        return False, "Passwort muss mindestens einen Großbuchstaben enthalten."
+    
+    if not re.search(r"[a-z]", password):
+        return False, "Passwort muss mindestens einen Kleinbuchstaben enthalten."
+    
+    if not re.search(r"[0-9]", password):
+        return False, "Passwort muss mindestens eine Zahl enthalten."
+    
+    if not re.search(f"[{re.escape(SPECIAL_CHARS)}]", password):
+        return False, "Passwort muss mindestens ein Sonderzeichen enthalten."
+    
+    return True, None
+
+
+# ════════════════════════════════════════════════════════════════════
+# ANZEIGENAME-VALIDIERUNG
+# ════════════════════════════════════════════════════════════════════
+
+def validate_display_name(name: str) -> tuple[bool, Optional[str]]:
+    """Validiert den Anzeigenamen.
+    
+    Args:
+        name: Zu validierender Anzeigename
+    
+    Returns:
+        Tuple (is_valid, error_message)
+    """
+    from utils.constants import MAX_DISPLAY_NAME_LENGTH
+    
+    if not name or not name.strip():
+        return False, "Bitte Anzeigename eingeben."
+    
+    if len(name) > MAX_DISPLAY_NAME_LENGTH:
+        return False, f"Anzeigename max. {MAX_DISPLAY_NAME_LENGTH} Zeichen."
     
     return True, None
 

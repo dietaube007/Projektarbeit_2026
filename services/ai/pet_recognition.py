@@ -1,14 +1,18 @@
-"""
-Pet Recognition Service - KI-gestützte Tier- und Rassenerkennung.
+"""Pet Recognition Service - KI-gestützte Tier- und Rassenerkennung.
 
 Verwendet ein vortrainiertes Modell zur Erkennung von Hunde- und Katzenrassen
 aus Bildern. Das Modell wird beim ersten Start heruntergeladen.
 """
 
+from __future__ import annotations
+
 import io
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, Any
 from PIL import Image
-import numpy as np
+
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PetRecognitionService:
@@ -33,20 +37,20 @@ class PetRecognitionService:
             # Dieses Modell ist nicht speziell für Haustiere, aber funktioniert zuverlässig
             model_name = "google/vit-base-patch16-224"
             
-            print("🔄 Lade KI-Modell für Bilderkennung...")
-            print(f"   Modell: {model_name}")
-            print("   Dies kann beim ersten Start einige Minuten dauern...")
-            print("   Hinweis: Dies ist ein allgemeines Bilderkennungsmodell (ImageNet-basiert)")
+            logger.info("Lade KI-Modell für Bilderkennung...")
+            logger.info(f"Modell: {model_name}")
+            logger.info("Dies kann beim ersten Start einige Minuten dauern...")
+            logger.info("Hinweis: Dies ist ein allgemeines Bilderkennungsmodell (ImageNet-basiert)")
             
             self.processor = AutoImageProcessor.from_pretrained(model_name)
             self.model = AutoModelForImageClassification.from_pretrained(model_name)
             
             self.labels = self.model.config.id2label
             self._model_loaded = True
-            print("✅ Modell erfolgreich geladen!")
+            logger.info("Modell erfolgreich geladen!")
             
-        except Exception as ex:
-            print(f"❌ Fehler beim Laden des Modells: {ex}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden des Modells: {e}", exc_info=True)
             # Setze Flag, dass Modell nicht verfügbar ist
             self._model_loaded = False
             raise RuntimeError(
@@ -68,8 +72,8 @@ class PetRecognitionService:
                 img = img.convert("RGB")
             
             return img
-        except Exception as ex:
-            raise ValueError(f"Bild konnte nicht geladen werden: {ex}")
+        except Exception as e:  # noqa: BLE001
+            raise ValueError(f"Bild konnte nicht geladen werden: {e}")
     
     def _is_cat_or_dog(self, predicted_label: str) -> Tuple[Optional[str], str]:
         """
@@ -123,7 +127,7 @@ class PetRecognitionService:
         self,
         image_data: bytes,
         species_filter: Optional[str] = None
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Erkennt die Tierart und Rasse aus einem Bild.
         
@@ -204,10 +208,11 @@ class PetRecognitionService:
                 "error": None
             }
             
-        except Exception as ex:
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler bei der Erkennung: {e}", exc_info=True)
             return {
                 "success": False,
-                "error": f"Fehler bei der Erkennung: {str(ex)}",
+                "error": f"Fehler bei der Erkennung: {str(e)}",
                 "species": None,
                 "breed": None,
                 "confidence": 0.0

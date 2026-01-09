@@ -165,19 +165,15 @@ class PetBuddyApp:
     def _show_discover(self) -> None:
         """Zeigt die Discover-Seite."""
         try:
-            logger.info("_show_discover: Start")
             if not self.discover_view:
-                logger.info("_show_discover: discover_view nicht vorhanden, rufe build_ui() auf")
                 if not self.build_ui():
                     logger.error("_show_discover: build_ui() fehlgeschlagen")
                     return
-                logger.info("_show_discover: build_ui() erfolgreich")
 
             self.current_tab = TAB_START
             if self.nav:
                 self.nav.selected_index = TAB_START
 
-            logger.info("_show_discover: rufe _show_main_app() auf")
             self._show_main_app()
 
             # Gespeicherten Suchauftrag anwenden falls vorhanden
@@ -185,8 +181,6 @@ class PetBuddyApp:
             if saved_search and self.discover_view:
                 self.page.session.remove("apply_saved_search")
                 self.discover_view.apply_saved_search(saved_search)
-            
-            logger.info("_show_discover: Erfolgreich abgeschlossen")
         except Exception as e:
             logger.error(f"Fehler in _show_discover: {e}", exc_info=True)
     
@@ -376,9 +370,7 @@ class PetBuddyApp:
     def build_ui(self) -> bool:
         """Baut die UI-Bereiche auf."""
         try:
-            logger.info("build_ui: Start")
             # DiscoverView erstellen
-            logger.info("build_ui: Erstelle DiscoverView")
             self.discover_view = DiscoverView(
                 page=self.page,
                 sb=self.sb,
@@ -387,19 +379,15 @@ class PetBuddyApp:
                 on_login_required=self._show_favorite_login_dialog,
                 on_save_search_login_required=self._show_saved_search_login_dialog,
             )
-            logger.info("build_ui: DiscoverView erstellt")
             
             # PostForm erstellen
-            logger.info("build_ui: Erstelle PostForm")
             self.post_form = PostForm(
                 page=self.page,
                 sb=self.sb,
                 on_saved_callback=self.on_post_saved
             )
-            logger.info("build_ui: PostForm erstellt")
             
             # ProfileView erstellen
-            logger.info("build_ui: Erstelle ProfileView")
             self.profile_view = ProfileView(
                 page=self.page,
                 sb=self.sb,
@@ -407,9 +395,7 @@ class PetBuddyApp:
                 on_favorites_changed=self._on_favorites_changed,
                 on_posts_changed=self._on_posts_changed,
             )
-            logger.info("build_ui: ProfileView erstellt")
             
-            logger.info("build_ui: Erfolgreich abgeschlossen")
             return True
             
         except Exception as e:
@@ -482,12 +468,9 @@ class PetBuddyApp:
     def _show_main_app(self) -> None:
         """Zeigt die Hauptanwendung."""
         try:
-            logger.info("_show_main_app: Start")
             if not self.build_ui():
                 logger.error("_show_main_app: build_ui() fehlgeschlagen")
                 return
-            
-            logger.info("_show_main_app: build_ui() erfolgreich")
             
             # Komponenten erstellen
             self.start_section = self._build_start_section()
@@ -495,7 +478,6 @@ class PetBuddyApp:
                 logger.error("_show_main_app: start_section ist None")
                 return
             
-            logger.info("_show_main_app: start_section erstellt")
             self.nav = create_navigation_bar(self.current_tab, self._on_nav_change)
             
             # Seite leeren und neu aufbauen
@@ -508,20 +490,15 @@ class PetBuddyApp:
             self.page.navigation_bar = self.nav
             self.page.add(self.body)
             
-            logger.info("_show_main_app: body zur Seite hinzugefügt")
-            
             # Tab rendern und Daten laden
             self.render_tab()
-            logger.info("_show_main_app: render_tab() aufgerufen")
             
             if self.discover_view:
                 self.page.run_task(self.discover_view.load_posts)
-                logger.info("_show_main_app: load_posts() gestartet")
             else:
                 logger.error("_show_main_app: discover_view ist None")
             
             self.page.update()
-            logger.info("_show_main_app: page.update() aufgerufen")
         except Exception as e:
             logger.error(f"Fehler in _show_main_app: {e}", exc_info=True)
     

@@ -1,8 +1,7 @@
-"""Referenzdaten-Management.
+"""Referenzdaten-Management für Posts.
 
 Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank,
-die für Dropdowns, Filter und die Formularvalidierung benötigt werden.
-
+die für Post-Dropdowns, Filter und die Formularvalidierung benötigt werden.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class ReferenceService:
-    """Service-Klasse für das Laden von Referenzdaten aus der Datenbank."""
+    """Service-Klasse für das Laden von Post-Referenzdaten aus der Datenbank."""
 
     def __init__(self, sb: Client) -> None:
         """Initialisiert den Service mit dem Supabase-Client.
@@ -48,8 +47,8 @@ class ReferenceService:
             res = self.sb.table("post_status").select("*").execute()
             self._post_statuses = res.data or []
             return self._post_statuses
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden von Meldungstypen: {ex}", exc_info=True)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden von Meldungstypen: {e}", exc_info=True)
             return []
     
     def get_species(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -68,8 +67,8 @@ class ReferenceService:
             res = self.sb.table("species").select("*").execute()
             self._species = res.data or []
             return self._species
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden von Tierarten: {ex}", exc_info=True)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden von Tierarten: {e}", exc_info=True)
             return []
     
     def get_breeds_by_species(self, use_cache: bool = True) -> Dict[int, List[Dict[str, Any]]]:
@@ -96,8 +95,8 @@ class ReferenceService:
                     grouped[sid].append(breed)
             self._breeds_by_species = grouped
             return self._breeds_by_species
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden von Rassen: {ex}", exc_info=True)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden von Rassen: {e}", exc_info=True)
             return {}
     
     def get_colors(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -116,8 +115,8 @@ class ReferenceService:
             res = self.sb.table("color").select("*").execute()
             self._colors = res.data or []
             return self._colors
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden von Farben: {ex}", exc_info=True)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden von Farben: {e}", exc_info=True)
             return []
 
     def get_sex(self, use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -136,8 +135,8 @@ class ReferenceService:
             res = self.sb.table("sex").select("*").execute()
             self._sex = res.data or []
             return self._sex
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden von Geschlechtern: {ex}", exc_info=True)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Fehler beim Laden von Geschlechtern: {e}", exc_info=True)
             return []
 
     def clear_cache(self) -> None:

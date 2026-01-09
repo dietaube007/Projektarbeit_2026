@@ -8,14 +8,14 @@ from typing import Callable, Optional
 
 import flet as ft
 
-from .constants import (
+from ui.constants import (
     PRIMARY_COLOR,
     BACKGROUND_COLOR,
     CARD_COLOR,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
-from .validators import validate_login_form, validate_register_form
+from utils.validators import validate_email, validate_password, validate_display_name
 from .forms import (
     create_login_email_field,
     create_login_password_field,
@@ -33,8 +33,7 @@ from .forms import (
     create_password_reset_dialog,
 )
 from ui.components import show_success_dialog, show_error_dialog
-from utils.validators import validate_email
-from services.auth import AuthService, AuthResult
+from services.account import AuthService, AuthResult
 
 
 class AuthView:
@@ -82,9 +81,15 @@ class AuthView:
         password = (self._login_pwd.value or "").strip()
         
         # Validierung
-        error = validate_login_form(email, password)
-        if error:
-            self._show_login_message(error, ft.Colors.RED)
+        if not email:
+            self._show_login_message("Bitte E-Mail eingeben.", ft.Colors.RED)
+            return
+        is_valid, error_msg = validate_email(email)
+        if not is_valid:
+            self._show_login_message(error_msg or "Bitte gültige E-Mail eingeben.", ft.Colors.RED)
+            return
+        if not password:
+            self._show_login_message("Bitte Passwort eingeben.", ft.Colors.RED)
             return
         
         self._show_login_message("Anmeldung läuft...", ft.Colors.BLUE)
@@ -111,9 +116,23 @@ class AuthView:
             return
         
         # Validierung
-        error = validate_register_form(email, password, username)
-        if error:
-            self._show_reg_message(error, ft.Colors.RED)
+        if not email:
+            self._show_reg_message("Bitte E-Mail eingeben.", ft.Colors.RED)
+            return
+        is_valid, error_msg = validate_email(email)
+        if not is_valid:
+            self._show_reg_message(error_msg or "Bitte gültige E-Mail eingeben.", ft.Colors.RED)
+            return
+        if not password:
+            self._show_reg_message("Bitte Passwort eingeben.", ft.Colors.RED)
+            return
+        is_valid, error_msg = validate_password(password)
+        if not is_valid:
+            self._show_reg_message(error_msg or "Passwort ungültig.", ft.Colors.RED)
+            return
+        is_valid, error_msg = validate_display_name(username)
+        if not is_valid:
+            self._show_reg_message(error_msg or "Anzeigename ungültig.", ft.Colors.RED)
             return
         
         self._show_reg_message("Registrierung läuft...", ft.Colors.BLUE)
@@ -174,7 +193,7 @@ class AuthView:
                 self.page.update()
                 return
 
-            result = self.auth_service.send_reset_password_email(email)
+            result = self.auth_service.reset_password(email)
             if result.success:
                 self.page.close(dialog)
                 show_success_dialog(
@@ -303,7 +322,9 @@ class AuthView:
     def is_logged_in(self) -> bool:
         """Prüft, ob ein Benutzer angemeldet ist."""
         try:
-            user = self.sb.auth.get_user()
+            from services.account import ProfileService
+            profile_service = ProfileService(self.sb)
+            user = profile_service.get_current_user()
             return user is not None and user.user is not None
         except Exception:
             return False
@@ -311,7 +332,9 @@ class AuthView:
     def get_current_user(self):
         """Gibt den aktuell angemeldeten Benutzer zurück."""
         try:
-            return self.sb.auth.get_user()
+            from services.account import ProfileService
+            profile_service = ProfileService(self.sb)
+            return profile_service.get_current_user()
         except Exception:
             return None
 

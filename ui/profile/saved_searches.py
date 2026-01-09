@@ -8,8 +8,8 @@ import flet as ft
 
 from ui.theme import soft_card
 from ui.components import show_error_dialog, show_success_dialog
-from services.profile import SavedSearchService
-from services.references import ReferenceService
+from services.posts import SavedSearchService
+from services.posts.references import ReferenceService
 
 
 def build_saved_searches_list(

@@ -7,9 +7,15 @@ from datetime import datetime, date
 from typing import Callable, Dict, List, Optional, Any
 import flet as ft
 
-from services.references import ReferenceService
-from services.posts import PostService
-from ui.constants import PRIMARY_COLOR
+from services.posts.references import ReferenceService
+from services.posts import PostService, PostRelationsService
+from ui.constants import (
+    PRIMARY_COLOR,
+    DATE_FORMAT,
+    NO_SELECTION_VALUE,
+    NO_SELECTION_LABEL,
+    ALLOWED_POST_STATUSES,
+)
 from utils.logging_config import get_logger
 from ui.components import show_success_dialog
 
@@ -19,11 +25,7 @@ logger = get_logger(__name__)
 class EditPostDialog:
     """Dialog zum Bearbeiten einer bestehenden Meldung."""
 
-    DATE_FORMAT = "%d.%m.%Y"
     DATE_FORMAT_DB = "%Y-%m-%d"
-    NO_SELECTION_VALUE = "-1"
-    NO_SELECTION_LABEL = "Keine Angabe"
-    ALLOWED_POST_STATUSES = ["vermisst", "gefunden"]
 
     def __init__(
         self,
@@ -41,6 +43,7 @@ class EditPostDialog:
         # Services
         self.ref_service = ReferenceService(self.sb)
         self.post_service = PostService(self.sb)
+        self.post_relations_service = PostRelationsService(self.sb)
 
         # Referenzdaten
         self.post_statuses: List[dict] = []
@@ -162,7 +165,7 @@ class EditPostDialog:
         event_date_str = self.post.get("event_date", "")
         if event_date_str:
             try:
-                parsed_date = datetime.strptime(event_date_str[:10], self.DATE_FORMAT_DB).date()
+                parsed_date = datetime.strptime(event_date_str[:10], EditPostDialog.DATE_FORMAT_DB).date()
                 self.date_picker.value = parsed_date
             except (ValueError, TypeError):
                 pass
@@ -176,14 +179,14 @@ class EditPostDialog:
         if not date_str:
             return ""
         try:
-            return datetime.strptime(date_str[:10], self.DATE_FORMAT_DB).strftime(self.DATE_FORMAT)
+            return datetime.strptime(date_str[:10], EditPostDialog.DATE_FORMAT_DB).strftime(DATE_FORMAT)
         except ValueError:
             return ""
 
     def _parse_date(self, date_str: str) -> Optional[datetime]:
         """Parst ein Datum im Anzeigeformat. Gibt None bei Fehler zurück."""
         try:
-            return datetime.strptime(date_str.strip(), self.DATE_FORMAT).date()
+            return datetime.strptime(date_str.strip(), DATE_FORMAT).date()
         except ValueError:
             return None
 
@@ -195,7 +198,7 @@ class EditPostDialog:
     def _get_dropdown_id(self, dropdown: ft.Dropdown) -> Optional[int]:
         """Extrahiert die ID aus einem Dropdown, None bei 'Keine Angabe'."""
         val = dropdown.value
-        return int(val) if val and val != self.NO_SELECTION_VALUE else None
+        return int(val) if val and val != NO_SELECTION_VALUE else None
 
     def _get_original_color_ids(self) -> List[int]:
         """Extrahiert die ursprünglichen Farb-IDs."""
@@ -237,7 +240,7 @@ class EditPostDialog:
                 selected_date = e.control.value
                 if isinstance(selected_date, date):
                     # Formatieren im Anzeigeformat (TT.MM.JJJJ)
-                    self.date_tf.value = selected_date.strftime(self.DATE_FORMAT)
+                    self.date_tf.value = selected_date.strftime(DATE_FORMAT)
                     self.page.update()
             except Exception as ex:
                 logger.warning(f"Fehler beim Verarbeiten des ausgewählten Datums: {ex}")
@@ -245,7 +248,7 @@ class EditPostDialog:
     def _update_breeds(self):
         """Aktualisiert das Rassen-Dropdown basierend auf der Tierart."""
         self.breed_dd.options = [
-            ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
+            ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)
         ]
         try:
             species_id = int(self.species_dd.value) if self.species_dd.value else None
@@ -256,7 +259,7 @@ class EditPostDialog:
                 ]
         except (ValueError, TypeError):
             pass
-        self.breed_dd.value = self.NO_SELECTION_VALUE
+        self.breed_dd.value = NO_SELECTION_VALUE
 
     # ══════════════════════════════════════════════════════════════════════
     # DATEN LADEN
@@ -276,7 +279,7 @@ class EditPostDialog:
         all_statuses = self.ref_service.get_post_statuses()
         self.post_statuses = [
             s for s in all_statuses
-            if s["name"].lower() in self.ALLOWED_POST_STATUSES
+            if s["name"].lower() in ALLOWED_POST_STATUSES
         ]
         self.meldungsart.segments = [
             ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
@@ -314,13 +317,13 @@ class EditPostDialog:
 
         # Geschlecht
         self.sex_dd.options = [
-            ft.dropdown.Option(self.NO_SELECTION_VALUE, self.NO_SELECTION_LABEL)
+            ft.dropdown.Option(NO_SELECTION_VALUE, NO_SELECTION_LABEL)
         ] + [
             ft.dropdown.Option(str(s["id"]), s["name"])
             for s in self.sex_list
         ]
         current_sex = self._get_nested_id("sex")
-        self.sex_dd.value = str(current_sex) if current_sex else self.NO_SELECTION_VALUE
+        self.sex_dd.value = str(current_sex) if current_sex else NO_SELECTION_VALUE
 
     def _load_colors(self):
         """Lädt die Farben und erstellt Checkboxen."""
@@ -442,7 +445,7 @@ class EditPostDialog:
             }
 
             self.post_service.update(self.post["id"], post_data)
-            self.post_service.update_colors(self.post["id"], self.selected_farben)
+            self.post_relations_service.update_colors(self.post["id"], self.selected_farben)
             self.page.close(self.dialog)
 
             self._show_success_dialog("Erfolgreich gespeichert", "Die Meldung wurde erfolgreich aktualisiert.")

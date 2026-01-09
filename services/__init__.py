@@ -1,18 +1,21 @@
 """Services-Modul für PetBuddy.
 
 Enthält alle Service-Klassen für Datenbankoperationen:
-- PostService: Verwaltung von Tier-Meldungen
-- ReferenceService: Stammdaten (Tierarten, Rassen, etc.)
-- ProfileService: Benutzerprofil-Verwaltung
+- Account Services: Authentifizierung, Profil, Profilbild, Konto-Löschung
+- Post Services: CRUD, Suche, Favoriten, Gespeicherte Suchen, Stammdaten
 """
 
-from .posts import PostService
-from .references import ReferenceService
-from .profile import ProfileService
+from .posts import PostService, SearchService, FavoritesService, SavedSearchService, ReferenceService
+from .account import ProfileService, AuthService, AuthResult
 
 __all__ = [
     "PostService",
-    "ReferenceService",
+    "SearchService",
+    "FavoritesService",
+    "SavedSearchService",
     "ProfileService",
+    "AuthService",
+    "AuthResult",
+    "ReferenceService",
 ]
 

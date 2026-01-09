@@ -5,6 +5,7 @@ from typing import Any
 import flet as ft
 
 from utils.logging_config import get_logger
+from utils.validators import validate_password
 from ui.components import show_success_dialog, show_error_dialog
 
 logger = get_logger(__name__)
@@ -52,9 +53,9 @@ def show_change_password_dialog(view: Any) -> None:
             return
 
         # Passwort-Anforderungen prüfen
-        is_valid, pw_error = view.profile_service.validate_password(new_pw)
+        is_valid, pw_error = validate_password(new_pw)
         if not is_valid:
-            error_text.value = pw_error
+            error_text.value = pw_error or "Passwort ungültig."
             error_text.visible = True
             view.page.update()
             return
@@ -89,13 +90,15 @@ def show_change_password_dialog(view: Any) -> None:
                 return
 
             # Neues Passwort setzen
-            success, error_msg = view.profile_service.update_password(new_pw)
+            from services.account import AuthService
+            auth_service = AuthService(view.sb)
+            result = auth_service.change_password(new_pw)
 
-            if success:
+            if result.success:
                 view.page.close(dialog)
                 show_success_dialog(view.page, "Erfolg", "Passwort wurde geändert!")
             else:
-                error_text.value = error_msg or "Fehler beim Ändern."
+                error_text.value = result.message or "Fehler beim Ändern."
                 error_text.visible = True
                 view.page.update()
 
@@ -200,7 +203,9 @@ def confirm_delete_account(view: Any) -> None:
 
 def delete_account(view: Any) -> None:
     """Löscht das Benutzerkonto."""
-    success, error_msg = view.profile_service.delete_account()
+    from services.account import AccountDeletionService
+    deletion_service = AccountDeletionService(view.sb)
+    success, error_msg = deletion_service.delete_account()
 
     if success:
         show_success_dialog(

@@ -142,69 +142,6 @@ def build_favorite_card(
     return soft_card(card_inner, pad=12, elev=3)
 
 
-async def load_favorites(sb, user_id: str) -> List[dict]:
-    """Lädt alle favorisierten Meldungen eines Benutzers."""
-    try:
-        # 1) Favoriten-Einträge lesen
-        fav_res = (
-            sb.table("favorite")
-            .select("post_id")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        fav_rows = fav_res.data or []
-        
-        post_ids = [row["post_id"] for row in fav_rows if row.get("post_id")]
-        
-        if not post_ids:
-            return []
-        
-        # 2) Dazu passende Posts laden
-        posts_res = (
-            sb.table("post")
-            .select(
-                """
-                id,
-                headline,
-                location_text,
-                event_date,
-                created_at,
-                is_active,
-                post_status(id, name),
-                species(id, name),
-                breed(id, name),
-                post_image(url),
-                post_color(color(id, name))
-                """
-            )
-            .in_("id", post_ids)
-            .order("created_at", desc=True)
-            .execute()
-        )
-        
-        return posts_res.data or []
-        
-    except Exception as e:
-        logger.error(f"Fehler beim Laden der Favoriten (User {user_id}): {e}", exc_info=True)
-        return []
-
-
-def remove_favorite(sb, user_id: str, post_id: int) -> bool:
-    """Entfernt einen Post aus den Favoriten."""
-    try:
-        (
-            sb.table("favorite")
-            .delete()
-            .eq("user_id", user_id)
-            .eq("post_id", post_id)
-            .execute()
-        )
-        return True
-    except Exception as e:
-        logger.error(f"Fehler beim Entfernen aus Favoriten (User {user_id}, Post {post_id}): {e}", exc_info=True)
-        return False
-
-
 def render_favorites_list(
     favorites_list: ft.Column,
     favorites_items: List[dict],
@@ -250,8 +187,11 @@ class ProfileFavoritesMixin:
             self.favorites_list.controls = [loading_indicator("Favoriten werden geladen...")]
             self.page.update()
 
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
+            from services.account import ProfileService
+            profile_service = ProfileService(self.sb)
+            user_id = profile_service.get_user_id()
+            
+            if not user_id:
                 self.favorites_items = []
                 render_favorites_list(
                     self.favorites_list,
@@ -262,8 +202,10 @@ class ProfileFavoritesMixin:
                 self.page.update()
                 return
 
-            user_id = user_resp.user.id
-            self.favorites_items = await load_favorites(self.sb, user_id)
+            # FavoritesService nutzen
+            from services.posts import FavoritesService
+            favorites_service = FavoritesService(self.sb)
+            self.favorites_items = favorites_service.get_favorites()
             render_favorites_list(
                 self.favorites_list,
                 self.favorites_items,
@@ -281,17 +223,18 @@ class ProfileFavoritesMixin:
             )
             self.page.update()
 
-    def _remove_favorite(self, post_id: int):
-        """Entfernt einen Post aus den Favoriten."""
+    def _remove_favorite(self, post_id: str):
+        """Entfernt einen Post aus den Favoriten.
+        
+        Args:
+            post_id: ID des Posts (UUID als String)
+        """
         try:
-            user_resp = self.sb.auth.get_user()
-            if not user_resp or not user_resp.user:
-                return
-
-            user_id = user_resp.user.id
-
+            from services.posts import FavoritesService
+            favorites_service = FavoritesService(self.sb)
+            
             # Aus Datenbank löschen
-            if remove_favorite(self.sb, user_id, post_id):
+            if favorites_service.remove_favorite(str(post_id)):
                 # Lokal entfernen
                 self.favorites_items = [
                     p for p in self.favorites_items if p.get("id") != post_id

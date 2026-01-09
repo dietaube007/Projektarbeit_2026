@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, Dict, Any, List, Callable
 import flet as ft
 
-from services.references import ReferenceService
+from services.posts.references import ReferenceService
 from utils.logging_config import get_logger
 from .filters import populate_dropdown
 

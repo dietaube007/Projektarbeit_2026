@@ -9,11 +9,10 @@ from typing import Callable, Optional, Dict, Any, List
 import flet as ft
 from supabase import Client
 
-from ui.constants import MAX_POSTS_LIMIT
+from utils.constants import MAX_POSTS_LIMIT
 from ui.theme import soft_card
-from services.references import ReferenceService
-from services.profile import SavedSearchService, FavoritesService
-from services.discover import DiscoverService
+from services.posts.references import ReferenceService
+from services.posts import SavedSearchService, FavoritesService, SearchService
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +33,6 @@ from .filters import (
 from .references_loader import load_and_populate_references, update_breeds_dropdown
 from .item_renderer import render_items, create_empty_state_card
 from .ui_builder import build_discover_ui
-from .data import get_favorite_ids
 
 
 class DiscoverView:
@@ -60,7 +58,7 @@ class DiscoverView:
         self.ref_service = ReferenceService(self.sb)
         self.saved_search_service = SavedSearchService(self.sb)
         self.favorites_service = FavoritesService(self.sb)
-        self.discover_service = DiscoverService(self.sb)
+        self.search_service = SearchService(self.sb)
 
         # Filter-Status
         self.selected_farben: list[int] = []
@@ -82,19 +80,11 @@ class DiscoverView:
     # USER / AUTH
     # ──────────────────────────────────────────────────────────────────
 
-    def _get_current_user_id(self) -> Optional[str]:
-        """Zieht die aktuelle User-ID aus Supabase."""
-        try:
-            user_resp = self.sb.auth.get_user()
-            if user_resp and getattr(user_resp, "user", None):
-                return user_resp.user.id
-        except Exception:
-            pass
-        return None
-
     def refresh_user(self) -> None:
         """Kann von außen (z.B. nach Login) aufgerufen werden."""
-        self.current_user_id = self._get_current_user_id()
+        from services.account import ProfileService
+        profile_service = ProfileService(self.sb)
+        self.current_user_id = profile_service.get_user_id()
 
     # ──────────────────────────────────────────────────────────────────
     # INIT UI
@@ -152,6 +142,11 @@ class DiscoverView:
 
         # Buttons
         self.reset_btn = create_reset_button(on_click=self._reset_filters)
+        self.save_search_btn = ft.TextButton(
+            "Suche speichern",
+            icon=ft.Icons.BOOKMARK_ADD_OUTLINED,
+            on_click=self._show_save_search_dialog,
+        )
 
         self.search_row = ft.ResponsiveRow(
             controls=[
@@ -160,7 +155,10 @@ class DiscoverView:
                 ft.Container(self.filter_art, col={"xs": 6, "md": 2}),
                 ft.Container(self.filter_geschlecht, col={"xs": 6, "md": 2}),
                 ft.Container(self.filter_rasse, col={"xs": 6, "md": 1}),
-                ft.Container(self.reset_btn, col={"xs": 12, "md": 12}),
+                ft.Container(
+                    ft.Row([self.reset_btn, self.save_search_btn], spacing=8),
+                    col={"xs": 12, "md": 12},
+                ),
                 ft.Container(self.farben_header, col={"xs": 12, "md": 12}),
                 ft.Container(self.farben_panel, col={"xs": 12, "md": 12}),
             ],
@@ -363,11 +361,11 @@ class DiscoverView:
             }
 
             # Favoriten-IDs laden (für Markierung)
-            favorite_ids = get_favorite_ids(self.sb, self.current_user_id)
+            favorite_ids = self.favorites_service.get_favorite_ids(self.current_user_id) if self.current_user_id else set()
 
-            # Posts über DiscoverService laden
+            # Posts über SearchService laden
             sort_option = self.sort_dropdown.value if self.sort_dropdown.value else "created_at_desc"
-            items = self.discover_service.search_posts(
+            items = self.search_service.search_posts(
                 filters=filters,
                 search_query=self.search_q.value if self.search_q.value else None,
                 selected_colors=set(self.selected_farben) if self.selected_farben else None,
@@ -380,8 +378,6 @@ class DiscoverView:
 
         except Exception as ex:
             logger.error(f"Fehler beim Laden der Daten: {ex}", exc_info=True)
-            import traceback
-            traceback.print_exc()
             self.current_items = []
             self.list_view.controls = [self.empty_state_card]
             self.grid_view.controls = []
@@ -390,56 +386,63 @@ class DiscoverView:
             self.page.update()
 
     def _render_items(self, items: list[dict]):
-        if not items:
-            no_results = soft_card(
-                ft.Column(
-                    [
-                        ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-                        ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-                        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
-                        ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=8,
-                ),
-                elev=1,
-                pad=24,
-            )
-            self.list_view.controls = [no_results]
-            self.grid_view.controls = []
-            self.list_view.visible = True
-            self.grid_view.visible = False
-            self.page.update()
-            return
+        try:
+            if not items:
+                no_results = soft_card(
+                    ft.Column(
+                        [
+                            ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
+                            ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
+                            ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
+                            ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=8,
+                    ),
+                    elev=1,
+                    pad=24,
+                )
+                self.list_view.controls = [no_results]
+                self.grid_view.controls = []
+                self.list_view.visible = True
+                self.grid_view.visible = False
+                self.page.update()
+                return
 
-        if self.view_mode == "grid":
-            self.grid_view.controls = [
-                build_small_card(
-                    item=it,
-                    page=self.page,
-                    on_favorite_click=self._toggle_favorite,
-                    on_card_click=self._show_detail_dialog,
-                )
-                for it in items
-            ]
-            self.list_view.controls = []
-            self.list_view.visible = False
-            self.grid_view.visible = True
-        else:
-            self.list_view.controls = [
-                build_big_card(
-                    item=it,
-                    page=self.page,
-                    on_favorite_click=self._toggle_favorite,
-                    on_card_click=self._show_detail_dialog,
-                    on_contact_click=self.on_contact_click,
-                    supabase=self.sb,
-                )
-                for it in items
-            ]
-            self.grid_view.controls = []
-            self.list_view.visible = True
-            self.grid_view.visible = False
+            if self.view_mode == "grid":
+                self.grid_view.controls = [
+                    build_small_card(
+                        item=it,
+                        page=self.page,
+                        on_favorite_click=self._toggle_favorite,
+                        on_card_click=self._show_detail_dialog,
+                    )
+                    for it in items
+                ]
+                self.list_view.controls = []
+                self.list_view.visible = False
+                self.grid_view.visible = True
+            else:
+                self.list_view.controls = [
+                    build_big_card(
+                        item=it,
+                        page=self.page,
+                        on_favorite_click=self._toggle_favorite,
+                        on_card_click=self._show_detail_dialog,
+                        on_contact_click=self.on_contact_click,
+                        supabase=self.sb,
+                    )
+                    for it in items
+                ]
+                self.grid_view.controls = []
+                self.list_view.visible = True
+                self.grid_view.visible = False
+
+            self.page.update()
+        except Exception as e:
+            logger.error(f"Fehler in _render_items: {e}", exc_info=True)
+            self.list_view.controls = [self.empty_state_card]
+            self.page.update()
 
     def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
         """Wrapper-Methode für den Detail-Dialog."""

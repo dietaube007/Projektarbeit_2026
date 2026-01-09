@@ -414,7 +414,7 @@ def collect_current_filters(
         pass
 
     return {
-        "filters": filters,  # Für DiscoverService
+        "filters": filters,  # Für SearchService
         "search_query": search_query,
         "status_id": status_id,
         "species_id": species_id,

@@ -109,15 +109,6 @@ class CommentSection(ft.Container):
             expand=True
         )
     
-    def _get_current_user_id(self) -> Optional[str]:
-        """Holt die aktuelle User-ID aus Supabase Auth."""
-        try:
-            user_resp = self.supabase.auth.get_user()
-            if user_resp and getattr(user_resp, "user", None):
-                return user_resp.user.id
-        except Exception:
-            pass
-        return None
     
     def load_comments(self):
         """Lädt alle nicht gelöschten Kommentare für diesen Post"""
@@ -183,7 +174,7 @@ class CommentSection(ft.Container):
             self.comments_list.controls.append(
                 ft.Container(
                     content=ft.Text(
-                        f"⚠️ Fehler beim Laden: {str(e)}",
+                        f"Fehler beim Laden: {str(e)}",
                         color=ft.Colors.RED_400,
                         size=14
                     ),
@@ -200,7 +191,9 @@ class CommentSection(ft.Container):
     
     def create_comment_card(self, comment, is_reply=False):
         """Erstellt eine Kommentar-Karte"""
-        current_user_id = self._get_current_user_id()
+        from services.account import ProfileService
+        profile_service = ProfileService(self.supabase)
+        current_user_id = profile_service.get_user_id()
         is_author = (str(current_user_id) == str(comment.get('user_id')))
         
         # User-Daten extrahieren (Schema: user-Tabelle hat display_name, nicht username)
@@ -304,7 +297,9 @@ class CommentSection(ft.Container):
         if not self.comment_input.value or not self.comment_input.value.strip():
             return
         
-        current_user_id = self._get_current_user_id()
+        from services.account import ProfileService
+        profile_service = ProfileService(self.supabase)
+        current_user_id = profile_service.get_user_id()
         
         # Login-Check
         if not current_user_id:

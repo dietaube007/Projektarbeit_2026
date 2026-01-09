@@ -1,138 +1,19 @@
 """
-Photo Manager - Foto-Upload und Bildkomprimierung.
+Photo Manager - Lokale Datei-Verwaltung und Helper-Funktionen.
 
 Enthält Funktionen für:
-- Bildkomprimierung mit PIL
-- Datei-Upload zu Supabase Storage
-- Foto-Entfernung aus Storage
+- Lokale Datei-Verwaltung (Upload-Pfade, Cleanup)
+- Hinweis: Storage-Operationen sind jetzt in PostService
 """
 
 from __future__ import annotations
 
 import os
-import io
-import base64
-from datetime import datetime
-from typing import Tuple, Optional, Dict, Any
+from typing import Optional
 
-from supabase import Client
+from utils.logging_config import get_logger
 
-from PIL import Image
-
-from ui.post_form.constants import (
-    MAX_IMAGE_SIZE,
-    IMAGE_QUALITY,
-    STORAGE_BUCKET,
-)
-
-
-def compress_image(file_path: str) -> Tuple[bytes, str]:
-    """Komprimiert ein Bild für schnelleres Laden.
-    
-    Konvertiert das Bild zu JPEG und passt die Größe an.
-    Behält das Seitenverhältnis bei.
-    
-    Args:
-        file_path: Pfad zur Bilddatei
-    
-    Returns:
-        Tuple mit (komprimierte Bytes, Dateiendung)
-    """
-    with Image.open(file_path) as img:
-        # EXIF-Orientierung beibehalten, zu RGB konvertieren
-        img = img.convert("RGB")
-        
-        # Größe anpassen wenn nötig (behält Seitenverhältnis)
-        img.thumbnail(MAX_IMAGE_SIZE, Image.Resampling.LANCZOS)
-        
-        # Als JPEG komprimieren
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=IMAGE_QUALITY, optimize=True)
-        buffer.seek(0)
-        
-        return buffer.read(), "jpeg"
-
-
-def upload_to_storage(
-    sb: Client,
-    file_path: str,
-    original_filename: str
-) -> Dict[str, Optional[str]]:
-    """Komprimiert und lädt ein Bild zu Supabase Storage hoch.
-    
-    Args:
-        sb: Supabase Client-Instanz
-        file_path: Pfad zur lokalen Bilddatei
-        original_filename: Original-Dateiname
-    
-    Returns:
-        Dictionary mit:
-        - path: Storage-Pfad
-        - base64: Base64-kodierte Bilddaten
-        - url: Öffentliche URL
-        - name: Original-Dateiname
-        Alle Werte sind None bei Fehler
-    """
-    try:
-        print(f"[DEBUG upload_to_storage] file_path: {file_path}")
-        print(f"[DEBUG upload_to_storage] Datei existiert: {os.path.exists(file_path)}")
-        
-        # Bild komprimieren
-        print(f"[DEBUG upload_to_storage] Starte Komprimierung...")
-        compressed_bytes, file_ext = compress_image(file_path)
-        print(f"[DEBUG upload_to_storage] Komprimierung OK, Größe: {len(compressed_bytes)} bytes")
-        image_data = base64.b64encode(compressed_bytes).decode()
-        
-        # Eindeutigen Dateinamen generieren
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        original_name = original_filename.rsplit(".", 1)[0]
-        storage_filename = f"{timestamp}_{original_name}.jpg"
-        print(f"[DEBUG upload_to_storage] Storage-Dateiname: {storage_filename}")
-        
-        # Zu Supabase Storage hochladen
-        print(f"[DEBUG upload_to_storage] Starte Supabase Upload zu Bucket '{STORAGE_BUCKET}'...")
-        sb.storage.from_(STORAGE_BUCKET).upload(
-            path=storage_filename,
-            file=compressed_bytes,
-            file_options={"content-type": "image/jpeg"}
-        )
-        print(f"[DEBUG upload_to_storage] Supabase Upload erfolgreich!")
-        
-        # Öffentliche URL abrufen
-        public_url = sb.storage.from_(STORAGE_BUCKET).get_public_url(storage_filename)
-        print(f"[DEBUG upload_to_storage] Public URL: {public_url}")
-        
-        return {
-            "path": storage_filename,
-            "base64": image_data,
-            "url": public_url,
-            "name": original_filename
-        }
-        
-    except Exception as ex:
-        print(f"Fehler beim Upload: {ex}")
-        return {"path": None, "base64": None, "url": None, "name": None}
-
-
-def remove_from_storage(sb: Client, storage_path: Optional[str]) -> bool:
-    """Entfernt ein Bild aus Supabase Storage.
-    
-    Args:
-        sb: Supabase Client-Instanz
-        storage_path: Pfad zum Bild im Storage (oder None)
-    
-    Returns:
-        True bei Erfolg, False bei Fehler
-    """
-    if not storage_path:
-        return True
-        
-    try:
-        sb.storage.from_(STORAGE_BUCKET).remove([storage_path])
-        return True
-    except Exception as ex:
-        logger.error(f"Fehler beim Löschen aus Storage ({storage_path}): {ex}", exc_info=True)
-        return False
+logger = get_logger(__name__)
 
 
 def cleanup_local_file(file_path: str) -> bool:
@@ -153,6 +34,17 @@ def cleanup_local_file(file_path: str) -> bool:
         return False
 
 
-def get_upload_path(filename: str) -> str:
-    """Erstellt den lokalen Upload-Pfad für eine Datei."""
-    return f"{UPLOAD_DIR}/{filename}"
+def get_upload_path(filename: str, session_id: Optional[str] = None) -> str:
+    """Erstellt den lokalen Upload-Pfad für eine Datei.
+    
+    Args:
+        filename: Dateiname
+        session_id: Optional Session-ID für Unterordner
+    
+    Returns:
+        Vollständiger Pfad zur Datei
+    """
+    upload_dir = os.getenv("UPLOAD_DIR", "image_uploads")
+    if session_id:
+        return f"{upload_dir}/{session_id}/{filename}"
+    return f"{upload_dir}/{filename}"
