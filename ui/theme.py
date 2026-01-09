@@ -10,6 +10,8 @@ Es definiert:
 
 """
 
+from typing import Callable, Optional
+
 import flet as ft
 from utils.logging_config import get_logger
 
@@ -51,6 +53,7 @@ class ThemeManager:
         """Initialisiert den ThemeManager mit einer Flet-Page."""
         self.page = page
         self._toggle_button: ft.IconButton | None = None
+        self._on_after_toggle: Optional[Callable[[bool], None]] = None
     
     # ════════════════════════════════════════════════════════════════════
     # THEME-BUILDER
@@ -131,6 +134,7 @@ class ThemeManager:
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         self.page.theme_mode = ft.ThemeMode.LIGHT if is_dark else ft.ThemeMode.DARK
         
+        # Icon-Update im Button (wenn vorhanden)
         if self._toggle_button:
             self._toggle_button.icon = self._get_current_icon()
             tip = self._get_current_tooltip()
@@ -139,15 +143,44 @@ class ThemeManager:
                 self._toggle_button.semantic_label = tip
             except Exception:
                 pass
+        
+        # Callback für View-spezifische UI-Updates nach Theme-Wechsel
+        new_is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        if self._on_after_toggle:
+            self._on_after_toggle(new_is_dark)
+        
         self.page.update()
     
-    def create_toggle_button(self) -> ft.IconButton:
-        """Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus."""
+    def create_toggle_button(
+        self, 
+        on_after_toggle: Optional[Callable[[bool], None]] = None,
+        icon_color: Optional[str] = None
+    ) -> ft.IconButton:
+        """
+        Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus.
+        
+        Args:
+            on_after_toggle: Optionaler Callback(is_dark: bool), der nach Theme-Wechsel 
+                            aufgerufen wird für View-spezifische UI-Updates
+            icon_color: Optional manuelle Icon-Farbe (Standard: automatisch)
+        
+        Returns:
+            IconButton für Theme-Toggle
+        """
+        self._on_after_toggle = on_after_toggle
+        
         tip = self._get_current_tooltip()
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        
+        # Icon-Farbe: manuell gesetzt oder automatisch basierend auf Theme
+        if icon_color is None:
+            icon_color = ft.Colors.WHITE if is_dark else ft.Colors.GREY_700
+        
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),
             tooltip=tip,
-            on_click=self._toggle_theme
+            on_click=self._toggle_theme,
+            icon_color=icon_color,
         )
         # Optional: Screenreader-Label nur setzen, wenn unterstützt
         try:

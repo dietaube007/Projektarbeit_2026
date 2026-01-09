@@ -1,9 +1,9 @@
 """
-ui/auth/view.py
 Authentifizierungs-View mit Login, Registrierung und Theme-Toggle.
+
+Enthält UI-Komposition und orchestriert Auth-Features.
 """
 
-import asyncio
 from typing import Callable, Optional
 
 import flet as ft
@@ -14,9 +14,19 @@ from ui.constants import (
     CARD_COLOR,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
+    MESSAGE_TYPE_ERROR,
+    MESSAGE_TYPE_SUCCESS,
+    MESSAGE_TYPE_INFO,
+    MESSAGE_COLOR_MAP,
+    MESSAGE_COLOR_INFO,
+    DARK_BACKGROUND,
+    DARK_CARD,
+    DARK_TEXT_PRIMARY,
+    DARK_TEXT_SECONDARY,
 )
-from utils.validators import validate_email, validate_password, validate_display_name
-from .forms import (
+from services.account import AuthService, ProfileService
+from ui.theme import ThemeManager
+from .components import (
     create_login_email_field,
     create_login_password_field,
     create_register_email_field,
@@ -27,13 +37,12 @@ from .forms import (
     create_register_button,
     create_continue_button,
     create_logout_button,
-    create_theme_toggle,
     create_registration_modal,
     create_login_card,
-    create_password_reset_dialog,
 )
-from ui.components import show_success_dialog, show_error_dialog
-from services.account import AuthService, AuthResult
+from .features.login import handle_login, handle_logout
+from .features.register import handle_register
+from .features.password_reset import show_password_reset_dialog_feature
 
 
 class AuthView:
@@ -43,15 +52,18 @@ class AuthView:
         self,
         page: ft.Page,
         sb,
-        on_auth_success: Optional[Callable] = None,
-        on_continue_without_account: Optional[Callable] = None,
+        on_auth_success: Optional[Callable[[], None]] = None,
+        on_continue_without_account: Optional[Callable[[], None]] = None,
     ):
         """Initialisiert die AuthView."""
         self.page = page
         self.sb = sb
         self.auth_service = AuthService(sb)
+        self.profile_service = ProfileService(sb)
         self.on_auth_success = on_auth_success
         self.on_continue_without_account = on_continue_without_account
+        
+        self.theme_manager = ThemeManager(page)
         
         # UI-Komponenten (werden in build() initialisiert)
         self._login_email: Optional[ft.TextField] = None
@@ -75,90 +87,42 @@ class AuthView:
     # Authentifizierungs-Methoden
     # ─────────────────────────────────────────────────────────────
 
-    async def _login(self):
+    def _login(self):
         """Führt die Anmeldung durch."""
         email = (self._login_email.value or "").strip()
         password = (self._login_pwd.value or "").strip()
-        
-        # Validierung
-        if not email:
-            self._show_login_message("Bitte E-Mail eingeben.", ft.Colors.RED)
-            return
-        is_valid, error_msg = validate_email(email)
-        if not is_valid:
-            self._show_login_message(error_msg or "Bitte gültige E-Mail eingeben.", ft.Colors.RED)
-            return
-        if not password:
-            self._show_login_message("Bitte Passwort eingeben.", ft.Colors.RED)
-            return
-        
-        self._show_login_message("Anmeldung läuft...", ft.Colors.BLUE)
+        handle_login(
+            auth_service=self.auth_service,
+            email=email,
+            password=password,
+            show_message_callback=self._show_login_message,
+            on_success_callback=self.on_auth_success,
+        )
 
-        result: AuthResult = self.auth_service.login(email, password)
-
-        if result.success:
-            self._show_login_message("Erfolgreich!", ft.Colors.GREEN)
-            if self.on_auth_success:
-                self.on_auth_success()
-        else:
-            self._show_login_message(result.message or "Anmeldung fehlgeschlagen.", ft.Colors.RED)
-
-    async def _register(self):
+    def _register(self):
         """Führt die Registrierung durch."""
         email = (self._reg_email.value or "").strip()
         password = (self._reg_pwd.value or "").strip()
         password_confirm = (self._reg_pwd_confirm.value or "").strip()
         username = (self._reg_username.value or "").strip()
         
-        # Passwörter vergleichen
-        if password != password_confirm:
-            self._show_reg_message("Passwörter stimmen nicht überein.", ft.Colors.RED)
-            return
-        
-        # Validierung
-        if not email:
-            self._show_reg_message("Bitte E-Mail eingeben.", ft.Colors.RED)
-            return
-        is_valid, error_msg = validate_email(email)
-        if not is_valid:
-            self._show_reg_message(error_msg or "Bitte gültige E-Mail eingeben.", ft.Colors.RED)
-            return
-        if not password:
-            self._show_reg_message("Bitte Passwort eingeben.", ft.Colors.RED)
-            return
-        is_valid, error_msg = validate_password(password)
-        if not is_valid:
-            self._show_reg_message(error_msg or "Passwort ungültig.", ft.Colors.RED)
-            return
-        is_valid, error_msg = validate_display_name(username)
-        if not is_valid:
-            self._show_reg_message(error_msg or "Anzeigename ungültig.", ft.Colors.RED)
-            return
-        
-        self._show_reg_message("Registrierung läuft...", ft.Colors.BLUE)
-
-        result: AuthResult = self.auth_service.register(
+        handle_register(
+            auth_service=self.auth_service,
             email=email,
             password=password,
+            password_confirm=password_confirm,
             username=username,
+            page=self.page,
+            show_message_callback=self._show_reg_message,
+            on_close_modal_callback=self._close_modal,
         )
 
-        if result.success:
-            if result.code == "confirm_email":
-                self._show_success_dialog(
-                    result.message
-                    or "Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihr Postfach."
-                )
-            else:
-                self._show_success_dialog("Registrierung erfolgreich.")
-        else:
-            self._show_reg_message(result.message or "Fehler!", ft.Colors.RED)
-
-    async def _logout(self):
+    def _logout(self):
         """Meldet den Benutzer ab."""
-        result = self.auth_service.logout()
-        if result.success:
-            self._show_login_message(result.message or "Abgemeldet.", ft.Colors.GREEN)
+        handle_logout(
+            auth_service=self.auth_service,
+            show_message_callback=self._show_login_message,
+        )
 
     # ─────────────────────────────────────────────────────────────
     # Passwort vergessen
@@ -166,111 +130,81 @@ class AuthView:
 
     def _show_forgot_password_dialog(self, e=None):
         """Zeigt den Dialog zum Zurücksetzen des Passworts."""
-        import os
-
-        email_field = ft.TextField(
-            label="E-Mail-Adresse",
-            prefix_icon=ft.Icons.EMAIL,
-            keyboard_type=ft.KeyboardType.EMAIL,
-            width=300,
-            hint_text="Ihre registrierte E-Mail",
-        )
-
-        # Vorausfüllen mit Login-E-Mail falls vorhanden
+        initial_email = None
         if self._login_email and self._login_email.value:
-            email_field.value = self._login_email.value
-
-        error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
-
-        def on_send(e):
-            email = (email_field.value or "").strip()
-
-            # Validierung
-            is_valid, error_msg = validate_email(email)
-            if not is_valid:
-                error_text.value = error_msg or "Bitte gültige E-Mail eingeben."
-                error_text.visible = True
-                self.page.update()
-                return
-
-            result = self.auth_service.reset_password(email)
-            if result.success:
-                self.page.close(dialog)
-                show_success_dialog(
-                    self.page,
-                    "E-Mail gesendet",
-                    result.message,
-                )
-            else:
-                error_text.value = result.message or "Fehler beim Senden der E-Mail."
-                error_text.visible = True
-                self.page.update()
-
-        def on_cancel(e):
-            self.page.close(dialog)
-
-        dialog = create_password_reset_dialog(
-            email_field=email_field,
-            error_text=error_text,
-            on_send=on_send,
-            on_cancel=on_cancel,
+            initial_email = self._login_email.value
+        
+        show_password_reset_dialog_feature(
+            page=self.page,
+            auth_service=self.auth_service,
+            initial_email=initial_email,
         )
-        self.page.open(dialog)
 
     # ─────────────────────────────────────────────────────────────
     # UI-Hilfsmethoden
     # ─────────────────────────────────────────────────────────────
 
-    def _show_login_message(self, message: str, color):
-        """Zeigt eine Nachricht im Login-Bereich."""
-        self._login_info.value = message
-        self._login_info.color = color
+    def _show_message(
+        self,
+        info_widget: ft.Text,
+        message: str,
+        message_type: str = MESSAGE_TYPE_INFO,
+    ) -> None:
+        """Zeigt eine Nachricht in einem Info-Widget.
+        
+        Args:
+            info_widget: Text-Widget für die Nachricht
+            message: Nachrichtentext
+            message_type: "error", "success", "info"
+        """
+        info_widget.value = message
+        info_widget.color = MESSAGE_COLOR_MAP.get(message_type, MESSAGE_COLOR_INFO)
         self.page.update()
 
-    def _show_reg_message(self, message: str, color):
-        """Zeigt eine Nachricht im Registrierungs-Bereich."""
-        self._reg_info.value = message
-        self._reg_info.color = color
-        self.page.update()
+    def _show_login_message(self, message: str, message_type: str = MESSAGE_TYPE_INFO):
+        """Zeigt eine Nachricht im Login-Bereich.
+        
+        Args:
+            message: Nachricht
+            message_type: "info", "success", "error"
+        """
+        self._show_message(self._login_info, message, message_type)
 
-    def _show_success_dialog(self, message: str):
-        """Zeigt einen Erfolgs-Dialog."""
-        show_success_dialog(
-            self.page,
-            "Erfolg",
-            message,
-            on_close=self._close_modal
-        )
+    def _show_reg_message(self, message: str, message_type: str = MESSAGE_TYPE_INFO):
+        """Zeigt eine Nachricht im Registrierungs-Bereich.
+        
+        Args:
+            message: Nachricht
+            message_type: "info", "success", "error"
+        """
+        self._show_message(self._reg_info, message, message_type)
 
-    def _toggle_theme(self, e):
-        """Wechselt zwischen Hell- und Dunkelmodus."""
-        if self.page.theme_mode == ft.ThemeMode.LIGHT:
-            self.page.theme_mode = ft.ThemeMode.DARK
-        else:
-            self.page.theme_mode = ft.ThemeMode.LIGHT
+
+    def _update_ui_colors(self, is_dark: bool):
+        """Aktualisiert View-spezifische UI-Farben nach Theme-Wechsel.
         
-        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        Args:
+            is_dark: True wenn Dark-Modus aktiv, False für Light-Modus
+        """
+        # Icon-Farbe aktualisieren (ThemeManager aktualisiert Icon/Tooltip bereits)
+        if self._theme_icon:
+            self._theme_icon.icon_color = DARK_TEXT_PRIMARY if is_dark else TEXT_SECONDARY
         
-        # Icon/Tooltip zeigen die Aktion (Gegenmodus)
-        self._theme_icon.icon = ft.Icons.LIGHT_MODE if is_dark else ft.Icons.DARK_MODE
-        self._theme_icon.tooltip = "Zu Hellmodus wechseln" if is_dark else "Zu Dunkelmodus wechseln"
-        try:
-            self._theme_icon.semantic_label = self._theme_icon.tooltip
-        except Exception:
-            pass
-        self._theme_icon.icon_color = ft.Colors.WHITE if is_dark else TEXT_SECONDARY
-        
-        # Farben aktualisieren
-        self._background.bgcolor = ft.Colors.GREY_900 if is_dark else BACKGROUND_COLOR
-        self._form_card.bgcolor = ft.Colors.GREY_800 if is_dark else CARD_COLOR
-        self._reg_modal_card.bgcolor = ft.Colors.GREY_800 if is_dark else CARD_COLOR
+        # Hintergrund-Farben aktualisieren
+        if self._background:
+            self._background.bgcolor = DARK_BACKGROUND if is_dark else BACKGROUND_COLOR
+        if self._form_card:
+            self._form_card.bgcolor = DARK_CARD if is_dark else CARD_COLOR
+        if self._reg_modal_card:
+            self._reg_modal_card.bgcolor = DARK_CARD if is_dark else CARD_COLOR
         
         # Überschriften-Farben aktualisieren
-        self._welcome_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
-        self._title_text.color = ft.Colors.WHITE if is_dark else TEXT_PRIMARY
-        self._subtitle_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
-        
-        self.page.update()
+        if self._welcome_text:
+            self._welcome_text.color = DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY
+        if self._title_text:
+            self._title_text.color = DARK_TEXT_PRIMARY if is_dark else TEXT_PRIMARY
+        if self._subtitle_text:
+            self._subtitle_text.color = DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY
     
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
@@ -322,9 +256,7 @@ class AuthView:
     def is_logged_in(self) -> bool:
         """Prüft, ob ein Benutzer angemeldet ist."""
         try:
-            from services.account import ProfileService
-            profile_service = ProfileService(self.sb)
-            user = profile_service.get_current_user()
+            user = self.profile_service.get_current_user()
             return user is not None and user.user is not None
         except Exception:
             return False
@@ -332,9 +264,7 @@ class AuthView:
     def get_current_user(self):
         """Gibt den aktuell angemeldeten Benutzer zurück."""
         try:
-            from services.account import ProfileService
-            profile_service = ProfileService(self.sb)
-            return profile_service.get_current_user()
+            return self.profile_service.get_current_user()
         except Exception:
             return None
 
@@ -350,8 +280,8 @@ class AuthView:
         self._login_email = create_login_email_field()
         self._login_pwd = create_login_password_field()
         # Enter-Taste für Login aktivieren
-        self._login_email.on_submit = lambda e: self.page.run_task(self._login)
-        self._login_pwd.on_submit = lambda e: self.page.run_task(self._login)
+        self._login_email.on_submit = lambda e: self._login()
+        self._login_pwd.on_submit = lambda e: self._login()
         self._login_info = ft.Text("", size=13, weight=ft.FontWeight.W_500)
         
         # Registrierungs-Formular Felder
@@ -361,8 +291,11 @@ class AuthView:
         self._reg_username = create_register_username_field()
         self._reg_info = ft.Text("", size=12, weight=ft.FontWeight.W_500)
         
-        # Theme-Toggle
-        self._theme_icon = create_theme_toggle(is_dark, self._toggle_theme)
+        # Theme-Toggle (mit Callback für View-spezifische UI-Updates)
+        self._theme_icon = self.theme_manager.create_toggle_button(
+            on_after_toggle=self._update_ui_colors,
+            icon_color=ft.Colors.WHITE if is_dark else TEXT_SECONDARY,
+        )
         
         # Registrierungs-Modal
         self._reg_modal_card = create_registration_modal(
@@ -371,7 +304,7 @@ class AuthView:
             password_confirm_field=self._reg_pwd_confirm,
             username_field=self._reg_username,
             info_text=self._reg_info,
-            on_register=lambda e: self.page.run_task(self._register),
+            on_register=lambda e: self._register(),
             on_close=self._close_modal,
             is_dark=is_dark,
         )
@@ -388,12 +321,12 @@ class AuthView:
         )
         
         # Buttons
-        login_btn = create_login_button(lambda e: self.page.run_task(self._login))
+        login_btn = create_login_button(lambda e: self._login())
         register_btn = create_register_button(self._open_modal)
         continue_btn = create_continue_button(
             lambda e: self.on_continue_without_account() if self.on_continue_without_account else None
         )
-        logout_btn = create_logout_button(lambda e: self.page.run_task(self._logout))
+        logout_btn = create_logout_button(lambda e: self._logout())
         forgot_password_btn = ft.TextButton(
             "Passwort vergessen?",
             on_click=self._show_forgot_password_dialog,
@@ -426,25 +359,24 @@ class AuthView:
         self._welcome_text = ft.Text(
             "Willkommen bei",
             size=16,
-            color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
+            color=DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY,
         )
         self._title_text = ft.Text(
             "PetBuddy",
             size=32,
             weight=ft.FontWeight.BOLD,
-            color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
+            color=DARK_TEXT_PRIMARY if is_dark else TEXT_PRIMARY,
         )
         self._subtitle_text = ft.Text(
             "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
             size=14,
-            color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
+            color=DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,
         )
         
         # Haupt-Layout
         self._background = ft.Container(
             content=ft.Stack([
-                # Hauptinhalt zentriert
                 ft.Column([
                     ft.Container(expand=True),
                     ft.Column([
@@ -459,14 +391,13 @@ class AuthView:
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Container(expand=True),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
-                # Theme-Toggle oben rechts (als Positioned-Container im Stack)
                 ft.Container(
                     content=ft.Row([self._theme_icon], spacing=8),
                     top=16,
                     right=16,
                 ),
             ]),
-            bgcolor=ft.Colors.GREY_900 if is_dark else BACKGROUND_COLOR,
+            bgcolor=DARK_BACKGROUND if is_dark else BACKGROUND_COLOR,
             expand=True,
         )
         

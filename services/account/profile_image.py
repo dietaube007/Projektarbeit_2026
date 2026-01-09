@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import io
 import os
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from PIL import Image
 from supabase import Client
 
 from utils.logging_config import get_logger
-from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from services.account.profile import ProfileService
@@ -21,7 +20,6 @@ logger = get_logger(__name__)
 class ProfileImageService:
     """Service für alle Profilbild-bezogenen Operationen."""
 
-    # Klassen-Konstanten
     PROFILE_IMAGE_BUCKET: str = "profile-images"
     PROFILE_IMAGE_SIZE: Tuple[int, int] = (400, 400)
     IMAGE_QUALITY: int = 85
@@ -93,7 +91,6 @@ class ProfileImageService:
 
     def upload_profile_image(self, file_path: str) -> Tuple[bool, Optional[str], str]:
         """Lädt ein Profilbild zu Supabase Storage hoch und aktualisiert user_metadata."""
-        # Validierungen
         if not os.path.exists(file_path):
             return False, None, "Datei nicht gefunden."
 

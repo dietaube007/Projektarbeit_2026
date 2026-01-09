@@ -1,17 +1,13 @@
-"""Service für gespeicherte Suchaufträge.
-
-Ermöglicht Benutzern das Speichern, Laden und Löschen von Suchfiltern.
-"""
+"""Service für gespeicherte Suchaufträge."""
 
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, TYPE_CHECKING
 import json
 from supabase import Client
 
 from utils.logging_config import get_logger
 from utils.validators import validate_not_empty, validate_length, sanitize_string
-from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from services.account.profile import ProfileService
@@ -22,7 +18,6 @@ logger = get_logger(__name__)
 class SavedSearchService:
     """Service-Klasse für gespeicherte Suchaufträge."""
 
-    # Klassen-Konstanten
     MAX_SEARCH_NAME_LENGTH: int = 100
     MAX_SAVED_SEARCHES: int = 20
 

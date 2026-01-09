@@ -10,81 +10,18 @@ from __future__ import annotations
 from typing import Callable, Optional, Dict, Any
 import flet as ft
 
-from ui.theme import soft_card, chip
+from ui.theme import soft_card
 from ui.constants import (
-    STATUS_COLORS, SPECIES_COLORS,
     CARD_IMAGE_HEIGHT, LIST_IMAGE_HEIGHT, DIALOG_IMAGE_HEIGHT,
     DEFAULT_PLACEHOLDER
 )
 from ui.helpers import extract_item_data
 from ui.comment_section import CommentSection
-
-
-def badge_for_typ(typ: str) -> ft.Control:
-    """Erstellt ein Badge für den Meldungstyp (Vermisst/Fundtier).
-    
-    Args:
-        typ: Meldungstyp (z.B. "Vermisst", "Fundtier")
-    
-    Returns:
-        Control-Widget mit Badge für den Typ
-    """
-    typ_lower = (typ or "").lower().strip()
-    color = STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
-    label = typ.capitalize() if typ else "Unbekannt"
-    return chip(label, color)
-
-
-def badge_for_species(species: str) -> ft.Control:
-    """Erstellt ein Badge für die Tierart.
-    
-    Args:
-        species: Tierart (z.B. "Hund", "Katze")
-    
-    Returns:
-        Control-Widget mit Badge für die Tierart
-    """
-    species_lower = (species or "").lower().strip()
-    color = SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
-    label = species.capitalize() if species else "Unbekannt"
-    return chip(label, color)
-
-
-def meta_row(icon: str, text: str) -> ft.Control:
-    """Erstellt eine Zeile mit Icon und Text für Metadaten.
-    
-    Args:
-        icon: Icon-Name (z.B. ft.Icons.LOCATION_ON)
-        text: Anzuzeigender Text
-    
-    Returns:
-        Row-Widget mit Icon und Text
-    """
-    return ft.Row(
-        [
-            ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text(text, color=ft.Colors.ON_SURFACE_VARIANT)
-        ],
-        spacing=6,
-    )
-
-
-def image_placeholder(height: int, icon_size: int = 50) -> ft.Container:
-    """Erstellt einen Platzhalter für fehlende Bilder.
-    
-    Args:
-        height: Höhe des Platzhalters
-        icon_size: Größe des Platzhalter-Icons (Standard: 50)
-    
-    Returns:
-        Container mit Platzhalter-Icon
-    """
-    return ft.Container(
-        height=height,
-        bgcolor=ft.Colors.GREY_200,
-        alignment=ft.alignment.center,
-        content=ft.Icon(ft.Icons.PETS, size=icon_size, color=ft.Colors.GREY_400),
-        expand=True,
+from ui.components import (
+    badge_for_typ,
+    badge_for_species,
+    meta_row,
+    image_placeholder,
     )
 
 
@@ -110,7 +47,7 @@ def build_small_card(
     visual_content = (
         ft.Image(src=data["img_src"], height=CARD_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
-        else image_placeholder(CARD_IMAGE_HEIGHT)
+        else image_placeholder(CARD_IMAGE_HEIGHT, expand=True)
     )
 
     visual = ft.Container(
@@ -188,7 +125,7 @@ def build_big_card(
     visual_content = (
         ft.Image(src=data["img_src"], height=LIST_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
-        else image_placeholder(LIST_IMAGE_HEIGHT, icon_size=64)
+        else image_placeholder(LIST_IMAGE_HEIGHT, icon_size=64, expand=True)
     )
 
     visual = ft.Container(

@@ -35,11 +35,9 @@ def get_client() -> Client:
     Raises:
         RuntimeError: Wenn Konfiguration fehlt oder Client nicht erstellt werden kann
     """
-    # Lese Konfiguration aus Umgebungsvariablen
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_ANON_KEY")
 
-    # Validiere dass beide Konfigurationswerte vorhanden sind
     if not url or not key:
         url_status = "(vorhanden)" if url else "(FEHLT)"
         key_status = "(vorhanden)" if key else "(FEHLT)"
@@ -56,7 +54,6 @@ def get_client() -> Client:
         logger.error("Supabase-Konfiguration fehlt")
         raise RuntimeError(error_msg)
 
-    # Versuche Client zu initialisieren
     try:
         logger.debug("Initialisiere Supabase Client...")
         client = create_client(url, key)

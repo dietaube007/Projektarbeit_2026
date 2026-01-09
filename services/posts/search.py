@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Dict, List, Set, Any
+from typing import Optional, Dict, List, Set, Any, TYPE_CHECKING
 from supabase import Client
 
 from utils.logging_config import get_logger
@@ -15,9 +15,11 @@ from utils.filters import (
 )
 from .queries import POST_SELECT_FULL
 
+if TYPE_CHECKING:
+    from services.account.profile import ProfileService
+
 logger = get_logger(__name__)
 
-# Sort-Optionen als Konstanten
 SORT_CREATED_DESC = "created_at_desc"
 SORT_CREATED_ASC = "created_at_asc"
 SORT_EVENT_DESC = "event_date_desc"
@@ -27,13 +29,23 @@ SORT_EVENT_ASC = "event_date_asc"
 class SearchService:
     """Service für Post-Suche mit Filtern."""
 
-    def __init__(self, sb: Client) -> None:
+    def __init__(
+        self,
+        sb: Client,
+        profile_service: Optional["ProfileService"] = None,
+    ) -> None:
         """Initialisiert den Service mit dem Supabase-Client.
 
         Args:
             sb: Supabase Client-Instanz
+            profile_service: Optional ProfileService (wird bei Bedarf erstellt)
         """
         self.sb = sb
+        if profile_service is None:
+            from services.account.profile import ProfileService
+            self._profile_service = ProfileService(sb)
+        else:
+            self._profile_service = profile_service
 
     def _apply_id_filter(
         self,
@@ -112,7 +124,6 @@ class SearchService:
         Returns:
             Supabase Query-Objekt mit angewendeten Filtern
         """
-        # Basis-Select mit allen benötigten Relationen
         query = (
             self.sb.table("post")
             .select(POST_SELECT_FULL)
@@ -127,7 +138,6 @@ class SearchService:
             # Für Event-Datum Sortierung: Zuerst nach created_at laden, dann in Python sortieren
             query = query.order("created_at", desc=True)
         else:
-            # Fallback: Neueste zuerst
             query = query.order("created_at", desc=True)
 
         # Filter anwenden
@@ -215,43 +225,15 @@ class SearchService:
         if not items:
             return items
 
-        # Alle eindeutigen user_ids sammeln
         user_ids = {
             item.get("user_id")
             for item in items
             if item.get("user_id")
         }
 
-        if not user_ids:
-            # Keine user_ids vorhanden, leere Namen setzen
-            for item in items:
-                item["user_display_name"] = ""
-            return items
+        display_names = self._profile_service.get_user_display_names(user_ids) if user_ids else {}
 
-        # Benutzernamen laden
-        display_names: Dict[str, str] = {}
-        try:
-            user_ids_list = list(user_ids)
-            result = (
-                self.sb.table("user_profiles")
-                .select("id, display_name")
-                .in_("id", user_ids_list)
-                .execute()
-            )
-
-            display_names = {
-                row["id"]: row.get("display_name") or ""
-                for row in (result.data or [])
-            }
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Laden der Benutzernamen: {e}", exc_info=True)
-
-        # Posts anreichern
         for item in items:
-            user_id = item.get("user_id")
-            if user_id and user_id in display_names:
-                item["user_display_name"] = display_names[user_id]
-            else:
-                item["user_display_name"] = ""
+            item["user_display_name"] = display_names.get(item.get("user_id"), "")
 
         return items

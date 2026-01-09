@@ -4,8 +4,10 @@ Hilfsfunktionen für Datenverarbeitung und Formatierung.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, Dict, Any, List
+
+from ui.constants import DATE_FORMAT
 
 
 def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -68,11 +70,12 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_date(date_str: Optional[str]) -> str:
+def format_date(date_str: Optional[str], return_format: Optional[str] = None) -> str:
     """Formatiert ein Datum aus ISO-Format ins Anzeigeformat TT.MM.JJJJ.
 
     Args:
         date_str: Datumsstring im ISO-Format (YYYY-MM-DD)
+        return_format: Optionales Datumsformat (Standard: DATE_FORMAT aus constants)
 
     Returns:
         Formatiertes Datum (TT.MM.JJJJ) oder "—" wenn leer
@@ -80,11 +83,13 @@ def format_date(date_str: Optional[str]) -> str:
     if not date_str or not date_str.strip():
         return "—"
     
+    output_format = return_format or DATE_FORMAT
+    
     try:
         # ISO-Format parsen (YYYY-MM-DD)
         date_obj = datetime.strptime(date_str[:10], "%Y-%m-%d")
         # Formatieren als TT.MM.JJJJ
-        return date_obj.strftime("%d.%m.%Y")
+        return date_obj.strftime(output_format)
     except (ValueError, TypeError):
         # Fallback: Original zurückgeben wenn Parsing fehlschlägt
         return date_str[:10] if date_str else "—"
@@ -147,3 +152,92 @@ def get_nested_value(data: Dict[str, Any], *keys, default: str = "") -> str:
         if current is None:
             return default
     return str(current) if current else default
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ZEIT- UND DATUMSFORMATIERUNG
+# ══════════════════════════════════════════════════════════════════════
+
+def format_time(timestamp: Optional[str]) -> str:
+    """Formatiert Zeitstempel zu relativem, lesbarem Format.
+    
+    Args:
+        timestamp: ISO-Format Zeitstempel (z.B. "2024-01-15T10:30:00Z")
+    
+    Returns:
+        Formatierter Zeitstring (z.B. "vor 5 Min.", "Gestern", "15.01.2024")
+        oder leerer String bei Fehler
+    """
+    if not timestamp:
+        return ""
+    
+    try:
+        # Supabase timestamps sind ISO format
+        created = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        now = datetime.now(created.tzinfo) if created.tzinfo else datetime.now()
+        diff = now - created
+        
+        # Zeitdifferenz berechnen
+        if diff.days == 0:
+            if diff.seconds < 60:
+                return "Gerade eben"
+            elif diff.seconds < 3600:
+                minutes = diff.seconds // 60
+                return f"vor {minutes} Min."
+            else:
+                hours = diff.seconds // 3600
+                return f"vor {hours} Std."
+        elif diff.days == 1:
+            return "Gestern"
+        elif diff.days < 7:
+            return f"vor {diff.days} Tagen"
+        else:
+            return created.strftime(DATE_FORMAT)
+            
+    except Exception:
+        return ""
+
+
+def parse_date(date_str: str) -> Optional[date]:
+    """Parst ein Datum im Anzeigeformat (TT.MM.JJJJ).
+    
+    Args:
+        date_str: Datumsstring im Anzeigeformat (TT.MM.JJJJ)
+    
+    Returns:
+        date-Objekt oder None bei Fehler
+    """
+    if not date_str:
+        return None
+    
+    try:
+        return datetime.strptime(date_str.strip(), DATE_FORMAT).date()
+    except ValueError:
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# DICTIONARY-ZUGRIFF
+# ══════════════════════════════════════════════════════════════════════
+
+def get_nested_id(data: Dict[str, Any], key: str) -> Optional[int]:
+    """Extrahiert die ID aus einem verschachtelten Dict-Feld.
+    
+    Args:
+        data: Quell-Dictionary
+        key: Schlüssel für das verschachtelte Dictionary
+    
+    Returns:
+        ID als Integer oder None wenn nicht gefunden
+    """
+    value = data.get(key)
+    if isinstance(value, dict):
+        id_value = value.get("id")
+        if isinstance(id_value, int):
+            return id_value
+        elif isinstance(id_value, str):
+            try:
+                return int(id_value)
+            except ValueError:
+                return None
+    return None

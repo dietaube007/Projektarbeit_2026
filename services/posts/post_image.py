@@ -20,7 +20,6 @@ logger = get_logger(__name__)
 class PostStorageService:
     """Service für Post-Image Storage-Operationen."""
 
-    # Klassen-Konstanten
     MAX_IMAGE_SIZE: Tuple[int, int] = (1920, 1920)
     IMAGE_QUALITY: int = 85
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB
@@ -55,7 +54,7 @@ class PostStorageService:
         try:
             parts = url.split(f"{self.STORAGE_BUCKET}/")
             if len(parts) > 1:
-                path = parts[1].split("?")[0]  # Query-Parameter entfernen
+                path = parts[1].split("?")[0]
                 return path if path else None
         except (AttributeError, IndexError, ValueError) as e:
             logger.warning(f"Fehler beim Extrahieren des Storage-Pfads aus URL: {e}")

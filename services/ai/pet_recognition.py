@@ -1,8 +1,4 @@
-"""Pet Recognition Service - KI-gestützte Tier- und Rassenerkennung.
-
-Verwendet ein vortrainiertes Modell zur Erkennung von Hunde- und Katzenrassen
-aus Bildern. Das Modell wird beim ersten Start heruntergeladen.
-"""
+"""Service für KI-gestützte Tier- und Rassenerkennung aus Bildern."""
 
 from __future__ import annotations
 

@@ -81,7 +81,6 @@ class AuthService:
         Returns:
             AuthResult mit Erfolg/Fehler-Status
         """
-        # Validierung
         if not email or not email.strip():
             return AuthResult(
                 success=False,
@@ -147,7 +146,6 @@ class AuthService:
         Returns:
             AuthResult mit Erfolg/Fehler-Status
         """
-        # Validierung
         if not email or not email.strip():
             return AuthResult(
                 success=False,

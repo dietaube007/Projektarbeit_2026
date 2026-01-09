@@ -1,8 +1,4 @@
-"""Referenzdaten-Management für Posts.
-
-Dieses Modul verwaltet alle statischen Referenzdaten aus der Datenbank,
-die für Post-Dropdowns, Filter und die Formularvalidierung benötigt werden.
-"""
+"""Service für Referenzdaten-Management (Tierarten, Rassen, Farben, etc.)."""
 
 from __future__ import annotations
 
@@ -24,7 +20,6 @@ class ReferenceService:
         """
         self.sb = sb
 
-        # Cache für Referenzdaten
         self._post_statuses: Optional[List[Dict[str, Any]]] = None
         self._species: Optional[List[Dict[str, Any]]] = None
         self._breeds_by_species: Optional[Dict[int, List[Dict[str, Any]]]] = None

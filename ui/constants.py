@@ -46,6 +46,16 @@ SPECIES_COLORS: dict[str, str] = {
 }
 
 # ══════════════════════════════════════════════════════════════════════
+# DUNKELMODUS-FARBEN (für Auth-View und andere Komponenten)
+# ══════════════════════════════════════════════════════════════════════
+
+DARK_BACKGROUND = ft.Colors.GREY_900
+DARK_CARD = ft.Colors.GREY_800
+DARK_TEXT_PRIMARY = ft.Colors.WHITE
+DARK_TEXT_SECONDARY = ft.Colors.GREY_400
+"""Farben für Dark-Modus."""
+
+# ══════════════════════════════════════════════════════════════════════
 # FENSTERGRÖSSEN
 # ══════════════════════════════════════════════════════════════════════
 
@@ -123,3 +133,29 @@ NO_SELECTION_LABEL: str = "— Keine Angabe —"
 
 ALLOWED_POST_STATUSES: list[str] = ["vermisst", "fundtier"]
 """Erlaubte Meldungsarten (von Post-Statuses in der DB)."""
+
+# ══════════════════════════════════════════════════════════════════════
+# UI-NACHRICHTEN-TYPEN (für Message-Displays)
+# ══════════════════════════════════════════════════════════════════════
+
+MESSAGE_TYPE_ERROR = "error"
+MESSAGE_TYPE_SUCCESS = "success"
+MESSAGE_TYPE_INFO = "info"
+"""Konstanten für Message-Typen in UI-Nachrichten."""
+
+# ══════════════════════════════════════════════════════════════════════
+# FARBEN FÜR UI-NACHRICHTEN
+# ══════════════════════════════════════════════════════════════════════
+
+MESSAGE_COLOR_ERROR = ft.Colors.RED
+MESSAGE_COLOR_SUCCESS = ft.Colors.GREEN
+MESSAGE_COLOR_INFO = ft.Colors.BLUE
+"""Farben für verschiedene Message-Typen."""
+
+# Mapping für einfachen Zugriff
+MESSAGE_COLOR_MAP: dict[str, str] = {
+    MESSAGE_TYPE_ERROR: MESSAGE_COLOR_ERROR,
+    MESSAGE_TYPE_SUCCESS: MESSAGE_COLOR_SUCCESS,
+    MESSAGE_TYPE_INFO: MESSAGE_COLOR_INFO,
+}
+"""Dictionary zur Farbzuordnung für Message-Typen."""

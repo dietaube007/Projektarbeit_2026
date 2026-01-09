@@ -31,8 +31,9 @@ from .filters import (
     create_sort_dropdown,
 )
 from .references_loader import load_and_populate_references, update_breeds_dropdown
-from .item_renderer import render_items, create_empty_state_card
+from .item_renderer import render_items
 from .ui_builder import build_discover_ui
+from ui.components import create_empty_state_card
 
 
 class DiscoverView:

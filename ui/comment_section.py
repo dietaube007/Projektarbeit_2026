@@ -1,6 +1,7 @@
 import flet as ft
-from datetime import datetime
 from typing import Optional
+
+from ui.helpers import format_time
 
 class CommentSection(ft.Container):
     """
@@ -224,7 +225,7 @@ class CommentSection(ft.Container):
                         color=ft.Colors.BLACK87
                     ),
                     ft.Text(
-                        self.format_time(comment.get('created_at')),
+                        format_time(comment.get('created_at')),
                         size=12 if not is_reply else 11,
                         color=ft.Colors.GREY_600
                     )
@@ -362,38 +363,6 @@ class CommentSection(ft.Container):
         except Exception as e:
             print(f"Fehler beim Löschen: {e}")
             self.show_snackbar("Fehler beim Löschen", ft.Colors.RED_400)
-    
-    def format_time(self, timestamp):
-        """Formatiert Zeitstempel zu lesbarem Format"""
-        if not timestamp:
-            return ""
-        
-        try:
-            # Supabase timestamps sind ISO format
-            created = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-            now = datetime.now(created.tzinfo) if created.tzinfo else datetime.now()
-            diff = now - created
-            
-            # Zeitdifferenz berechnen
-            if diff.days == 0:
-                if diff.seconds < 60:
-                    return "Gerade eben"
-                elif diff.seconds < 3600:
-                    minutes = diff.seconds // 60
-                    return f"vor {minutes} Min."
-                else:
-                    hours = diff.seconds // 3600
-                    return f"vor {hours} Std."
-            elif diff.days == 1:
-                return "Gestern"
-            elif diff.days < 7:
-                return f"vor {diff.days} Tagen"
-            else:
-                return created.strftime("%d.%m.%Y")
-                
-        except Exception as e:
-            print(f"Fehler beim Formatieren: {e}")
-            return ""
     
     def show_snackbar(self, message: str, bgcolor):
         """Zeigt eine Snackbar-Nachricht"""

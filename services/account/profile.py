@@ -1,12 +1,4 @@
-"""Profil-Service für Benutzerverwaltung.
-
-Dieses Modul verwaltet Profil-Daten:
-- Benutzerdaten laden (User-ID, Display-Name, E-Mail, Profilbild-URL)
-- Anzeigename aktualisieren
-- Benutzernamen für mehrere User-IDs laden
-
-Hinweis: Login/Logout → AuthService, Profilbild → ProfileImageService, Konto-Löschen → AccountDeletionService (in account_deletion.py)
-"""
+"""Service für Benutzer-Profil-Verwaltung."""
 
 from __future__ import annotations
 
@@ -69,7 +61,6 @@ class ProfileService:
 
     def update_display_name(self, new_name: str) -> Tuple[bool, str]:
         """Aktualisiert den Anzeigenamen des aktuellen Benutzers."""
-        # Validierung
         name_valid, name_error = validate_not_empty(new_name, "Anzeigename")
         if not name_valid:
             return False, name_error or "Anzeigename darf nicht leer sein."
@@ -109,7 +100,7 @@ class ProfileService:
 
         try:
             # user_profiles View abfragen
-            user_ids_list = list(set(user_ids))  # Deduplizieren und zu Liste konvertieren
+            user_ids_list = list(set(user_ids))
             if not user_ids_list:
                 return {}
             
@@ -120,7 +111,6 @@ class ProfileService:
                 .execute()
             )
 
-            # Mapping erstellen
             return {
                 row["id"]: row.get("display_name") or ""
                 for row in (result.data or [])

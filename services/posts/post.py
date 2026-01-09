@@ -116,7 +116,7 @@ class PostService:
             logger.error(f"Fehler beim Prüfen der Post-Existenz {post_id}: {e}", exc_info=True)
             return False
         
-        # Sammle Informationen für Rollback (falls nötig)
+        # Sammle Informationen für Rollback
         deleted_storage_files = []
         deleted_images = False
         deleted_colors = False
@@ -126,7 +126,7 @@ class PostService:
             images_res = self.sb.table("post_image").select("url").eq("post_id", post_id).execute()
             image_urls = [img["url"] for img in (images_res.data or [])]
             
-            # 2. Lösche Bilder aus Storage (kann fehlschlagen, ist aber nicht kritisch)
+            # 2. Lösche Bilder aus Storage 
             for url in image_urls:
                 try:
                     file_path = self._storage_service.extract_storage_path_from_url(url)
@@ -135,7 +135,6 @@ class PostService:
                         deleted_storage_files.append(file_path)
                         logger.debug(f"Storage-Datei gelöscht: {file_path}")
                 except Exception as e:  # noqa: BLE001
-                    # Storage-Löschung ist nicht kritisch, weitermachen
                     logger.warning(f"Konnte Storage-Datei nicht löschen ({url}): {e}")
             
             # 3. Lösche verknüpfte Daten aus der Datenbank
@@ -156,19 +155,16 @@ class PostService:
                 logger.error(f"Fehler beim Löschen der Post-Farben für Post {post_id}: {e}", exc_info=True)
                 raise
             
-            # 4. Lösche den Post selbst (zuletzt, da andere Tabellen davon abhängen)
+            # 4. Lösche den Post selbst 
             try:
                 self.sb.table("post").delete().eq("id", post_id).execute()
                 logger.info(f"Post {post_id} erfolgreich gelöscht")
                 return True
             except Exception as e:  # noqa: BLE001
                 logger.error(f"Fehler beim Löschen des Posts {post_id}: {e}", exc_info=True)
-                # Post konnte nicht gelöscht werden, aber abhängige Daten wurden bereits gelöscht
-                # Dies ist ein inkonsistenter Zustand, sollte aber selten vorkommen
                 raise
             
         except Exception as e:  # noqa: BLE001
-            # Bei Fehler: Logge den inkonsistenten Zustand
             logger.error(
                 f"Fehler beim Löschen von Post {post_id}. "
                 f"Status: Images={deleted_images}, Colors={deleted_colors}, "

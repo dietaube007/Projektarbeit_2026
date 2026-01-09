@@ -1,7 +1,4 @@
-"""Service für Favoriten-Verwaltung.
-
-Ermöglicht Benutzern das Hinzufügen, Entfernen und Abfragen von favorisierten Posts.
-"""
+"""Service für Favoriten-Verwaltung."""
 
 from __future__ import annotations
 
@@ -79,15 +76,6 @@ class FavoritesService:
             logger.error(f"Fehler beim Laden der Favoriten: {e}", exc_info=True)
             return []
 
-    def _get_current_user_id(self) -> Optional[str]:
-        """Hilfsmethode: Gibt die User-ID des aktuellen Benutzers zurück.
-        
-        Returns:
-            User-ID oder None wenn nicht eingeloggt
-        """
-        user = self._profile_service.get_current_user()
-        return user.id if user else None
-
     def add_favorite(self, post_id: str) -> bool:
         """Fügt einen Post zu den Favoriten hinzu.
         
@@ -101,7 +89,7 @@ class FavoritesService:
             logger.warning(f"Ungültige post_id beim Hinzufügen zu Favoriten: {post_id}")
             return False
         
-        user_id = self._get_current_user_id()
+        user_id = self._profile_service.get_user_id()
         if not user_id:
             return False
 
@@ -131,7 +119,7 @@ class FavoritesService:
             logger.warning(f"Ungültige post_id beim Entfernen aus Favoriten: {post_id}")
             return False
         
-        user_id = self._get_current_user_id()
+        user_id = self._profile_service.get_user_id()
         if not user_id:
             return False
 
@@ -161,7 +149,7 @@ class FavoritesService:
         if not post_id or not isinstance(post_id, str) or not post_id.strip():
             return False
         
-        user_id = self._get_current_user_id()
+        user_id = self._profile_service.get_user_id()
         if not user_id:
             return False
 

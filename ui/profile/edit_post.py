@@ -16,6 +16,7 @@ from ui.constants import (
     NO_SELECTION_LABEL,
     ALLOWED_POST_STATUSES,
 )
+from ui.helpers import format_date, parse_date, get_nested_id
 from utils.logging_config import get_logger
 from ui.components import show_success_dialog
 
@@ -132,7 +133,7 @@ class EditPostDialog:
 
         self.date_tf = ft.TextField(
             label="Datum﹡ (TT.MM.JJJJ)",
-            value=self._format_date(self.post.get("event_date", "")),
+            value=format_date(self.post.get("event_date", "")),
             width=180,
             border_radius=8,
             read_only=True,
@@ -173,27 +174,6 @@ class EditPostDialog:
     # ══════════════════════════════════════════════════════════════════════
     # HILFSMETHODEN
     # ══════════════════════════════════════════════════════════════════════
-
-    def _format_date(self, date_str: str) -> str:
-        """Konvertiert DB-Datum (YYYY-MM-DD) ins Anzeigeformat (TT.MM.JJJJ)."""
-        if not date_str:
-            return ""
-        try:
-            return datetime.strptime(date_str[:10], EditPostDialog.DATE_FORMAT_DB).strftime(DATE_FORMAT)
-        except ValueError:
-            return ""
-
-    def _parse_date(self, date_str: str) -> Optional[datetime]:
-        """Parst ein Datum im Anzeigeformat. Gibt None bei Fehler zurück."""
-        try:
-            return datetime.strptime(date_str.strip(), DATE_FORMAT).date()
-        except ValueError:
-            return None
-
-    def _get_nested_id(self, key: str) -> Optional[int]:
-        """Extrahiert die ID aus einem verschachtelten Dict-Feld."""
-        value = self.post.get(key)
-        return value.get("id") if isinstance(value, dict) else None
 
     def _get_dropdown_id(self, dropdown: ft.Dropdown) -> Optional[int]:
         """Extrahiert die ID aus einem Dropdown, None bei 'Keine Angabe'."""
@@ -286,7 +266,7 @@ class EditPostDialog:
             for s in self.post_statuses
         ]
 
-        current_id = self._get_nested_id("post_status")
+        current_id = get_nested_id(self.post, "post_status")
         if current_id:
             self.meldungsart.selected = {str(current_id)}
         elif self.post_statuses:
@@ -303,7 +283,7 @@ class EditPostDialog:
             ft.dropdown.Option(str(s["id"]), s["name"])
             for s in self.species_list
         ]
-        current_species = self._get_nested_id("species")
+        current_species = get_nested_id(self.post, "species")
         if current_species:
             self.species_dd.value = str(current_species)
         elif self.species_list:
@@ -311,7 +291,7 @@ class EditPostDialog:
 
         # Rasse
         self._update_breeds()
-        current_breed = self._get_nested_id("breed")
+        current_breed = get_nested_id(self.post, "breed")
         if current_breed:
             self.breed_dd.value = str(current_breed)
 
@@ -322,7 +302,7 @@ class EditPostDialog:
             ft.dropdown.Option(str(s["id"]), s["name"])
             for s in self.sex_list
         ]
-        current_sex = self._get_nested_id("sex")
+        current_sex = get_nested_id(self.post, "sex")
         self.sex_dd.value = str(current_sex) if current_sex else NO_SELECTION_VALUE
 
     def _load_colors(self):
@@ -373,7 +353,7 @@ class EditPostDialog:
         try:
             # Status
             current_status = int(list(self.meldungsart.selected)[0]) if self.meldungsart.selected else None
-            if current_status != self._get_nested_id("post_status"):
+            if current_status != get_nested_id(self.post, "post_status"):
                 return True
 
             # Textfelder
@@ -387,15 +367,15 @@ class EditPostDialog:
                     return True
 
             # Datum
-            if self.date_tf.value.strip() != self._format_date(self.post.get("event_date", "")):
+            if self.date_tf.value.strip() != format_date(self.post.get("event_date", "")):
                 return True
 
             # Dropdowns
-            if int(self.species_dd.value) != self._get_nested_id("species"):
+            if int(self.species_dd.value) != get_nested_id(self.post, "species"):
                 return True
-            if self._get_dropdown_id(self.breed_dd) != self._get_nested_id("breed"):
+            if self._get_dropdown_id(self.breed_dd) != get_nested_id(self.post, "breed"):
                 return True
-            if self._get_dropdown_id(self.sex_dd) != self._get_nested_id("sex"):
+            if self._get_dropdown_id(self.sex_dd) != get_nested_id(self.post, "sex"):
                 return True
 
             # Farben
@@ -426,7 +406,7 @@ class EditPostDialog:
             return
 
         # Datum parsen
-        event_date = self._parse_date(self.date_tf.value)
+        event_date = parse_date(self.date_tf.value)
         if not event_date:
             self._show_error("Ungültiges Datumsformat.\nBitte verwende: TT.MM.YYYY")
             return

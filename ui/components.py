@@ -8,6 +8,7 @@ import flet as ft
 from typing import Callable, Optional, Dict, Any
 
 from ui.constants import STATUS_COLORS, SPECIES_COLORS
+from ui.theme import soft_card, chip
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -142,16 +143,47 @@ def species_badge(text: str, bgcolor: Optional[str] = None) -> ft.Container:
     )
 
 
+def badge_for_typ(typ: str) -> ft.Control:
+    """Erstellt ein Badge für den Meldungstyp (Vermisst/Fundtier).
+    
+    Args:
+        typ: Meldungstyp (z.B. "Vermisst", "Fundtier")
+    
+    Returns:
+        Control-Widget mit Badge für den Typ (verwendet chip() für konsistentes Design)
+    """
+    typ_lower = (typ or "").lower().strip()
+    color = STATUS_COLORS.get(typ_lower, ft.Colors.GREY_700)
+    label = typ.capitalize() if typ else "Unbekannt"
+    return chip(label, color)
+
+
+def badge_for_species(species: str) -> ft.Control:
+    """Erstellt ein Badge für die Tierart.
+    
+    Args:
+        species: Tierart (z.B. "Hund", "Katze")
+    
+    Returns:
+        Control-Widget mit Badge für die Tierart (verwendet chip() für konsistentes Design)
+    """
+    species_lower = (species or "").lower().strip()
+    color = SPECIES_COLORS.get(species_lower, ft.Colors.GREY_500)
+    label = species.capitalize() if species else "Unbekannt"
+    return chip(label, color)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # PLATZHALTER
 # ══════════════════════════════════════════════════════════════════════
 
-def image_placeholder(height: int = 160, icon_size: int = 48) -> ft.Container:
+def image_placeholder(height: int = 160, icon_size: int = 48, expand: bool = False) -> ft.Container:
     """Erstellt einen Bild-Platzhalter.
     
     Args:
         height: Höhe des Platzhalters (Standard: 160)
         icon_size: Größe des Platzhalter-Icons (Standard: 48)
+        expand: Ob der Container expandieren soll (Standard: False)
     
     Returns:
         Container mit Platzhalter-Icon
@@ -162,6 +194,7 @@ def image_placeholder(height: int = 160, icon_size: int = 48) -> ft.Container:
         alignment=ft.alignment.center,
         bgcolor=ft.Colors.GREY_200,
         border_radius=12,
+        expand=expand,
     )
 
 
@@ -389,3 +422,106 @@ def loading_indicator(text: str = "Lädt...") -> ft.Row:
         ft.ProgressRing(width=24, height=24),
         ft.Text(text),
     ], spacing=12)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# META-KOMPONENTEN
+# ══════════════════════════════════════════════════════════════════════
+
+def meta_row(icon: str, text: str) -> ft.Control:
+    """Erstellt eine Zeile mit Icon und Text für Metadaten.
+    
+    Args:
+        icon: Icon-Name (z.B. ft.Icons.LOCATION_ON)
+        text: Anzuzeigender Text
+    
+    Returns:
+        Row-Widget mit Icon und Text
+    """
+    return ft.Row(
+        [
+            ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(text, color=ft.Colors.ON_SURFACE_VARIANT)
+        ],
+        spacing=6,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# CHIPS
+# ══════════════════════════════════════════════════════════════════════
+
+def filter_chip(text: str, color: str = ft.Colors.BLUE_100) -> ft.Container:
+    """Erstellt einen Filter-Chip.
+    
+    Args:
+        text: Text des Chips
+        color: Hintergrundfarbe (Standard: BLUE_100)
+    
+    Returns:
+        Container mit Filter-Chip
+    """
+    return ft.Container(
+        content=ft.Text(text, size=12, color=ft.Colors.GREY_800),
+        bgcolor=color,
+        border_radius=12,
+        padding=ft.padding.symmetric(horizontal=10, vertical=4),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# EMPTY STATES (als Cards)
+# ══════════════════════════════════════════════════════════════════════
+
+def create_empty_state_card(message: str = "Noch keine Meldungen", subtitle: str = "") -> ft.Container:
+    """Erstellt eine Empty-State-Karte.
+
+    Args:
+        message: Haupttext
+        subtitle: Untertitel
+
+    Returns:
+        Container mit Empty-State (verwendet soft_card für konsistentes Design)
+    """
+    return soft_card(
+        ft.Column(
+            [
+                ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
+                ft.Text(message, weight=ft.FontWeight.W_600),
+                ft.Text(subtitle, color=ft.Colors.GREY_700) if subtitle else ft.Container(),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=8,
+        ),
+        elev=1,
+        pad=24,
+    )
+
+
+def create_no_results_card(on_reset: Optional[Callable] = None) -> ft.Container:
+    """Erstellt eine "Keine Ergebnisse"-Karte.
+
+    Args:
+        on_reset: Optional Callback für Reset-Button
+
+    Returns:
+        Container mit No-Results-State (verwendet soft_card für konsistentes Design)
+    """
+    controls = [
+        ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
+        ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
+        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
+    ]
+    
+    if on_reset:
+        controls.append(ft.TextButton("Filter zurücksetzen", on_click=on_reset))
+
+    return soft_card(
+        ft.Column(
+            controls,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=8,
+        ),
+        elev=1,
+        pad=24,
+    )

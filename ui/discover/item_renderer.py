@@ -5,61 +5,10 @@ from __future__ import annotations
 from typing import List, Dict, Any, Callable, Optional
 import flet as ft
 
-from ui.theme import soft_card
 from .cards import build_small_card, build_big_card
-
-
-def create_empty_state_card(message: str = "Noch keine Meldungen", subtitle: str = "") -> ft.Container:
-    """Erstellt eine Empty-State-Karte.
-
-    Args:
-        message: Haupttext
-        subtitle: Untertitel
-
-    Returns:
-        Container mit Empty-State
-    """
-    return soft_card(
-        ft.Column(
-            [
-                ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
-                ft.Text(message, weight=ft.FontWeight.W_600),
-                ft.Text(subtitle, color=ft.Colors.GREY_700) if subtitle else ft.Container(),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=8,
-        ),
-        elev=1,
-        pad=24,
-    )
-
-
-def create_no_results_card(on_reset: Optional[Callable] = None) -> ft.Container:
-    """Erstellt eine "Keine Ergebnisse"-Karte.
-
-    Args:
-        on_reset: Optional Callback für Reset-Button
-
-    Returns:
-        Container mit No-Results-State
-    """
-    controls = [
-        ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-        ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
-    ]
-    
-    if on_reset:
-        controls.append(ft.TextButton("Filter zurücksetzen", on_click=on_reset))
-
-    return soft_card(
-        ft.Column(
-            controls,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=8,
-        ),
-        elev=1,
-        pad=24,
+from ui.components import (
+    create_empty_state_card,
+    create_no_results_card,
     )
 
 

@@ -1,6 +1,7 @@
 """
-ui/auth/forms.py
-Formular-Komponenten für Login und Registrierung.
+Gemeinsame UI-Komponenten für Login, Registrierung und Auth-Bereich.
+
+Enthält statische Komponenten-Builder-Funktionen.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from ui.constants import (
     CARD_COLOR,
     TEXT_SECONDARY,
     BORDER_COLOR,
+    DARK_CARD,
 )
 from utils.constants import MAX_DISPLAY_NAME_LENGTH
 
@@ -177,25 +179,8 @@ def create_logout_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Text
         "Abmelden",
         icon=ft.Icons.LOGOUT,
         on_click=on_click,
-        style=ft.ButtonStyle(color=ft.Colors.RED_400),
+        style=ft.ButtonStyle(color=ft.Colors.RED_400),  # Logout-Button rot bleiben
     )
-
-
-def create_theme_toggle(is_dark: bool, on_click: Callable) -> ft.IconButton:
-    """Erstellt den Theme-Toggle-Button."""
-    tooltip = "Zu hellem Modus wechseln" if is_dark else "Zu dunklem Modus wechseln"
-    btn = ft.IconButton(
-        icon=ft.Icons.DARK_MODE if is_dark else ft.Icons.LIGHT_MODE,
-        on_click=on_click,
-        tooltip=tooltip,
-        icon_color=ft.Colors.WHITE if is_dark else TEXT_SECONDARY,
-    )
-    # Optionales Screenreader-Label nur setzen, wenn unterstützt
-    try:
-        btn.semantic_label = tooltip
-    except Exception:
-        pass
-    return btn
 
 
 def create_registration_modal(
@@ -247,7 +232,7 @@ def create_registration_modal(
         ], tight=True, spacing=12),
         padding=24,
         border_radius=16,
-        bgcolor=ft.Colors.GREY_800 if is_dark else CARD_COLOR,
+        bgcolor=DARK_CARD if is_dark else CARD_COLOR,
         width=400,
         shadow=ft.BoxShadow(
             blur_radius=20,
@@ -372,7 +357,7 @@ def create_login_card(
         content=ft.Column(card_content, tight=True, spacing=0),
         padding=40,
         border_radius=20,
-        bgcolor=ft.Colors.GREY_800 if is_dark else CARD_COLOR,
+        bgcolor=DARK_CARD if is_dark else CARD_COLOR,
         width=420,
         shadow=ft.BoxShadow(
             blur_radius=40,
