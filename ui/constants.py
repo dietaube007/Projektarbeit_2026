@@ -68,7 +68,7 @@ DIALOG_IMAGE_HEIGHT = 280
 # TEXT-LÄNGEN-LIMITS
 # ══════════════════════════════════════════════════════════════════════
 
-MAX_HEADLINE_LENGTH = 200
+MAX_HEADLINE_LENGTH = 50
 """Maximale Länge für Post-Überschrift/Name."""
 
 MAX_DESCRIPTION_LENGTH = 2000

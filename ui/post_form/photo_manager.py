@@ -23,11 +23,7 @@ from ui.post_form.constants import (
     MAX_IMAGE_SIZE,
     IMAGE_QUALITY,
     STORAGE_BUCKET,
-    UPLOAD_DIR,
 )
-from utils.logging_config import get_logger
-
-logger = get_logger(__name__)
 
 
 def compress_image(file_path: str) -> Tuple[bytes, str]:
@@ -78,24 +74,33 @@ def upload_to_storage(
         Alle Werte sind None bei Fehler
     """
     try:
+        print(f"[DEBUG upload_to_storage] file_path: {file_path}")
+        print(f"[DEBUG upload_to_storage] Datei existiert: {os.path.exists(file_path)}")
+        
         # Bild komprimieren
+        print(f"[DEBUG upload_to_storage] Starte Komprimierung...")
         compressed_bytes, file_ext = compress_image(file_path)
+        print(f"[DEBUG upload_to_storage] Komprimierung OK, Größe: {len(compressed_bytes)} bytes")
         image_data = base64.b64encode(compressed_bytes).decode()
         
         # Eindeutigen Dateinamen generieren
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         original_name = original_filename.rsplit(".", 1)[0]
         storage_filename = f"{timestamp}_{original_name}.jpg"
+        print(f"[DEBUG upload_to_storage] Storage-Dateiname: {storage_filename}")
         
         # Zu Supabase Storage hochladen
+        print(f"[DEBUG upload_to_storage] Starte Supabase Upload zu Bucket '{STORAGE_BUCKET}'...")
         sb.storage.from_(STORAGE_BUCKET).upload(
             path=storage_filename,
             file=compressed_bytes,
             file_options={"content-type": "image/jpeg"}
         )
+        print(f"[DEBUG upload_to_storage] Supabase Upload erfolgreich!")
         
         # Öffentliche URL abrufen
         public_url = sb.storage.from_(STORAGE_BUCKET).get_public_url(storage_filename)
+        print(f"[DEBUG upload_to_storage] Public URL: {public_url}")
         
         return {
             "path": storage_filename,
@@ -105,7 +110,7 @@ def upload_to_storage(
         }
         
     except Exception as ex:
-        logger.error(f"Fehler beim Upload von {original_filename}: {ex}", exc_info=True)
+        print(f"Fehler beim Upload: {ex}")
         return {"path": None, "base64": None, "url": None, "name": None}
 
 
@@ -149,12 +154,5 @@ def cleanup_local_file(file_path: str) -> bool:
 
 
 def get_upload_path(filename: str) -> str:
-    """Erstellt den lokalen Upload-Pfad für eine Datei.
-    
-    Args:
-        filename: Dateiname
-    
-    Returns:
-        Vollständiger Pfad im Upload-Verzeichnis
-    """
+    """Erstellt den lokalen Upload-Pfad für eine Datei."""
     return f"{UPLOAD_DIR}/{filename}"

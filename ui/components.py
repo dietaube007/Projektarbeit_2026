@@ -169,22 +169,15 @@ def image_placeholder(height: int = 160, icon_size: int = 48) -> ft.Container:
 # BANNER
 # ══════════════════════════════════════════════════════════════════════
 
-def login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
-    """Erstellt ein Login-Banner für nicht eingeloggte Benutzer.
-    
-    Args:
-        on_login_click: Callback-Funktion für Login-Button-Klick
-    
-    Returns:
-        Container mit Login-Banner
-    """
+def login_banner(on_login_click: Callable) -> ft.Container:
+    """Erstellt ein Login-Banner für nicht eingeloggte Benutzer."""
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700, size=20),
+                ft.Icon(ft.Icons.INFO_OUTLINE, color=icon_color, size=20),
                 ft.Text(
                     "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
-                    color=ft.Colors.BLUE_900,
+                    color=text_color,
                     size=14,
                     expand=True,
                 ),
@@ -192,15 +185,16 @@ def login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Contai
                     "Anmelden",
                     icon=ft.Icons.LOGIN,
                     on_click=on_login_click,
+                    style=ft.ButtonStyle(color=link_color),
                 ),
             ],
             spacing=12,
             alignment=ft.MainAxisAlignment.START,
         ),
         padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        bgcolor=ft.Colors.BLUE_50,
+        bgcolor=bg_color,
         border_radius=10,
-        border=ft.border.all(1, ft.Colors.BLUE_200),
+        border=ft.border.all(1, border_color),
     )
 
 

@@ -34,6 +34,7 @@ from .forms import (
 )
 from ui.components import show_success_dialog, show_error_dialog
 from utils.validators import validate_email
+from services.auth import AuthService, AuthResult
 
 
 class AuthView:
@@ -49,6 +50,7 @@ class AuthView:
         """Initialisiert die AuthView."""
         self.page = page
         self.sb = sb
+        self.auth_service = AuthService(sb)
         self.on_auth_success = on_auth_success
         self.on_continue_without_account = on_continue_without_account
         
@@ -85,23 +87,16 @@ class AuthView:
             self._show_login_message(error, ft.Colors.RED)
             return
         
-        try:
-            self._show_login_message("🔐 Anmeldung läuft...", ft.Colors.BLUE)
-            
-            res = self.sb.auth.sign_in_with_password({
-                "email": email, 
-                "password": password
-            })
-            
-            if res.user:
-                self._show_login_message("✅ Erfolgreich!", ft.Colors.GREEN)
-                if self.on_auth_success:
-                    self.on_auth_success()
-            else:
-                self._show_login_message("❌ Anmeldung fehlgeschlagen.", ft.Colors.RED)
-                
-        except Exception as ex:
-            self._handle_login_error(ex)
+        self._show_login_message("Anmeldung läuft...", ft.Colors.BLUE)
+
+        result: AuthResult = self.auth_service.login(email, password)
+
+        if result.success:
+            self._show_login_message("Erfolgreich!", ft.Colors.GREEN)
+            if self.on_auth_success:
+                self.on_auth_success()
+        else:
+            self._show_login_message(result.message or "Anmeldung fehlgeschlagen.", ft.Colors.RED)
 
     async def _register(self):
         """Führt die Registrierung durch."""
@@ -112,7 +107,7 @@ class AuthView:
         
         # Passwörter vergleichen
         if password != password_confirm:
-            self._show_reg_message("❌ Passwörter stimmen nicht überein.", ft.Colors.RED)
+            self._show_reg_message("Passwörter stimmen nicht überein.", ft.Colors.RED)
             return
         
         # Validierung
@@ -121,76 +116,30 @@ class AuthView:
             self._show_reg_message(error, ft.Colors.RED)
             return
         
-        try:
-            self._show_reg_message("📝 Registrierung läuft...", ft.Colors.BLUE)
-            
-            # Redirect-URL für E-Mail-Bestätigung bestimmen
-            import os
-            if os.getenv("FLY_APP_NAME"):
-                # Produktion
-                redirect_url = "https://petbuddy.fly.dev/login"
+        self._show_reg_message("Registrierung läuft...", ft.Colors.BLUE)
+
+        result: AuthResult = self.auth_service.register(
+            email=email,
+            password=password,
+            username=username,
+        )
+
+        if result.success:
+            if result.code == "confirm_email":
+                self._show_success_dialog(
+                    result.message
+                    or "Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihr Postfach."
+                )
             else:
-                # Lokal
-                redirect_url = "http://localhost:8550/login"
-            
-            res = self.sb.auth.sign_up({
-                "email": email, 
-                "password": password,
-                "options": {
-                    "data": {
-                        "display_name": username
-                    },
-                    "email_redirect_to": redirect_url
-                }
-            })
-            
-            if res.user:
-                # Prüfen ob E-Mail bereits registriert ist
-                if not res.user.identities or len(res.user.identities) == 0:
-                    self._show_reg_message("❌ E-Mail bereits registriert. Bitte melden Sie sich an!", ft.Colors.RED)
-                    return
-                
-                # Prüfen ob E-Mail-Bestätigung erforderlich ist
-                if res.user.confirmed_at is None:
-                    self._show_success_dialog(
-                        "Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihr Postfach."
-                    )
-                    return
-            else:
-                self._show_reg_message("❌ Fehler!", ft.Colors.RED)
-                
-        except Exception as ex:
-            self._handle_register_error(ex)
+                self._show_success_dialog("Registrierung erfolgreich.")
+        else:
+            self._show_reg_message(result.message or "Fehler!", ft.Colors.RED)
 
     async def _logout(self):
         """Meldet den Benutzer ab."""
-        try:
-            self.sb.auth.sign_out()
-            self._show_login_message("✅ Abgemeldet.", ft.Colors.GREEN)
-        except Exception:
-            pass
-
-    # ─────────────────────────────────────────────────────────────
-    # Error Handler
-    # ─────────────────────────────────────────────────────────────
-
-    def _handle_login_error(self, ex: Exception):
-        """Behandelt Login-Fehler."""
-        error_str = str(ex).lower()
-        if "invalid login credentials" in error_str or "invalid credentials" in error_str:
-            self._show_login_message("❌ E-Mail oder Passwort falsch.", ft.Colors.RED)
-        elif "email not confirmed" in error_str:
-            self._show_login_message("❌ Bitte bestätigen Sie zuerst Ihre E-Mail.", ft.Colors.ORANGE)
-        else:
-            self._show_login_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
-
-    def _handle_register_error(self, ex: Exception):
-        """Behandelt Registrierungs-Fehler."""
-        error_str = str(ex).lower()
-        if "already registered" in error_str:
-            self._show_reg_message("❌ E-Mail bereits registriert.", ft.Colors.RED)
-        else:
-            self._show_reg_message(f"❌ Fehler: {str(ex)[:50]}", ft.Colors.RED)
+        result = self.auth_service.logout()
+        if result.success:
+            self._show_login_message(result.message or "Abgemeldet.", ft.Colors.GREEN)
 
     # ─────────────────────────────────────────────────────────────
     # Passwort vergessen
@@ -225,29 +174,16 @@ class AuthView:
                 self.page.update()
                 return
 
-            # E-Mail senden mit Redirect-URL
-            try:
-                # Ermittle die Redirect-URL basierend auf der Umgebung
-                if os.getenv("FLY_APP_NAME"):
-                    # Produktion
-                    redirect_url = "https://petbuddy.fly.dev/"
-                else:
-                    # Lokal
-                    redirect_url = "http://localhost:8550/"
-
-                self.sb.auth.reset_password_email(
-                    email.lower(),
-                    options={"redirect_to": redirect_url}
-                )
+            result = self.auth_service.send_reset_password_email(email)
+            if result.success:
                 self.page.close(dialog)
                 show_success_dialog(
                     self.page,
                     "E-Mail gesendet",
-                    f"Eine E-Mail wurde an {email} gesendet.\n\n"
-                    "Bitte prüfen Sie auch Ihren Spam-Ordner."
+                    result.message,
                 )
-            except Exception as ex:
-                error_text.value = f"Fehler: {str(ex)[:50]}"
+            else:
+                error_text.value = result.message or "Fehler beim Senden der E-Mail."
                 error_text.visible = True
                 self.page.update()
 
@@ -296,8 +232,13 @@ class AuthView:
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         
-        # Icons aktualisieren
-        self._theme_icon.icon = ft.Icons.DARK_MODE if is_dark else ft.Icons.LIGHT_MODE
+        # Icon/Tooltip zeigen die Aktion (Gegenmodus)
+        self._theme_icon.icon = ft.Icons.LIGHT_MODE if is_dark else ft.Icons.DARK_MODE
+        self._theme_icon.tooltip = "Zu Hellmodus wechseln" if is_dark else "Zu Dunkelmodus wechseln"
+        try:
+            self._theme_icon.semantic_label = self._theme_icon.tooltip
+        except Exception:
+            pass
         self._theme_icon.icon_color = ft.Colors.WHITE if is_dark else TEXT_SECONDARY
         
         # Farben aktualisieren
@@ -311,7 +252,7 @@ class AuthView:
         self._subtitle_text.color = ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY
         
         self.page.update()
-
+    
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
         # Login-Felder deaktivieren damit Tab nicht dorthin springt
@@ -471,7 +412,7 @@ class AuthView:
             color=ft.Colors.WHITE if is_dark else TEXT_PRIMARY,
         )
         self._subtitle_text = ft.Text(
-            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten 🐾",
+            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
             size=14,
             color=ft.Colors.GREY_400 if is_dark else TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,
@@ -495,11 +436,11 @@ class AuthView:
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Container(expand=True),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
-                # Theme-Toggle oben rechts
+                # Theme-Toggle oben rechts (als Positioned-Container im Stack)
                 ft.Container(
-                    content=self._theme_icon,
-                    alignment=ft.alignment.top_right,
-                    padding=ft.padding.only(top=16, right=16),
+                    content=ft.Row([self._theme_icon], spacing=8),
+                    top=16,
+                    right=16,
                 ),
             ]),
             bgcolor=ft.Colors.GREY_900 if is_dark else BACKGROUND_COLOR,

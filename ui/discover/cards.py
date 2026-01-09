@@ -228,7 +228,8 @@ def build_big_card(
         [
             meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
             meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-            meta_row(ft.Icons.LABEL, data["status"]),
+            meta_row(ft.Icons.PERSON, data["username"]),
+            meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
         ],
         spacing=16,
         wrap=True,
@@ -336,7 +337,8 @@ def build_big_card(
 def show_detail_dialog(
     page: ft.Page,
     item: Dict[str, Any],
-    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None
+    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
+    on_favorite_click: Optional[Callable[[Dict[str, Any], ft.Control], None]] = None
 ) -> None:
     """Zeigt den Detail-Dialog für eine Meldung.
     
@@ -344,6 +346,7 @@ def show_detail_dialog(
         page: Flet Page-Instanz
         item: Post-Dictionary mit allen Daten
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
+        on_favorite_click: Optionaler Callback (item, control) für Favoriten-Toggle
     """
     data = extract_item_data(item)
 
@@ -353,8 +356,28 @@ def show_detail_dialog(
         else image_placeholder(DIALOG_IMAGE_HEIGHT, icon_size=72)
     )
 
+    # Favoriten-Button
+    is_fav = item.get("is_favorite", False)
+    favorite_btn = None
+    if on_favorite_click:
+        favorite_btn = ft.IconButton(
+            icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
+            icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
+            tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
+            on_click=lambda e, it=item: on_favorite_click(it, e.control),
+        )
+
+    # Titel mit Favoriten-Button
+    title_row = ft.Row(
+        [
+            ft.Text(data["title"], expand=True),
+            favorite_btn,
+        ],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+    ) if favorite_btn else ft.Text(data["title"])
+
     dlg = ft.AlertDialog(
-        title=ft.Text(data["title"]),
+        title=title_row,
         content=ft.Column(
             [
                 ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
@@ -363,7 +386,8 @@ def show_detail_dialog(
                 ft.Container(height=8),
                 meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
                 meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-                meta_row(ft.Icons.LABEL, data["status"]),
+                meta_row(ft.Icons.PERSON, data["username"]),
+                meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
             ],
             tight=True,
             spacing=8,

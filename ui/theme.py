@@ -43,6 +43,7 @@ class ThemeManager:
     Verantwortlich für:
     - Erstellen und Anwenden von Light/Dark Themes
     - Theme-Toggle-Funktionalität
+    - Sprach-Umschalter
     - Material 3 Design-Konfiguration
     """
     
@@ -120,6 +121,11 @@ class ThemeManager:
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         return ft.Icons.LIGHT_MODE if is_dark else ft.Icons.DARK_MODE
     
+    def _get_current_tooltip(self) -> str:
+        """Gibt den passenden Tooltip/Aria-Label-Text für die Toggle-Aktion zurück."""
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        return "Zu Hellmodus wechseln" if is_dark else "Zu Dunkelmodus wechseln"
+    
     def _toggle_theme(self, _) -> None:
         """Toggled zwischen Light und Dark Theme."""
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
@@ -127,16 +133,29 @@ class ThemeManager:
         
         if self._toggle_button:
             self._toggle_button.icon = self._get_current_icon()
+            tip = self._get_current_tooltip()
+            self._toggle_button.tooltip = tip
+            try:
+                self._toggle_button.semantic_label = tip
+            except Exception:
+                pass
         self.page.update()
     
     def create_toggle_button(self) -> ft.IconButton:
         """Erstellt einen Icon-Button zum Wechseln zwischen Hell/Dunkel-Modus."""
+        tip = self._get_current_tooltip()
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),
-            tooltip="Theme wechseln",
+            tooltip=tip,
             on_click=self._toggle_theme
         )
+        # Optional: Screenreader-Label nur setzen, wenn unterstützt
+        try:
+            self._toggle_button.semantic_label = tip
+        except Exception:
+            pass
         return self._toggle_button
+    
 
 
 # ════════════════════════════════════════════════════════════════════

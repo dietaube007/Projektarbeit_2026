@@ -1,4 +1,4 @@
-# 🐾 PetBuddy
+# PetBuddy
 
 Eine moderne Web-Anwendung zur Vermittlung von vermissten und gefundenen Tieren.
 
@@ -8,7 +8,7 @@ Eine moderne Web-Anwendung zur Vermittlung von vermissten und gefundenen Tieren.
 
 ---
 
-## 🚀 Schnellstart
+## Schnellstart
 
 ```bash
 # 1. Dependencies installieren
@@ -26,7 +26,7 @@ Die Anwendung öffnet sich automatisch im Browser unter `http://localhost:8550`
 
 ---
 
-## 📚 Dokumentation
+## Dokumentation
 
 **Vollständige Dokumentation:** Siehe [documentation/](documentation/) für die ausführliche MkDocs-Dokumentation.
 
@@ -41,7 +41,7 @@ Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 
 ---
 
-## 🛠️ Technologie-Stack
+## Technologie-Stack
 
 - **Flet** - Python UI-Framework
 - **Supabase** - Backend (PostgreSQL, Auth, Storage)
@@ -50,7 +50,7 @@ Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 
 ---
 
-## 📁 Projektstruktur
+## Projektstruktur
 
 ```
 ├── app/              # Hauptanwendungslogik
@@ -63,7 +63,7 @@ Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 
 ---
 
-## 📖 Weitere Informationen
+## Weitere Informationen
 
 - **Installation & Setup**: Siehe [documentation/docs/entwickler/installation.md](documentation/docs/entwickler/installation.md)
 - **Architektur**: Siehe [documentation/docs/entwickler/architektur.md](documentation/docs/entwickler/architektur.md)

@@ -224,7 +224,7 @@ def render_favorites_list(
                 [
                     ft.Icon(ft.Icons.FAVORITE_BORDER, size=48, color=ft.Colors.GREY_400),
                     ft.Text("Sie haben noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600),
-                    ft.Text("Klicken Sie auf ❤️ bei einer Meldung, um sie hier zu speichern.",
+                    ft.Text("Klicken Sie auf das Herz-Symbol bei einer Meldung, um sie hier zu speichern.",
                            size=12, color=ft.Colors.GREY_500),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,

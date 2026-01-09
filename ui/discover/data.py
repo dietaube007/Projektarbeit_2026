@@ -32,11 +32,12 @@ def build_query(
     # Basis-Select mit allen benötigten Relationen
     # Hinweis: Favoriten werden separat geladen, da Supabase PostgREST
     # keine direkten Joins auf Tabellen ohne Foreign Key unterstützt
+    # user_profiles:user_id lädt display_name aus der user_profiles View
     query = (
         sb.table("post")
         .select(
             """
-            id, headline, description, location_text, event_date, created_at, is_active,
+            id, headline, description, location_text, event_date, created_at, is_active, user_id,
             post_status(id, name),
             species(id, name),
             breed(id, name),
@@ -98,12 +99,15 @@ def build_query(
     # Filter: Rasse - mit Validierung
     filter_rasse = filters.get("rasse")
     if filter_rasse and filter_rasse != "alle":
-        try:
-            rasse_id = int(filter_rasse)
-            if rasse_id > 0:
-                query = query.eq("breed_id", rasse_id)
-        except (ValueError, TypeError):
-            logger.warning(f"Ungültiger Filter-Rasse: {filter_rasse}")
+        if filter_rasse == "keine_angabe":
+            query = query.is_("breed_id", "null")
+        else:
+            try:
+                rasse_id = int(filter_rasse)
+                if rasse_id > 0:
+                    query = query.eq("breed_id", rasse_id)
+            except (ValueError, TypeError):
+                logger.warning(f"Ungültiger Filter-Rasse: {filter_rasse}")
     
     return query
 
@@ -189,21 +193,22 @@ def filter_by_colors(items: List[Dict[str, Any]], selected_color_ids: Set[int]) 
         selected_color_ids: Set mit IDs der ausgewählten Farben
 
     Returns:
-        Gefilterte Liste von Posts mit mindestens einer der Farben
+        Gefilterte Liste von Posts die ALLE ausgewählten Farben haben
     """
     if not selected_color_ids:
         return items
-    
-    def has_color(it: dict) -> bool:
+
+    def has_all_colors(it: dict) -> bool:
         pcs = it.get("post_color") or []
         ids = set()
         for pc in pcs:
             c = pc.get("color") if isinstance(pc, dict) else None
             if isinstance(c, dict) and c.get("id") is not None:
                 ids.add(c["id"])
-        return bool(ids.intersection(selected_color_ids))
-    
-    return [it for it in items if has_color(it)]
+        # Prüfen ob ALLE ausgewählten Farben im Post vorhanden sind
+        return selected_color_ids.issubset(ids)
+
+    return [it for it in items if has_all_colors(it)]
 
 
 def get_favorite_ids(sb, user_id: Optional[str]) -> Set[int]:
@@ -248,6 +253,70 @@ def mark_favorites(items: List[Dict[str, Any]], favorite_ids: Set[int]) -> List[
     """
     for it in items:
         it["is_favorite"] = it.get("id") in favorite_ids
+    return items
+
+
+def get_user_display_names(sb, user_ids: Set[str]) -> Dict[str, str]:
+    """Lädt die Anzeigenamen für eine Liste von User-IDs.
+
+    Args:
+        sb: Supabase Client-Instanz
+        user_ids: Set mit User-IDs
+
+    Returns:
+        Dictionary mit user_id -> display_name Mapping
+    """
+    if not user_ids:
+        return {}
+
+    try:
+        # user_profiles View abfragen
+        user_ids_list = list(user_ids)
+        result = (
+            sb.table("user_profiles")
+            .select("id, display_name")
+            .in_("id", user_ids_list)
+            .execute()
+        )
+
+        # Mapping erstellen
+        return {
+            row["id"]: row.get("display_name") or ""
+            for row in (result.data or [])
+        }
+    except Exception as ex:
+        logger.error(f"Fehler beim Laden der Benutzernamen: {ex}", exc_info=True)
+        return {}
+
+
+def enrich_posts_with_usernames(sb, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Reichert Posts mit Benutzernamen an.
+
+    Args:
+        sb: Supabase Client-Instanz
+        items: Liste von Post-Dictionaries
+
+    Returns:
+        Liste von Posts mit user_display_name Feld
+    """
+    # Alle eindeutigen user_ids sammeln
+    user_ids = {
+        item.get("user_id")
+        for item in items
+        if item.get("user_id")
+    }
+
+    # Benutzernamen laden
+    display_names = get_user_display_names(sb, user_ids)
+
+    # Posts anreichern
+    for item in items:
+        user_id = item.get("user_id")
+        if user_id and user_id in display_names:
+            item["user_display_name"] = display_names[user_id]
+        else:
+            item["user_display_name"] = ""
+
     return items
 
 

@@ -8,7 +8,7 @@ import flet as ft
 
 from ui.theme import soft_card
 from ui.components import show_error_dialog, show_success_dialog
-from services.saved_search import SavedSearchService
+from services.profile import SavedSearchService
 from services.references import ReferenceService
 
 
@@ -102,7 +102,7 @@ def _build_search_card(
     name = search.get("name", "Unbekannt")
     created_at = search.get("created_at", "")
 
-    # Datum formatieren
+    # Datum formatieren (TT.MM.JJJJ)
     try:
         dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
         date_str = dt.strftime("%d.%m.%Y")
@@ -118,7 +118,7 @@ def _build_search_card(
     # Suchbegriff
     search_query = filters.get("search_query")
     if search_query:
-        filter_chips.append(_create_filter_chip(f"🔍 {str(search_query)[:20]}"))
+        filter_chips.append(_create_filter_chip(f"Suche: {str(search_query)[:20]}"))
 
     # Referenzdaten für Namen laden
     post_statuses = {s["id"]: s for s in ref_service.get_post_statuses()}
@@ -130,19 +130,23 @@ def _build_search_card(
     status_id = filters.get("status_id")
     if status_id:
         status = post_statuses.get(int(status_id)) if isinstance(status_id, (int, str)) else None
-        name = status.get("name") if status else f"Status #{status_id}"
-        filter_chips.append(_create_filter_chip(f"📋 {name}"))
+        status_name = status.get("name") if status else f"Status #{status_id}"
+        filter_chips.append(_create_filter_chip(f"Status: {status_name}"))
 
     # Tierart
     species_id = filters.get("species_id")
     if species_id:
         species = species_list.get(int(species_id)) if isinstance(species_id, (int, str)) else None
-        name = species.get("name") if species else f"Tierart #{species_id}"
-        filter_chips.append(_create_filter_chip(f"🐾 {name}"))
+        species_name = species.get("name") if species else f"Tierart #{species_id}"
+        filter_chips.append(_create_filter_chip(f"Tierart: {species_name}"))
 
     # Rasse
+    rasse_value = filters.get("rasse")
     breed_id = filters.get("breed_id")
-    if breed_id:
+    # Prüfen, ob "keine_angabe" gespeichert ist
+    if rasse_value == "keine_angabe":
+        filter_chips.append(_create_filter_chip("Rasse: Keine Angabe"))
+    elif breed_id:
         breed_obj = None
         # Versuchen, über species_id -> breeds_by_species zu finden
         try:
@@ -156,20 +160,24 @@ def _build_search_card(
                 if b.get("id") == bid_int:
                     breed_obj = b
                     break
-        name = breed_obj.get("name") if breed_obj else f"Rasse #{breed_id}"
-        filter_chips.append(_create_filter_chip(f"🏷️ {name}"))
+        breed_name = breed_obj.get("name") if breed_obj else f"Rasse #{breed_id}"
+        filter_chips.append(_create_filter_chip(f"Rasse: {breed_name}"))
 
     # Geschlecht
+    geschlecht_value = filters.get("geschlecht")
     sex_id = filters.get("sex_id")
-    if sex_id:
+    # Prüfen, ob "keine_angabe" gespeichert ist
+    if geschlecht_value == "keine_angabe":
+        filter_chips.append(_create_filter_chip("Geschlecht: Keine Angabe"))
+    elif sex_id:
         sex = sex_list.get(int(sex_id)) if isinstance(sex_id, (int, str)) else None
-        name = sex.get("name") if sex else f"Geschlecht #{sex_id}"
-        filter_chips.append(_create_filter_chip(f"⚥ {name}"))
+        sex_name = sex.get("name") if sex else f"Geschlecht #{sex_id}"
+        filter_chips.append(_create_filter_chip(f"Geschlecht: {sex_name}"))
 
     # Farben
     colors = filters.get("colors", [])
     if colors and len(colors) > 0:
-        filter_chips.append(_create_filter_chip(f"🎨 {len(colors)} Farben"))
+        filter_chips.append(_create_filter_chip(f"{len(colors)} Farben"))
 
     # Falls keine Filter aktiv
     if not filter_chips:

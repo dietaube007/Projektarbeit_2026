@@ -42,7 +42,7 @@ def create_login_password_field() -> ft.TextField:
     """
     return ft.TextField(
         label="Passwort",
-        hint_text="Ihr Passwort",
+        hint_text="Dein Passwort",
         password=True,
         can_reveal_password=True,
         border_radius=8,
@@ -181,22 +181,20 @@ def create_logout_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Text
     )
 
 
-def create_theme_toggle(is_dark: bool, on_click: Callable[[ft.ControlEvent], None]) -> ft.IconButton:
-    """Erstellt den Theme-Toggle-Button.
-    
-    Args:
-        is_dark: Ob aktuell Dark-Modus aktiv ist
-        on_click: Callback-Funktion für Button-Klick
-    
-    Returns:
-        IconButton zum Wechseln zwischen Light/Dark Theme
-    """
+def create_theme_toggle(is_dark: bool, on_click: Callable) -> ft.IconButton:
+    """Erstellt den Theme-Toggle-Button."""
     return ft.IconButton(
         icon=ft.Icons.DARK_MODE if is_dark else ft.Icons.LIGHT_MODE,
         on_click=on_click,
-        tooltip="Theme wechseln",
+        tooltip=tooltip,
         icon_color=ft.Colors.WHITE if is_dark else TEXT_SECONDARY,
     )
+    # Optionales Screenreader-Label nur setzen, wenn unterstützt
+    try:
+        btn.semantic_label = tooltip
+    except Exception:
+        pass
+    return btn
 
 
 def create_registration_modal(
@@ -227,7 +225,7 @@ def create_registration_modal(
     return ft.Container(
         content=ft.Column([
             ft.Row([
-                ft.Text("Registrierung", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text("Registrieren", size=20, weight=ft.FontWeight.BOLD),
                 ft.IconButton(ft.Icons.CLOSE, on_click=on_close)
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Divider(),

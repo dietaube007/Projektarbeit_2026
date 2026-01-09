@@ -8,6 +8,7 @@ Enthält Konfigurationswerte für:
 - Datumsformate
 """
 
+import os
 from typing import Tuple
 
 # BILDVERARBEITUNG
@@ -29,8 +30,8 @@ PLACEHOLDER_IMAGE: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQV
 STORAGE_BUCKET: str = "pet-images"
 """Supabase Storage Bucket für Tierbilder."""
 
-UPLOAD_DIR: str = "image_uploads"
-"""Lokaler Upload-Ordner für temporäre Dateien."""
+UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "image_uploads")
+"""Lokaler Upload-Ordner für temporäre Dateien (aus Umgebung)."""
 
 # FORMULARLAYOUT
 
