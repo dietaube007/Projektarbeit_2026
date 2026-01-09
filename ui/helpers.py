@@ -8,6 +8,29 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 
 from ui.constants import DATE_FORMAT
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+def get_color_names(post_colors: List[Dict[str, Any]]) -> str:
+    """Extrahiert Farbnamen aus post_color Liste.
+
+    Args:
+        post_colors: Liste von post_color Dictionaries
+
+    Returns:
+        Komma-separierte Farbnamen oder leerer String
+    """
+    if not post_colors:
+        return ""
+
+    farben_namen = [
+        pc.get("color", {}).get("name", "")
+        for pc in post_colors
+        if isinstance(pc, dict) and pc.get("color")
+    ]
+    return ", ".join([x for x in farben_namen if x])
 
 
 def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -33,13 +56,7 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
     breed = item.get("breed") or {}
     rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
 
-    post_colors = item.get("post_color") or []
-    farben_namen = [
-        pc.get("color", {}).get("name", "")
-        for pc in post_colors
-        if isinstance(pc, dict) and pc.get("color")
-    ]
-    farbe = ", ".join([x for x in farben_namen if x]) if farben_namen else ""
+    farbe = get_color_names(item.get("post_color") or [])
 
     ort = item.get("location_text") or ""
     when_raw = (item.get("event_date") or item.get("created_at") or "")[:10]
@@ -112,26 +129,6 @@ def truncate_text(text: str, max_length: int = 100) -> str:
     return text[:max_length - 3] + "..."
 
 
-def get_color_names(post_colors: List[Dict[str, Any]]) -> str:
-    """Extrahiert Farbnamen aus post_color Liste.
-
-    Args:
-        post_colors: Liste von post_color Dictionaries
-
-    Returns:
-        Komma-separierte Farbnamen oder leerer String
-    """
-    if not post_colors:
-        return ""
-
-    farben_namen = [
-        pc.get("color", {}).get("name", "")
-        for pc in post_colors
-        if isinstance(pc, dict) and pc.get("color")
-    ]
-    return ", ".join([x for x in farben_namen if x])
-
-
 def get_nested_value(data: Dict[str, Any], *keys, default: str = "") -> str:
     """Holt verschachtelte Werte sicher aus einem Dictionary.
 
@@ -194,7 +191,8 @@ def format_time(timestamp: Optional[str]) -> str:
         else:
             return created.strftime(DATE_FORMAT)
             
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Fehler beim Formatieren des Zeitstempels '{timestamp}': {e}")
         return ""
 
 

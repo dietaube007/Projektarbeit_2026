@@ -22,8 +22,8 @@ from ui.constants import (
     PLACEHOLDER_IMAGE,
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
-)
-from ui.constants import (
+    BORDER_COLOR,
+    PRIMARY_COLOR,
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
@@ -74,6 +74,10 @@ def create_name_field() -> ft.TextField:
         max_length=MAX_HEADLINE_LENGTH,
         counter_text=f"0 / {MAX_HEADLINE_LENGTH}",
         helper_text=f"Max. {MAX_HEADLINE_LENGTH} Zeichen",
+        border_radius=12,
+        border_color=BORDER_COLOR,
+        focused_border_color=PRIMARY_COLOR,
+        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
 
 
@@ -142,6 +146,10 @@ def create_description_field() -> ft.TextField:
         max_length=MAX_DESCRIPTION_LENGTH,
         counter_text=f"0 / {MAX_DESCRIPTION_LENGTH}",
         helper_text=f"Min. {MIN_DESCRIPTION_LENGTH}, max. {MAX_DESCRIPTION_LENGTH} Zeichen",
+        border_radius=12,
+        border_color=BORDER_COLOR,
+        focused_border_color=PRIMARY_COLOR,
+        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
 
 
@@ -153,7 +161,11 @@ def create_location_field() -> ft.TextField:
     """
     return ft.TextField(
         label="Ort﹡",
-        width=FIELD_WIDTH_LARGE
+        width=FIELD_WIDTH_LARGE,
+        border_radius=12,
+        border_color=BORDER_COLOR,
+        focused_border_color=PRIMARY_COLOR,
+        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
 
 
@@ -166,7 +178,11 @@ def create_date_field() -> ft.TextField:
     return ft.TextField(
         label="Datum﹡ (TT.MM.YYYY)",
         width=FIELD_WIDTH_SMALL,
-        hint_text="z.B. 15.11.2025"
+        hint_text="z.B. 15.11.2025",
+        border_radius=12,
+        border_color=BORDER_COLOR,
+        focused_border_color=PRIMARY_COLOR,
+        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
 
 

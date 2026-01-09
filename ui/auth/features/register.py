@@ -28,21 +28,8 @@ def handle_register(
     on_success_callback: Optional[Callable[[], None]] = None,
     on_close_modal_callback: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Führt Registrierung durch (Service-Aufruf + UI-Feedback).
-    
-    Args:
-        auth_service: AuthService-Instanz
-        email: E-Mail-Adresse
-        password: Passwort
-        password_confirm: Passwort-Bestätigung
-        username: Anzeigename
-        page: Flet Page-Instanz
-        show_message_callback: Callback zum Anzeigen von Nachrichten (message, type)
-        on_success_callback: Optionaler Callback bei erfolgreicher Registrierung
-        on_close_modal_callback: Optionaler Callback zum Schließen des Modals
-    """
+    """Führt Registrierung durch (Service-Aufruf + UI-Feedback)."""
     try:
-        # UI-Validierung: Passwort-Bestätigung (Service validiert nicht)
         if password != password_confirm:
             show_message_callback(
                 "Passwörter stimmen nicht überein.",
@@ -52,7 +39,6 @@ def handle_register(
         
         show_message_callback("Registrierung läuft...", MESSAGE_TYPE_INFO)
         
-        # Service macht bereits Validierung + Business-Logik
         result = auth_service.register(
             email=email,
             password=password,

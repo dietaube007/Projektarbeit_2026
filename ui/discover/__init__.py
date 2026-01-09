@@ -5,10 +5,11 @@ Dieses Modul enthält die DiscoverView-Klasse und zugehörige Komponenten
 für die Anzeige und Filterung von Tiermeldungen.
 
 Struktur:
-- view.py: Hauptklasse DiscoverView (orchestriert alles)
-- cards.py: Card-Komponenten (Small/Big Card, Detail-Dialog)
-- filters.py: Filter-UI-Komponenten (Dropdowns, Suche, Farben)
-- data.py: Daten-Logik (Query-Builder, Filter-Funktionen)
+- view.py: Hauptklasse DiscoverView (UI-Komposition und Koordinierung)
+- filter_components.py: Filter-UI-Komponenten (Suchfeld, Dropdowns, Buttons)
+- post_card_components.py: Post-Karten-Komponenten (Small/Big Card, Detail-Dialog)
+- comment_components.py: Kommentar-Komponente (CommentSection)
+- features/: Feature-Module (Favorites, Search, Filters, References, SavedSearch)
 """
 
 # Re-export der Hauptklasse für einfachen Import

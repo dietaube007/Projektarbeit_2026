@@ -159,3 +159,10 @@ MESSAGE_COLOR_MAP: dict[str, str] = {
     MESSAGE_TYPE_INFO: MESSAGE_COLOR_INFO,
 }
 """Dictionary zur Farbzuordnung für Message-Typen."""
+
+# ══════════════════════════════════════════════════════════════════════
+# BUTTON-FARBEN
+# ══════════════════════════════════════════════════════════════════════
+
+LOGOUT_BUTTON_COLOR = ft.Colors.RED_400
+"""Farbe für Logout-Button."""

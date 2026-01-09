@@ -17,13 +17,7 @@ def handle_auth_error(
     operation_name: str,
     show_message_callback: Callable[[str, str], None],
 ) -> None:
-    """Zentrale Fehlerbehandlung für Auth-Operationen.
-    
-    Args:
-        error: Aufgetretene Exception
-        operation_name: Name der Operation (z.B. "Login", "Registrierung", "Logout")
-        show_message_callback: Callback zum Anzeigen von Nachrichten (message, type)
-    """
+    """Zentrale Fehlerbehandlung für Auth-Operationen."""
     logger.error(f"Fehler bei {operation_name}: {error}", exc_info=True)
     show_message_callback(
         "Ein unerwarteter Fehler ist aufgetreten.",

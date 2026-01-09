@@ -1,7 +1,7 @@
 """
 Authentifizierungs-View mit Login, Registrierung und Theme-Toggle.
 
-Enthält UI-Komposition und orchestriert Auth-Features.
+Enthält UI-Komposition und koordiniert Auth-Features.
 """
 
 from typing import Callable, Optional
@@ -37,6 +37,7 @@ from .components import (
     create_register_button,
     create_continue_button,
     create_logout_button,
+    create_forgot_password_button,
     create_registration_modal,
     create_login_card,
 )

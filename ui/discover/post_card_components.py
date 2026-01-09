@@ -1,5 +1,5 @@
 """
-Card-Komponenten für die Discover View.
+Meldungskarten-Komponenten für die Discover-View.
 
 Enthält Funktionen zum Erstellen von kleinen und großen Meldungskarten
 sowie den Detail-Dialog.
@@ -16,13 +16,14 @@ from ui.constants import (
     DEFAULT_PLACEHOLDER
 )
 from ui.helpers import extract_item_data
-from ui.comment_section import CommentSection
+from .comment_components import CommentSection
 from ui.components import (
     badge_for_typ,
     badge_for_species,
     meta_row,
     image_placeholder,
-    )
+    create_loading_indicator,
+)
 
 
 def build_small_card(
@@ -106,6 +107,7 @@ def build_big_card(
     on_card_click: Callable[[Dict[str, Any]], None],
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     supabase=None,
+    profile_service=None,
 ) -> ft.Control:
     """Erstellt eine große Listen-Karte für die Listen-Ansicht.
     
@@ -115,7 +117,8 @@ def build_big_card(
         on_favorite_click: Callback (item, control) für Favoriten-Toggle
         on_card_click: Callback (item) für Karten-Klick
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
-        supabase: Supabase-Client für Kommentare
+        supabase: Optional Supabase-Client für Kommentare
+        profile_service: Optional ProfileService für Kommentare
     
     Returns:
         Container mit großer Karten-Komponente
@@ -189,7 +192,9 @@ def build_big_card(
                 .execute()
             comment_count = response.count or 0
         except Exception as e:
-            print(f"Fehler beim Laden der Kommentar-Anzahl: {e}")
+            from utils.logging_config import get_logger
+            logger = get_logger(__name__)
+            logger.debug(f"Fehler beim Laden der Kommentar-Anzahl für Post {post_id}: {e}")
 
     # Button-Text mit Anzahl
     comment_button_text = f"Kommentare ({comment_count})" if comment_count > 0 else "Kommentare"
@@ -212,20 +217,16 @@ def build_big_card(
         if comments_container.visible:
             if comment_section is None and supabase and post_id:
                 # Zeige kurz Ladeindikator
-                comments_container.content = ft.Container(
-                    content=ft.Column([
-                        ft.ProgressRing(),
-                        ft.Text("Lade Kommentare...", size=12, color=ft.Colors.GREY_600)
-                    ], 
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=10),
-                    alignment=ft.alignment.center,
-                    padding=20
+                comments_container.content = create_loading_indicator(
+                    text="Lade Kommentare...",
+                    size=32,
+                    text_size=12,
+                    padding=20,
                 )
                 page.update()
                 
                 # CommentSection erstellen
-                comment_section = CommentSection(page, post_id, supabase)
+                comment_section = CommentSection(page, post_id, supabase, profile_service=profile_service)
                 comments_container.content = comment_section
                 comment_section.load_comments()
             elif comment_section:
@@ -275,7 +276,8 @@ def show_detail_dialog(
     page: ft.Page,
     item: Dict[str, Any],
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
-    on_favorite_click: Optional[Callable[[Dict[str, Any], ft.Control], None]] = None
+    on_favorite_click: Optional[Callable[[Dict[str, Any], ft.Control], None]] = None,
+    profile_service=None,
 ) -> None:
     """Zeigt den Detail-Dialog für eine Meldung.
     
@@ -284,6 +286,7 @@ def show_detail_dialog(
         item: Post-Dictionary mit allen Daten
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
         on_favorite_click: Optionaler Callback (item, control) für Favoriten-Toggle
+        profile_service: Optional ProfileService (wird aktuell nicht verwendet, aber für zukünftige Erweiterungen)
     """
     data = extract_item_data(item)
 

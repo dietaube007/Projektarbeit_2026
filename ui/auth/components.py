@@ -15,112 +15,130 @@ from ui.constants import (
     TEXT_SECONDARY,
     BORDER_COLOR,
     DARK_CARD,
+    LOGOUT_BUTTON_COLOR,
 )
 from utils.constants import MAX_DISPLAY_NAME_LENGTH
 
 
-def create_login_email_field() -> ft.TextField:
-    """Erstellt das E-Mail-Feld für Login.
+# ══════════════════════════════════════════════════════════════════════
+# TEXTFIELD-BASE-FUNKTIONEN
+# ══════════════════════════════════════════════════════════════════════
+
+def _create_base_textfield(
+    label: str,
+    hint_text: str = "",
+    password: bool = False,
+    keyboard_type: Optional[ft.KeyboardType] = None,
+    border_radius: int = 12,
+    max_length: Optional[int] = None,
+    prefix_icon: Optional[str] = None,
+    value: Optional[str] = None,
+    width: Optional[int] = None,
+) -> ft.TextField:
+    """Erstellt ein TextField mit konsistentem Styling.
+    
+    Args:
+        label: Feld-Label
+        hint_text: Platzhalter-Text
+        password: Ob es ein Passwort-Feld ist
+        keyboard_type: Optionaler Keyboard-Typ (z.B. EMAIL)
+        border_radius: Border-Radius (Standard: 12)
+        max_length: Maximale Textlänge
+        prefix_icon: Optionales Icon
+        value: Optionaler Vorbelegungswert
+        width: Optionale Breite
     
     Returns:
-        TextField für E-Mail-Eingabe mit Material-3 Styling
+        TextField mit konsistentem Styling
     """
-    return ft.TextField(
-        label="E-Mail",
-        hint_text="beispiel@mail.com",
-        keyboard_type=ft.KeyboardType.EMAIL,
-        border_radius=8,
+    field = ft.TextField(
+        label=label,
+        hint_text=hint_text,
+        password=password,
+        can_reveal_password=password,
+        keyboard_type=keyboard_type,
+        border_radius=border_radius,
         border_color=BORDER_COLOR,
         focused_border_color=PRIMARY_COLOR,
         content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
+    )
+    
+    if max_length:
+        field.max_length = max_length
+    if prefix_icon:
+        field.prefix_icon = prefix_icon
+    if value is not None:
+        field.value = value
+    if width:
+        field.width = width
+    
+    return field
+
+
+# ══════════════════════════════════════════════════════════════════════
+# LOGIN-FELDER
+# ══════════════════════════════════════════════════════════════════════
+
+def create_login_email_field() -> ft.TextField:
+    """Erstellt das E-Mail-Feld für Login."""
+    return _create_base_textfield(
+        label="E-Mail",
+        hint_text="beispiel@mail.com",
+        keyboard_type=ft.KeyboardType.EMAIL,
     )
 
 
 def create_login_password_field() -> ft.TextField:
-    """Erstellt das Passwort-Feld für Login.
-    
-    Returns:
-        TextField für Passwort-Eingabe mit Sichtbarkeits-Toggle
-    """
-    return ft.TextField(
+    """Erstellt das Passwort-Feld für Login."""
+    return _create_base_textfield(
         label="Passwort",
-        hint_text="Dein Passwort",
+        hint_text="Ihr Passwort",
         password=True,
-        can_reveal_password=True,
-        border_radius=8,
-        border_color=BORDER_COLOR,
-        focused_border_color=PRIMARY_COLOR,
-        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
 
 
 def create_register_email_field() -> ft.TextField:
-    """Erstellt das E-Mail-Feld für Registrierung.
-    
-    Returns:
-        TextField für E-Mail-Eingabe bei Registrierung
-    """
-    return ft.TextField(
+    """Erstellt das E-Mail-Feld für Registrierung."""
+    return _create_base_textfield(
         label="E-Mail",
         hint_text="beispiel@email.de",
         keyboard_type=ft.KeyboardType.EMAIL,
-        border_radius=12,
     )
 
 
 def create_register_password_field() -> ft.TextField:
-    """Erstellt das Passwort-Feld für Registrierung.
-    
-    Returns:
-        TextField für Passwort-Eingabe bei Registrierung
-    """
-    return ft.TextField(
+    """Erstellt das Passwort-Feld für Registrierung."""
+    return _create_base_textfield(
         label="Passwort",
         hint_text="Mind. 8 Zeichen, Ziffer & Sonderzeichen",
         password=True,
-        can_reveal_password=True,
-        border_radius=12,
     )
 
 
 def create_register_password_confirm_field() -> ft.TextField:
-    """Erstellt das Passwort-Bestätigungs-Feld für Registrierung.
-    
-    Returns:
-        TextField für Passwort-Bestätigung
-    """
-    return ft.TextField(
+    """Erstellt das Passwort-Bestätigungs-Feld für Registrierung."""
+    return _create_base_textfield(
         label="Passwort wiederholen",
         hint_text="Passwort bestätigen",
         password=True,
-        can_reveal_password=True,
-        border_radius=12,
     )
 
 
 def create_register_username_field() -> ft.TextField:
-    """Erstellt das Anzeigename-Feld für Registrierung.
-    
-    Returns:
-        TextField für Anzeigename mit Längenbegrenzung
-    """
-    return ft.TextField(
+    """Erstellt das Anzeigename-Feld für Registrierung."""
+    return _create_base_textfield(
         label="Anzeigename",
         hint_text="Ihr Name",
-        border_radius=12,
         max_length=MAX_DISPLAY_NAME_LENGTH,
     )
 
 
+# ══════════════════════════════════════════════════════════════════════
+# BUTTONS
+# ══════════════════════════════════════════════════════════════════════
+
 def create_login_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.ElevatedButton:
-    """Erstellt den Login-Button.
-    
-    Args:
-        on_click: Callback-Funktion für Button-Klick
-    
-    Returns:
-        ElevatedButton mit Material-3 Styling
-    """
+    """Erstellt den Login-Button."""
     return ft.ElevatedButton(
         "Einloggen",
         on_click=on_click,
@@ -135,14 +153,7 @@ def create_login_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Eleva
 
 
 def create_register_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:
-    """Erstellt den Registrierungs-Link-Button.
-    
-    Args:
-        on_click: Callback-Funktion für Button-Klick
-    
-    Returns:
-        TextButton für Registrierungs-Link
-    """
+    """Erstellt den Registrierungs-Link-Button."""
     return ft.TextButton(
         "Registrieren",
         on_click=on_click,
@@ -151,14 +162,7 @@ def create_register_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Te
 
 
 def create_continue_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:
-    """Erstellt den 'Ohne Account fortsetzen' Button.
-    
-    Args:
-        on_click: Callback-Funktion für Button-Klick
-    
-    Returns:
-        TextButton für Fortsetzen ohne Account
-    """
+    """Erstellt den 'Ohne Account fortsetzen' Button."""
     return ft.TextButton(
         "Ohne Account fortsetzen",
         on_click=on_click,
@@ -166,22 +170,28 @@ def create_continue_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Te
     )
 
 
+def create_forgot_password_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:
+    """Erstellt den 'Passwort vergessen?' Button."""
+    return ft.TextButton(
+        "Passwort vergessen?",
+        on_click=on_click,
+        style=ft.ButtonStyle(color=PRIMARY_COLOR),
+    )
+
+
 def create_logout_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:
-    """Erstellt den Logout-Button.
-    
-    Args:
-        on_click: Callback-Funktion für Button-Klick
-    
-    Returns:
-        TextButton mit rotem Styling für Logout
-    """
+    """Erstellt den Logout-Button."""
     return ft.TextButton(
         "Abmelden",
         icon=ft.Icons.LOGOUT,
         on_click=on_click,
-        style=ft.ButtonStyle(color=ft.Colors.RED_400),  # Logout-Button rot bleiben
+        style=ft.ButtonStyle(color=LOGOUT_BUTTON_COLOR),
     )
 
+
+# ══════════════════════════════════════════════════════════════════════
+# COMPLEX COMPONENTS
+# ══════════════════════════════════════════════════════════════════════
 
 def create_registration_modal(
     email_field: ft.TextField,
@@ -193,21 +203,7 @@ def create_registration_modal(
     on_close: Callable[[ft.ControlEvent], None],
     is_dark: bool = False,
 ) -> ft.Container:
-    """Erstellt das Registrierungs-Modal.
-    
-    Args:
-        email_field: TextField für E-Mail
-        password_field: TextField für Passwort
-        password_confirm_field: TextField für Passwort-Bestätigung
-        username_field: TextField für Anzeigename
-        info_text: Text-Widget für Fehlermeldungen/Info
-        on_register: Callback für Registrierungs-Button
-        on_close: Callback für Schließen-Button
-        is_dark: Ob Dark-Modus aktiv ist
-    
-    Returns:
-        Container mit Registrierungs-Modal
-    """
+    """Erstellt das Registrierungs-Modal."""
     return ft.Container(
         content=ft.Column([
             ft.Row([
@@ -242,23 +238,27 @@ def create_registration_modal(
     )
 
 
+def create_password_reset_email_field(
+    initial_email: Optional[str] = None,
+) -> ft.TextField:
+    """Erstellt das E-Mail-Feld für Passwort-Reset Dialog."""
+    return _create_base_textfield(
+        label="E-Mail-Adresse",
+        hint_text="Ihre registrierte E-Mail",
+        keyboard_type=ft.KeyboardType.EMAIL,
+        prefix_icon=ft.Icons.EMAIL,
+        value=initial_email or "",
+        width=300,
+    )
+
+
 def create_password_reset_dialog(
     email_field: ft.TextField,
     error_text: ft.Text,
     on_send: Callable[[ft.ControlEvent], None],
     on_cancel: Callable[[ft.ControlEvent], None],
 ) -> ft.AlertDialog:
-    """Erstellt den Dialog zum Zurücksetzen des Passworts.
-    
-    Args:
-        email_field: TextField für E-Mail-Eingabe
-        error_text: Text-Widget für Fehlermeldungen
-        on_send: Callback für "Link senden"-Button
-        on_cancel: Callback für "Abbrechen"-Button
-    
-    Returns:
-        AlertDialog für Passwort-Reset
-    """
+    """Erstellt den Dialog zum Zurücksetzen des Passworts."""
     return ft.AlertDialog(
         modal=True,
         title=ft.Row([
@@ -304,30 +304,13 @@ def create_login_card(
     forgot_password_btn: Optional[ft.TextButton] = None,
     is_dark: bool = False,
 ) -> ft.Container:
-    """Erstellt die Login-Card.
-    
-    Args:
-        email_field: TextField für E-Mail
-        password_field: TextField für Passwort
-        info_text: Text-Widget für Fehlermeldungen/Info
-        login_btn: ElevatedButton für Login
-        register_btn: TextButton für Registrierung
-        continue_btn: TextButton für Fortsetzen ohne Account
-        is_logged_in: Ob Benutzer eingeloggt ist
-        logout_btn: Optionaler TextButton für Logout
-        forgot_password_btn: Optionaler TextButton für Passwort vergessen
-        is_dark: Ob Dark-Modus aktiv ist
-    
-    Returns:
-        Container mit Login-Card
-    """
+    """Erstellt die Login-Card."""
     card_content = [
         email_field,
         ft.Container(height=16),
         password_field,
     ]
     
-    # "Passwort vergessen?" Link
     if forgot_password_btn:
         card_content.append(
             ft.Row([forgot_password_btn], alignment=ft.MainAxisAlignment.END)

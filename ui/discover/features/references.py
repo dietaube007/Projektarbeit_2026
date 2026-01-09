@@ -1,4 +1,6 @@
-"""Helper-Modul zum Laden und Befüllen von Referenz-Dropdowns."""
+"""
+References-Feature: UI und Logik zum Laden und Befüllen von Referenz-Dropdowns.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +9,7 @@ import flet as ft
 
 from services.posts.references import ReferenceService
 from utils.logging_config import get_logger
-from .filters import populate_dropdown
+from ..filter_components import populate_dropdown
 
 logger = get_logger(__name__)
 
@@ -118,12 +120,11 @@ def update_breeds_dropdown(
             filter_rasse.options.append(
                 ft.dropdown.Option(str(b.get("id")), b.get("name", ""))
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Fehler beim Aktualisieren des Rassen-Dropdowns: {e}", exc_info=True)
 
     if filter_rasse.value not in [o.key for o in filter_rasse.options]:
         filter_rasse.value = "alle"
 
     if page:
         page.update()
-

@@ -21,19 +21,10 @@ def handle_login(
     show_message_callback: Callable[[str, str], None],
     on_success_callback: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Führt Login durch (Service-Aufruf + UI-Feedback).
-    
-    Args:
-        auth_service: AuthService-Instanz
-        email: E-Mail-Adresse
-        password: Passwort
-        show_message_callback: Callback zum Anzeigen von Nachrichten (message, type)
-        on_success_callback: Optionaler Callback bei erfolgreichem Login
-    """
+    """Führt Login durch (Service-Aufruf + UI-Feedback)."""
     try:
         show_message_callback("Anmeldung läuft...", MESSAGE_TYPE_INFO)
         
-        # Service macht bereits Validierung + Business-Logik
         result: AuthResult = auth_service.login(email, password)
         
         if result.success:
@@ -53,12 +44,7 @@ def handle_logout(
     auth_service: AuthService,
     show_message_callback: Callable[[str, str], None],
 ) -> None:
-    """Führt Logout durch (Service-Aufruf + UI-Feedback).
-    
-    Args:
-        auth_service: AuthService-Instanz
-        show_message_callback: Callback zum Anzeigen von Nachrichten (message, type)
-    """
+    """Führt Logout durch (Service-Aufruf + UI-Feedback)."""
     try:
         result = auth_service.logout()
         if result.success:

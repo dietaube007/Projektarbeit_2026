@@ -13,7 +13,7 @@ from utils.logging_config import get_logger
 from services.account import AuthService
 from ui.components import show_success_dialog, show_error_dialog
 from ui.constants import MESSAGE_TYPE_ERROR, MESSAGE_COLOR_ERROR
-from ..components import create_password_reset_dialog
+from ..components import create_password_reset_dialog, create_password_reset_email_field
 
 logger = get_logger(__name__)
 

@@ -424,6 +424,37 @@ def loading_indicator(text: str = "Lädt...") -> ft.Row:
     ], spacing=12)
 
 
+def create_loading_indicator(
+    text: str = "Laden...",
+    size: int = 40,
+    text_size: int = 14,
+    padding: int = 40,
+) -> ft.Container:
+    """Erstellt einen zentrierten Loading-Indikator-Container.
+    
+    Args:
+        text: Text der angezeigt wird (Standard: "Laden...")
+        size: Größe des ProgressRing (Standard: 40)
+        text_size: Schriftgröße des Textes (Standard: 14)
+        padding: Padding des Containers (Standard: 40)
+    
+    Returns:
+        Container mit zentriertem Loading-Indikator
+    """
+    return ft.Container(
+        content=ft.Column(
+            [
+                ft.ProgressRing(width=size, height=size),
+                ft.Text(text, size=text_size, color=ft.Colors.GREY_600),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=12,
+        ),
+        padding=padding,
+        alignment=ft.alignment.center,
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════
 # META-KOMPONENTEN
 # ══════════════════════════════════════════════════════════════════════
@@ -510,7 +541,7 @@ def create_no_results_card(on_reset: Optional[Callable] = None) -> ft.Container:
     controls = [
         ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
         ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-        ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
+        ft.Text("Versuchen Sie andere Suchkriterien", color=ft.Colors.GREY_700),
     ]
     
     if on_reset:
@@ -525,3 +556,24 @@ def create_no_results_card(on_reset: Optional[Callable] = None) -> ft.Container:
         elev=1,
         pad=24,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# SNACKBAR HELPER
+# ══════════════════════════════════════════════════════════════════════
+
+def show_login_required_snackbar(
+    page: ft.Page,
+    message: str = "Bitte melden Sie sich an, um diese Aktion durchzuführen.",
+) -> None:
+    """Zeigt eine SnackBar-Nachricht für Login-Required-Fälle.
+    
+    Args:
+        page: Flet Page-Instanz
+        message: Nachricht die angezeigt werden soll
+    """
+    page.snack_bar = ft.SnackBar(
+        ft.Text(message),
+        open=True,
+    )
+    page.update()

@@ -1,7 +1,17 @@
+"""
+Kommentar-Komponenten für die Discover-View.
+
+Enthält die CommentSection-Klasse für die Kommentar-Funktionalität in Posts.
+"""
+
 import flet as ft
 from typing import Optional
 
 from ui.helpers import format_time
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class CommentSection(ft.Container):
     """
@@ -9,10 +19,19 @@ class CommentSection(ft.Container):
     Funktioniert mit Supabase und der bestehenden comment-Tabelle
     """
     
-    def __init__(self, page: ft.Page, post_id: str, supabase):
+    def __init__(self, page: ft.Page, post_id: str, supabase, profile_service=None):
+        """Initialisiert die CommentSection.
+        
+        Args:
+            page: Flet Page-Instanz
+            post_id: UUID des Posts für den Kommentare angezeigt werden
+            supabase: Supabase-Client für Datenbankzugriffe
+            profile_service: Optional ProfileService für User-ID-Abfragen
+        """
         self._page = page  # Verwende _page statt page um Konflikt zu vermeiden
         self.post_id = post_id  # UUID des Posts
         self.supabase = supabase
+        self.profile_service = profile_service
         # Antwort-Funktion deaktiviert, da kein parent_comment_id im Schema
         self.replying_to = None
         
@@ -53,6 +72,9 @@ class CommentSection(ft.Container):
             max_lines=4,
             expand=True,
             border_color=ft.Colors.GREY_400,
+            focused_border_color=ft.Colors.BLUE_600,
+            border_radius=8,
+            content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
             on_submit=self.post_comment
         )
         
@@ -112,13 +134,17 @@ class CommentSection(ft.Container):
     
     
     def load_comments(self):
-        """Lädt alle nicht gelöschten Kommentare für diesen Post"""
+        """Lädt alle nicht gelöschten Kommentare für diesen Post.
+        
+        Zeigt einen Loading-Indikator während des Ladens und rendert die
+        Kommentare in der Kommentar-Liste.
+        """
         self.loading.visible = True
         self.comments_list.controls.clear()
         
         try:
             self._page.update()
-        except:
+        except Exception:
             pass
         
         try:
@@ -168,9 +194,7 @@ class CommentSection(ft.Container):
                     )
             
         except Exception as e:
-            print(f"Fehler beim Laden der Kommentare: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Fehler beim Laden der Kommentare: {e}", exc_info=True)
             self.comments_list.controls.clear()
             self.comments_list.controls.append(
                 ft.Container(
@@ -187,14 +211,20 @@ class CommentSection(ft.Container):
             self.loading.visible = False
             try:
                 self._page.update()
-            except:
+            except Exception:
                 pass
     
     def create_comment_card(self, comment, is_reply=False):
-        """Erstellt eine Kommentar-Karte"""
-        from services.account import ProfileService
-        profile_service = ProfileService(self.supabase)
-        current_user_id = profile_service.get_user_id()
+        """Erstellt eine Kommentar-Karte.
+        
+        Args:
+            comment: Dictionary mit Kommentar-Daten
+            is_reply: Ob es sich um eine Antwort handelt (aktuell nicht verwendet)
+        
+        Returns:
+            Container mit Kommentar-Karte
+        """
+        current_user_id = self.profile_service.get_user_id() if self.profile_service else None
         is_author = (str(current_user_id) == str(comment.get('user_id')))
         
         # User-Daten extrahieren (Schema: user-Tabelle hat display_name, nicht username)
@@ -286,25 +316,31 @@ class CommentSection(ft.Container):
         self._page.update()
     
     def cancel_reply(self, e=None):
-        """Bricht den Antwort-Modus ab"""
+        """Bricht den Antwort-Modus ab.
+        
+        Args:
+            e: Optional ControlEvent vom Button-Klick
+        """
         self.replying_to = None
         self.reply_banner.visible = False
         self.comment_input.hint_text = "Schreibe einen Kommentar..."
         self._page.update()
     
     def post_comment(self, e):
-        """Speichert einen neuen Kommentar in Supabase"""
+        """Speichert einen neuen Kommentar in Supabase.
+        
+        Args:
+            e: ControlEvent vom Button-Klick
+        """
         # Eingabe validieren
         if not self.comment_input.value or not self.comment_input.value.strip():
             return
         
-        from services.account import ProfileService
-        profile_service = ProfileService(self.supabase)
-        current_user_id = profile_service.get_user_id()
+        current_user_id = self.profile_service.get_user_id() if self.profile_service else None
         
         # Login-Check
         if not current_user_id:
-            self.show_snackbar("Du musst eingeloggt sein, um zu kommentieren!", ft.Colors.RED_400)
+            self.show_snackbar("Sie müssen eingeloggt sein, um zu kommentieren!", ft.Colors.RED_400)
             return
         
         # Button während des Sendens deaktivieren
@@ -338,7 +374,7 @@ class CommentSection(ft.Container):
             self.show_snackbar("Kommentar gepostet!", ft.Colors.GREEN_400)
             
         except Exception as e:
-            print(f"Fehler beim Posten: {e}")
+            logger.error(f"Fehler beim Posten des Kommentars: {e}", exc_info=True)
             self.show_snackbar(f"Fehler beim Senden: {str(e)}", ft.Colors.RED_400)
         
         finally:
@@ -347,7 +383,11 @@ class CommentSection(ft.Container):
             self._page.update()
     
     def delete_comment(self, comment_id):
-        """Soft-Delete: Setzt is_deleted auf True"""
+        """Soft-Delete: Setzt is_deleted auf True.
+        
+        Args:
+            comment_id: ID des zu löschenden Kommentars
+        """
         try:
             # Soft Delete in Supabase
             self.supabase.table('comment') \
@@ -361,11 +401,16 @@ class CommentSection(ft.Container):
             self.show_snackbar("Kommentar gelöscht", ft.Colors.ORANGE_400)
             
         except Exception as e:
-            print(f"Fehler beim Löschen: {e}")
+            logger.error(f"Fehler beim Löschen des Kommentars (ID: {comment_id}): {e}", exc_info=True)
             self.show_snackbar("Fehler beim Löschen", ft.Colors.RED_400)
     
-    def show_snackbar(self, message: str, bgcolor):
-        """Zeigt eine Snackbar-Nachricht"""
+    def show_snackbar(self, message: str, bgcolor: str):
+        """Zeigt eine Snackbar-Nachricht.
+        
+        Args:
+            message: Nachricht die angezeigt werden soll
+            bgcolor: Hintergrundfarbe der Snackbar
+        """
         self._page.snack_bar = ft.SnackBar(
             content=ft.Text(message),
             bgcolor=bgcolor,

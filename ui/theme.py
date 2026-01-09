@@ -141,7 +141,8 @@ class ThemeManager:
             self._toggle_button.tooltip = tip
             try:
                 self._toggle_button.semantic_label = tip
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Semantic label nicht verfügbar: {e}")
                 pass
         
         # Callback für View-spezifische UI-Updates nach Theme-Wechsel
@@ -185,7 +186,8 @@ class ThemeManager:
         # Optional: Screenreader-Label nur setzen, wenn unterstützt
         try:
             self._toggle_button.semantic_label = tip
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Semantic label nicht verfügbar: {e}")
             pass
         return self._toggle_button
     

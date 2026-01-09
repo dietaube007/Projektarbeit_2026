@@ -1,28 +1,23 @@
 """
-ui/discover/view.py
-Discover-View mit Listen- und Kartendarstellung (refaktoriert).
+Discover-View mit Listen- und Kartendarstellung.
+
+Enthält UI-Komposition und koordiniert Discover-Features.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Dict, Any, List
+from typing import Callable, Optional, Dict, Any
 import flet as ft
 from supabase import Client
 
-from utils.constants import MAX_POSTS_LIMIT
-from ui.theme import soft_card
 from services.posts.references import ReferenceService
 from services.posts import SavedSearchService, FavoritesService, SearchService
+from services.account import ProfileService
 from utils.logging_config import get_logger
+from ui.theme import soft_card
+from ui.components import show_error_dialog, show_login_required_snackbar, create_empty_state_card
 
-logger = get_logger(__name__)
-
-from .cards import show_detail_dialog, build_small_card, build_big_card
-from .saved_search_dialog import show_save_search_dialog
-from .filters import (
-    reset_filters,
-    apply_saved_search_filters,
-    collect_current_filters,
+from .filter_components import (
     create_search_field,
     create_dropdown,
     create_farben_header,
@@ -30,14 +25,18 @@ from .filters import (
     create_view_toggle,
     create_sort_dropdown,
 )
-from .references_loader import load_and_populate_references, update_breeds_dropdown
-from .item_renderer import render_items
-from .ui_builder import build_discover_ui
-from ui.components import create_empty_state_card
+from .post_card_components import show_detail_dialog
+from .features.favorites import handle_toggle_favorite
+from .features.search import handle_load_posts, handle_render_items
+from .features.filters import reset_filters, apply_saved_search_filters, collect_current_filters
+from .features.references import load_and_populate_references, update_breeds_dropdown
+from .features.saved_search import show_save_search_dialog
+
+logger = get_logger(__name__)
 
 
 class DiscoverView:
-    """Klasse für die Startseite mit Meldungsübersicht."""
+    """Discover-View mit Listen- und Kartendarstellung."""
 
     def __init__(
         self,
@@ -48,6 +47,7 @@ class DiscoverView:
         on_login_required: Optional[Callable[[], None]] = None,
         on_save_search_login_required: Optional[Callable[[], None]] = None,
     ) -> None:
+        """Initialisiert die DiscoverView."""
         self.page = page
         self.sb = sb
         self.on_contact_click = on_contact_click
@@ -60,442 +60,255 @@ class DiscoverView:
         self.saved_search_service = SavedSearchService(self.sb)
         self.favorites_service = FavoritesService(self.sb)
         self.search_service = SearchService(self.sb)
+        self.profile_service = ProfileService(self.sb)
 
         # Filter-Status
         self.selected_farben: list[int] = []
         self.farben_panel_visible = False
-        self.view_mode = "list"  # "list" oder "grid"
+        self.view_mode = "list"
         self.current_items: list[dict] = []
 
         # User
         self.current_user_id: Optional[str] = None
         self.refresh_user()
 
-        # UI init
-        self._init_ui_elements()
+        # UI-Komponenten
+        self._search_q: Optional[ft.TextField] = None
+        self._filter_typ: Optional[ft.Dropdown] = None
+        self._filter_art: Optional[ft.Dropdown] = None
+        self._filter_geschlecht: Optional[ft.Dropdown] = None
+        self._filter_rasse: Optional[ft.Dropdown] = None
+        self._farben_filter_container: Optional[ft.ResponsiveRow] = None
+        self._farben_toggle_icon: Optional[ft.Icon] = None
+        self._farben_panel: Optional[ft.Container] = None
+        self._farben_header: Optional[ft.Container] = None
+        self._sort_dropdown: Optional[ft.Dropdown] = None
+        self._reset_btn: Optional[ft.TextButton] = None
+        self._save_search_btn: Optional[ft.TextButton] = None
+        self._view_toggle: Optional[ft.SegmentedButton] = None
+        self._list_view: Optional[ft.Column] = None
+        self._grid_view: Optional[ft.ResponsiveRow] = None
+        self._empty_state_card: Optional[ft.Container] = None
+        self.search_row = ft.ResponsiveRow(controls=[], spacing=10, run_spacing=10) 
 
-        # Referenzen laden
+        self._all_breeds: Dict[int, list] = {}
+
+        self._init_ui_elements()
         self.page.run_task(self._load_references)
 
-    # ──────────────────────────────────────────────────────────────────
-    # USER / AUTH
-    # ──────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────
+    # User / Auth
+    # ─────────────────────────────────────────────────────────────
 
     def refresh_user(self) -> None:
-        """Kann von außen (z.B. nach Login) aufgerufen werden."""
-        from services.account import ProfileService
-        profile_service = ProfileService(self.sb)
-        self.current_user_id = profile_service.get_user_id()
-
-    # ──────────────────────────────────────────────────────────────────
-    # INIT UI
-    # ──────────────────────────────────────────────────────────────────
-
-    def _init_ui_elements(self):
-        # Suche
-        self.search_q = create_search_field(
-            on_change=lambda _: self.page.run_task(self.load_posts)
-        )
-
-        # Filter Dropdowns
-        self.filter_typ = create_dropdown(
-            label="Kategorie",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-        )
-
-        self.filter_art = create_dropdown(
-            label="Tierart",
-            on_change=self._on_tierart_change,
-        )
-
-        self.filter_geschlecht = create_dropdown(
-            label="Geschlecht",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-            initial_options=[
-                ft.dropdown.Option("alle", "Alle"),
-                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
-            ],
-        )
-
-        self.filter_rasse = create_dropdown(
-            label="Rasse",
-            on_change=lambda _: self.page.run_task(self.load_posts),
-        )
-
-        # Farben Panel - wird später in _load_references befüllt
-        self.farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
-        self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN)
-        self.farben_panel = ft.Container(
-            content=self.farben_filter_container,
-            padding=12,
-            visible=False,
-        )
-
-        self.farben_header = create_farben_header(
-            toggle_icon=self.farben_toggle_icon,
-            on_click=self._toggle_farben_panel,
-        )
-
-        # Sortier-Dropdown
-        self.sort_dropdown = create_sort_dropdown(
-            on_change=lambda _: self.page.run_task(self.load_posts)
-        )
-
-        # Buttons
-        self.reset_btn = create_reset_button(on_click=self._reset_filters)
-        self.save_search_btn = ft.TextButton(
-            "Suche speichern",
-            icon=ft.Icons.BOOKMARK_ADD_OUTLINED,
-            on_click=self._show_save_search_dialog,
-        )
-
-        self.search_row = ft.ResponsiveRow(
-            controls=[
-                ft.Container(self.search_q, col={"xs": 12, "md": 5}),
-                ft.Container(self.filter_typ, col={"xs": 6, "md": 2}),
-                ft.Container(self.filter_art, col={"xs": 6, "md": 2}),
-                ft.Container(self.filter_geschlecht, col={"xs": 6, "md": 2}),
-                ft.Container(self.filter_rasse, col={"xs": 6, "md": 1}),
-                ft.Container(
-                    ft.Row([self.reset_btn, self.save_search_btn], spacing=8),
-                    col={"xs": 12, "md": 12},
-                ),
-                ft.Container(self.farben_header, col={"xs": 12, "md": 12}),
-                ft.Container(self.farben_panel, col={"xs": 12, "md": 12}),
-            ],
-            spacing=10,
-            run_spacing=10,
-        )
-
-        # View toggle
-        self.view_toggle = create_view_toggle(on_change=self._on_view_change)
-
-        # Ergebnisbereiche
-        self.list_view = ft.Column(spacing=14, expand=True)
-        self.grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12, visible=False)
+        """Aktualisiert die aktuelle User-ID.
         
-        # Initial mit empty_state_card befüllen
-        self.empty_state_card = soft_card(
-            ft.Column(
-                [
-                    ft.Icon(ft.Icons.PETS, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Noch keine Meldungen", weight=ft.FontWeight.W_600),
-                    ft.Text("Passe deine Filter an oder melde ein Tier.", color=ft.Colors.GREY_700),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=8,
-            ),
-            elev=1,
-            pad=24,
-        )
-        
-        # Initial empty state anzeigen
-        self.list_view.controls = [self.empty_state_card]
-        self.list_view.visible = True
+        Kann von außen (z.B. nach Login) aufgerufen werden, um den User-Status
+        zu aktualisieren.
+        """
+        self.current_user_id = self.profile_service.get_user_id()
 
-    def _on_view_change(self, e: ft.ControlEvent) -> None:
-        val = next(iter(e.control.selected), "list")
-        self.view_mode = val
-        self._render_items(self.current_items)
-
-    # ──────────────────────────────────────────────────────────────────
-    # REFERENCES
-    # ──────────────────────────────────────────────────────────────────
-
-    async def _load_references(self):
-        """Lädt alle Referenzen und befüllt die Dropdowns."""
-        try:
-            self._all_breeds = load_and_populate_references(
-                ref_service=self.ref_service,
-                filter_typ=self.filter_typ,
-                filter_art=self.filter_art,
-                filter_geschlecht=self.filter_geschlecht,
-                filter_rasse=self.filter_rasse,
-                farben_filter_container=self.farben_filter_container,
-                selected_colors=self.selected_farben,
-                on_color_change_callback=lambda: None,  # Keine automatische Suche
-                page=self.page,
-            )
-            self._update_rassen_dropdown()
-
-            # Farben Checkboxen
-            self.farben_filter_container.controls = []
-            for c in self.ref_service.get_colors() or []:
-                c_id = c["id"]
-
-                def on_color_change(e, color_id=c_id):
-                    if e.control.value:
-                        if color_id not in self.selected_farben:
-                            self.selected_farben.append(color_id)
-                    else:
-                        if color_id in self.selected_farben:
-                            self.selected_farben.remove(color_id)
-                    self.page.run_task(self.load_posts)
-
-                cb = ft.Checkbox(label=c["name"], value=False, on_change=on_color_change)
-                self.farben_filter_container.controls.append(
-                    ft.Container(cb, col={"xs": 6, "sm": 4, "md": 3})
-                )
-
-            self.page.update()
-        except Exception as ex:
-            print(f"Fehler beim Laden der Referenzen: {ex}")
-
-    def _on_tierart_change(self, e: ft.ControlEvent):
-        self._update_rassen_dropdown()
-
-    def _update_rassen_dropdown(self) -> None:
-        """Aktualisiert das Rassen-Dropdown basierend auf der ausgewählten Tierart."""
-        if hasattr(self, "_all_breeds"):
-            update_breeds_dropdown(
-                filter_art=self.filter_art,
-                filter_rasse=self.filter_rasse,
-                all_breeds=self._all_breeds,
-                page=self.page,
-            )
-
-    def _toggle_farben_panel(self, _: Optional[ft.ControlEvent] = None) -> None:
-        self.farben_panel_visible = not self.farben_panel_visible
-        self.farben_panel.visible = self.farben_panel_visible
-        self.farben_toggle_icon.name = (
-            ft.Icons.KEYBOARD_ARROW_UP if self.farben_panel_visible else ft.Icons.KEYBOARD_ARROW_DOWN
-        )
-        self.page.update()
-
-    # ──────────────────────────────────────────────────────────────────
-    # FAVORITEN
-    # ──────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────
+    # Favoriten
+    # ─────────────────────────────────────────────────────────────
 
     def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
-        """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""
+        """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie.
+        
+        Args:
+            item: Post-Dictionary
+            icon_button: IconButton-Widget das aktualisiert werden soll
+        """
         self.refresh_user()
+        handle_toggle_favorite(
+            favorites_service=self.favorites_service,
+            item=item,
+            icon_button=icon_button,
+            page=self.page,
+            current_user_id=self.current_user_id,
+            on_login_required=self.on_login_required,
+        )
 
-        if not self.current_user_id:
-            if self.on_login_required:
-                self.on_login_required()
-            else:
-                self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Bitte melde dich an, um Meldungen zu favorisieren."),
-                    open=True,
-                )
-                self.page.update()
-            return
-
-        post_id = item.get("id")
-        if not post_id:
-            return
-
-        try:
-            is_favorite = item.get("is_favorite", False)
-            if is_favorite:
-                success = self.favorites_service.remove_favorite(post_id)
-                if success:
-                    item["is_favorite"] = False
-                    icon_button.icon = ft.Icons.FAVORITE_BORDER
-                    icon_button.icon_color = ft.Colors.GREY_600
-                    # Dialog anzeigen
-                    from ui.components import show_success_dialog
-                    show_success_dialog(
-                        self.page,
-                        "Aus Favoriten entfernt",
-                        "Die Meldung wurde aus Ihren Favoriten entfernt."
-                    )
-            else:
-                success = self.favorites_service.add_favorite(post_id)
-                if success:
-                    item["is_favorite"] = True
-                    icon_button.icon = ft.Icons.FAVORITE
-                    icon_button.icon_color = ft.Colors.RED
-                    # Dialog anzeigen
-                    from ui.components import show_success_dialog
-                    show_success_dialog(
-                        self.page,
-                        "Zu Favoriten hinzugefügt",
-                        "Die Meldung wurde zu Ihren Favoriten hinzugefügt."
-                    )
-
-            if success:
-                self.page.update()
-
-        except Exception as ex:
-            logger.error(f"Fehler beim Aktualisieren der Favoriten (Post {post_id}): {ex}", exc_info=True)
-            from ui.components import show_error_dialog
-            show_error_dialog(
-                self.page,
-                "Fehler",
-                "Die Favoriten-Aktion konnte nicht durchgeführt werden."
-            )
-
-    # ──────────────────────────────────────────────────────────────────
-    # DATEN LADEN
-    # ──────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────
+    # Search
+    # ─────────────────────────────────────────────────────────────
 
     async def load_posts(self, _: Optional[ft.ControlEvent] = None) -> None:
-        """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen + Favoritenstatus."""
-        loading_indicator = ft.Container(
-            content=ft.Column(
-                [
-                    ft.ProgressRing(width=40, height=40),
-                    ft.Text("Laden...", size=14, color=ft.Colors.GREY_600),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=12,
-            ),
-            padding=40,
-            alignment=ft.alignment.center,
+        """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen + Favoritenstatus.
+        
+        Sammelt alle aktiven Filterwerte und ruft handle_load_posts auf.
+        """
+        # Sicherstellen, dass UI-Elemente initialisiert sind
+        if self._filter_typ is None:
+            return
+        
+        self.refresh_user()
+
+        filters = {
+            "typ": self._get_filter_value(self._filter_typ),
+            "art": self._get_filter_value(self._filter_art),
+            "geschlecht": self._get_filter_value(self._filter_geschlecht),
+            "rasse": self._get_filter_value(self._filter_rasse),
+        }
+
+        sort_option = self._get_filter_value(self._sort_dropdown, "created_at_desc")
+
+        handle_load_posts(
+            search_service=self.search_service,
+            favorites_service=self.favorites_service,
+            filters=filters,
+            search_query=self._search_q.value.strip() if self._search_q.value else None,
+            selected_colors=self.selected_farben,
+            sort_option=sort_option,
+            current_user_id=self.current_user_id,
+            list_view=self._list_view,
+            grid_view=self._grid_view,
+            empty_state_card=self._empty_state_card,
+            page=self.page,
+            on_render=self._render_items,
         )
-        self.list_view.controls = [loading_indicator]
-        self.grid_view.controls = []
-        self.list_view.visible = True
-        self.grid_view.visible = False
-        self.page.update()
 
-        try:
-            self.refresh_user()
-
-            # Filter-Werte sammeln (mit Fallback auf "alle" wenn None)
-            filters = {
-                "typ": self.filter_typ.value if self.filter_typ.value else "alle",
-                "art": self.filter_art.value if self.filter_art.value else "alle",
-                "geschlecht": self.filter_geschlecht.value if self.filter_geschlecht.value else "alle",
-                "rasse": self.filter_rasse.value if self.filter_rasse.value else "alle",
-            }
-
-            # Favoriten-IDs laden (für Markierung)
-            favorite_ids = self.favorites_service.get_favorite_ids(self.current_user_id) if self.current_user_id else set()
-
-            # Posts über SearchService laden
-            sort_option = self.sort_dropdown.value if self.sort_dropdown.value else "created_at_desc"
-            items = self.search_service.search_posts(
-                filters=filters,
-                search_query=self.search_q.value if self.search_q.value else None,
-                selected_colors=set(self.selected_farben) if self.selected_farben else None,
-                sort_option=sort_option,
-                favorite_ids=favorite_ids,
-            )
-
-            self.current_items = items
-            self._render_items(items)
-
-        except Exception as ex:
-            logger.error(f"Fehler beim Laden der Daten: {ex}", exc_info=True)
-            self.current_items = []
-            self.list_view.controls = [self.empty_state_card]
-            self.grid_view.controls = []
-            self.list_view.visible = True
-            self.grid_view.visible = False
-            self.page.update()
-
-    def _render_items(self, items: list[dict]):
-        try:
-            if not items:
-                no_results = soft_card(
-                    ft.Column(
-                        [
-                            ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-                            ft.Text("Keine Meldungen gefunden", weight=ft.FontWeight.W_600),
-                            ft.Text("Versuche andere Suchkriterien", color=ft.Colors.GREY_700),
-                            ft.TextButton("Filter zurücksetzen", on_click=self._reset_filters),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=8,
-                    ),
-                    elev=1,
-                    pad=24,
-                )
-                self.list_view.controls = [no_results]
-                self.grid_view.controls = []
-                self.list_view.visible = True
-                self.grid_view.visible = False
-                self.page.update()
-                return
-
-            if self.view_mode == "grid":
-                self.grid_view.controls = [
-                    build_small_card(
-                        item=it,
-                        page=self.page,
-                        on_favorite_click=self._toggle_favorite,
-                        on_card_click=self._show_detail_dialog,
-                    )
-                    for it in items
-                ]
-                self.list_view.controls = []
-                self.list_view.visible = False
-                self.grid_view.visible = True
-            else:
-                self.list_view.controls = [
-                    build_big_card(
-                        item=it,
-                        page=self.page,
-                        on_favorite_click=self._toggle_favorite,
-                        on_card_click=self._show_detail_dialog,
-                        on_contact_click=self.on_contact_click,
-                        supabase=self.sb,
-                    )
-                    for it in items
-                ]
-                self.grid_view.controls = []
-                self.list_view.visible = True
-                self.grid_view.visible = False
-
-            self.page.update()
-        except Exception as e:
-            logger.error(f"Fehler in _render_items: {e}", exc_info=True)
-            self.list_view.controls = [self.empty_state_card]
-            self.page.update()
+    def _render_items(self, items: list[dict]) -> None:
+        """Rendert die geladenen Items in der aktuellen View-Mode.
+        
+        Args:
+            items: Liste von Post-Dictionaries die gerendert werden sollen
+        """
+        self.current_items = items
+        handle_render_items(
+            items=items,
+            view_mode=self.view_mode,
+            list_view=self._list_view,
+            grid_view=self._grid_view,
+            empty_state_card=self._empty_state_card,
+            page=self.page,
+            on_favorite_click=self._toggle_favorite,
+            on_card_click=self._show_detail_dialog,
+            on_contact_click=self.on_contact_click,
+            supabase=self.sb,
+            profile_service=self.profile_service,
+        )
 
     def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
-        """Wrapper-Methode für den Detail-Dialog."""
+        """Zeigt den Detail-Dialog für eine Meldung.
+        
+        Args:
+            item: Post-Dictionary mit allen Daten
+        """
         show_detail_dialog(
             item=item,
             page=self.page,
             on_contact_click=self.on_contact_click,
             on_favorite_click=self._toggle_favorite,
+            profile_service=self.profile_service,
         )
 
-    # ──────────────────────────────────────────────────────────────────
-    # FILTER RESET
-    # ──────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────
+    # References
+    # ─────────────────────────────────────────────────────────────
+
+    async def _load_references(self) -> None:
+        """Lädt alle Referenzen und befüllt die Dropdowns."""
+        try:
+            self._all_breeds = load_and_populate_references(
+                ref_service=self.ref_service,
+                filter_typ=self._filter_typ,
+                filter_art=self._filter_art,
+                filter_geschlecht=self._filter_geschlecht,
+                filter_rasse=self._filter_rasse,
+                farben_filter_container=self._farben_filter_container,
+                selected_colors=self.selected_farben,
+                on_color_change_callback=self._on_filter_change,
+                page=self.page,
+            )
+            self._update_rassen_dropdown()
+            self.page.update()
+        except Exception as ex:
+            logger.error(f"Fehler beim Laden der Referenzen: {ex}", exc_info=True)
+            show_error_dialog(
+                self.page,
+                "Fehler beim Laden",
+                "Die Filteroptionen konnten nicht geladen werden. Bitte versuchen Sie es später erneut."
+            )
+
+    def _on_tierart_change(self, e: ft.ControlEvent) -> None:
+        """Wird aufgerufen wenn die Tierart geändert wird."""
+        self._update_rassen_dropdown()
+
+    def _update_rassen_dropdown(self) -> None:
+        """Aktualisiert das Rassen-Dropdown basierend auf der ausgewählten Tierart."""
+        if self._all_breeds:
+            update_breeds_dropdown(
+                filter_art=self._filter_art,
+                filter_rasse=self._filter_rasse,
+                all_breeds=self._all_breeds,
+                page=self.page,
+            )
+
+    def _toggle_farben_panel(self, _: Optional[ft.ControlEvent] = None) -> None:
+        """Öffnet oder schließt das Farben-Panel."""
+        self.farben_panel_visible = not self.farben_panel_visible
+        self._farben_panel.visible = self.farben_panel_visible
+        self._farben_toggle_icon.name = (
+            ft.Icons.KEYBOARD_ARROW_UP if self.farben_panel_visible else ft.Icons.KEYBOARD_ARROW_DOWN
+        )
+        self.page.update()
+
+    # ─────────────────────────────────────────────────────────────
+    # Filter
+    # ─────────────────────────────────────────────────────────────
 
     def _reset_filters(self, _: Optional[ft.ControlEvent] = None) -> None:
+        """Setzt alle Filter zurück."""
         reset_filters(
-            search_field=self.search_q,
-            filter_typ=self.filter_typ,
-            filter_art=self.filter_art,
-            filter_geschlecht=self.filter_geschlecht,
-            filter_rasse=self.filter_rasse,
-            sort_dropdown=self.sort_dropdown,
+            search_field=self._search_q,
+            filter_typ=self._filter_typ,
+            filter_art=self._filter_art,
+            filter_geschlecht=self._filter_geschlecht,
+            filter_rasse=self._filter_rasse,
+            sort_dropdown=self._sort_dropdown,
             selected_colors=self.selected_farben,
-            color_checkboxes_container=self.farben_filter_container,
+            color_checkboxes_container=self._farben_filter_container,
             page=self.page,
-            on_reset=lambda: self.page.run_task(self.load_posts),
+            on_reset=self._on_filter_change,
         )
+
+    def apply_saved_search(self, search: Dict[str, Any]) -> None:
+        """Wendet einen gespeicherten Suchauftrag auf die Filter an."""
+        apply_saved_search_filters(
+            search=search,
+            search_field=self._search_q,
+            filter_typ=self._filter_typ,
+            filter_art=self._filter_art,
+            filter_geschlecht=self._filter_geschlecht,
+            filter_rasse=self._filter_rasse,
+            selected_colors=self.selected_farben,
+            color_checkboxes_container=self._farben_filter_container,
+            update_breeds_callback=self._update_rassen_dropdown,
+            page=self.page,
+        )
+        self.page.run_task(self.load_posts)
 
     def _show_save_search_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Zeigt Dialog zum Speichern der aktuellen Suche."""
-        # Prüfen ob eingeloggt
         if not self.current_user_id:
             if self.on_save_search_login_required:
                 self.on_save_search_login_required()
             elif self.on_login_required:
-                # Fallback auf generischen Login-Callback
                 self.on_login_required()
             else:
-                self.page.snack_bar = ft.SnackBar(
-                    ft.Text("Bitte melden Sie sich an, um Suchaufträge zu speichern."),
-                    open=True,
+                show_login_required_snackbar(
+                    self.page,
+                    "Bitte melden Sie sich an, um Suchaufträge zu speichern."
                 )
-                self.page.update()
             return
 
-        # Aktuelle Filter sammeln
         current_filters = collect_current_filters(
-            search_field=self.search_q,
-            filter_typ=self.filter_typ,
-            filter_art=self.filter_art,
-            filter_geschlecht=self.filter_geschlecht,
-            filter_rasse=self.filter_rasse,
+            search_field=self._search_q,
+            filter_typ=self._filter_typ,
+            filter_art=self._filter_art,
+            filter_geschlecht=self._filter_geschlecht,
+            filter_rasse=self._filter_rasse,
             selected_colors=self.selected_farben,
         )
 
@@ -503,38 +316,161 @@ class DiscoverView:
             page=self.page,
             saved_search_service=self.saved_search_service,
             current_filters=current_filters,
-            ref_service=self.ref_service,
         )
 
-    def apply_saved_search(self, search: Dict[str, Any]) -> None:
-        """Wendet einen gespeicherten Suchauftrag auf die Filter an."""
-        apply_saved_search_filters(
-            search=search,
-            search_field=self.search_q,
-            filter_typ=self.filter_typ,
-            filter_art=self.filter_art,
-            filter_geschlecht=self.filter_geschlecht,
-            filter_rasse=self.filter_rasse,
-            selected_colors=self.selected_farben,
-            color_checkboxes_container=self.farben_filter_container,
-            update_breeds_callback=self._update_rassen_dropdown,
-            page=self.page,
-        )
+    # ─────────────────────────────────────────────────────────────
+    # UI-Hilfsmethoden
+    # ─────────────────────────────────────────────────────────────
+
+    def _on_filter_change(self, _: Optional[ft.ControlEvent] = None) -> None:
+        """Wird aufgerufen wenn ein Filter geändert wird.
+        
+        Lädt die Posts neu mit aktualisierten Filterwerten.
+        """
         self.page.run_task(self.load_posts)
 
-    # ──────────────────────────────────────────────────────────────────
-    # BUILD
-    # ──────────────────────────────────────────────────────────────────
+    def _get_filter_value(self, dropdown: ft.Dropdown, default: str = "alle") -> str:
+        """Holt den Wert aus einem Dropdown mit Fallback.
+        
+        Args:
+            dropdown: Dropdown-Widget
+            default: Standard-Wert wenn None oder leer
+        
+        Returns:
+            Dropdown-Wert oder default
+        """
+        return dropdown.value if dropdown.value else default
+
+    def _on_view_change(self, e: ft.ControlEvent) -> None:
+        """Wird aufgerufen wenn die View-Ansicht geändert wird.
+        
+        Wechselt zwischen Listen- und Grid-Ansicht und rendert die aktuellen
+        Items in der neuen Ansicht.
+        
+        Args:
+            e: ControlEvent vom View-Toggle
+        """
+        val = next(iter(e.control.selected), "list")
+        self.view_mode = val
+        self._render_items(self.current_items)
+
+    # ─────────────────────────────────────────────────────────────
+    # Build
+    # ─────────────────────────────────────────────────────────────
+
+    def _init_ui_elements(self) -> None:
+        """Initialisiert alle UI-Elemente."""
+        self._search_q = create_search_field(
+            on_change=self._on_filter_change
+        )
+
+        self._filter_typ = create_dropdown(
+            label="Kategorie",
+            on_change=self._on_filter_change,
+        )
+
+        self._filter_art = create_dropdown(
+            label="Tierart",
+            on_change=self._on_tierart_change,
+        )
+
+        self._filter_geschlecht = create_dropdown(
+            label="Geschlecht",
+            on_change=self._on_filter_change,
+            initial_options=[
+                ft.dropdown.Option("alle", "Alle"),
+                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
+            ],
+        )
+
+        self._filter_rasse = create_dropdown(
+            label="Rasse",
+            on_change=self._on_filter_change,
+        )
+
+        self._farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
+        self._farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN)
+        self._farben_panel = ft.Container(
+            content=self._farben_filter_container,
+            padding=12,
+            visible=False,
+        )
+
+        self._farben_header = create_farben_header(
+            toggle_icon=self._farben_toggle_icon,
+            on_click=self._toggle_farben_panel,
+        )
+
+        self._sort_dropdown = create_sort_dropdown(
+            on_change=self._on_filter_change
+        )
+
+        self._reset_btn = create_reset_button(on_click=self._reset_filters)
+        self._save_search_btn = ft.TextButton(
+            "Suche speichern",
+            icon=ft.Icons.BOOKMARK_ADD_OUTLINED,
+            on_click=self._show_save_search_dialog,
+        )
+
+        self._view_toggle = create_view_toggle(on_change=self._on_view_change)
+
+        self._list_view = ft.Column(spacing=14, expand=True)
+        self._grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12, visible=False)
+        
+        self._empty_state_card = create_empty_state_card(
+            message="Noch keine Meldungen",
+            subtitle="Passen Sie Ihre Filter an.",
+        )
+        
+        self._list_view.controls = [self._empty_state_card]
+        self._list_view.visible = True
+
+        if all([
+            self._search_q is not None,
+            self._filter_typ is not None,
+            self._filter_art is not None,
+            self._filter_geschlecht is not None,
+            self._filter_rasse is not None,
+            self._reset_btn is not None,
+            self._save_search_btn is not None,
+            self._farben_header is not None,
+            self._farben_panel is not None,
+        ]):
+            self.search_row = ft.ResponsiveRow(
+                controls=[
+                    ft.Container(self._search_q, col={"xs": 12, "md": 5}),
+                    ft.Container(self._filter_typ, col={"xs": 6, "md": 2}),
+                    ft.Container(self._filter_art, col={"xs": 6, "md": 2}),
+                    ft.Container(self._filter_geschlecht, col={"xs": 6, "md": 2}),
+                    ft.Container(self._filter_rasse, col={"xs": 6, "md": 1}),
+                    ft.Container(
+                        ft.Row([self._reset_btn, self._save_search_btn], spacing=8),
+                        col={"xs": 12, "md": 12},
+                    ),
+                    ft.Container(self._farben_header, col={"xs": 12, "md": 12}),
+                    ft.Container(self._farben_panel, col={"xs": 12, "md": 12}),
+                ],
+                spacing=10,
+                run_spacing=10,
+            )
+        else:
+            self.search_row = ft.ResponsiveRow(controls=[], spacing=10, run_spacing=10)
 
     def build(self) -> ft.Column:
+        """Erstellt und gibt die komplette Discover-UI zurück."""
+
         view_toggle_row = ft.Container(
-            content=ft.Row([self.view_toggle], alignment=ft.MainAxisAlignment.START),
+            content=ft.Row([self._view_toggle], alignment=ft.MainAxisAlignment.START),
             padding=ft.padding.only(left=4, top=12, bottom=8),
         )
 
         content_container = ft.Container(
             padding=4,
-            content=ft.Column([view_toggle_row, self.list_view, self.grid_view], spacing=8),
+            content=ft.Column([
+                view_toggle_row,
+                self._list_view,
+                self._grid_view,
+            ], spacing=8),
         )
 
         map_placeholder = ft.Column(
@@ -560,7 +496,6 @@ class DiscoverView:
             animation_duration=250,
         )
 
-        # Beim ersten Build direkt laden
         self.page.run_task(self.load_posts)
 
         return ft.Column([tabs], spacing=14, expand=True)

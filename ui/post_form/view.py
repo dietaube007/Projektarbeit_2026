@@ -286,7 +286,7 @@ class PostForm:
             show_error_dialog(
                 self.page,
                 "Kein Foto",
-                "Bitte lade zuerst ein Foto hoch, bevor du die KI-Erkennung startest."
+                "Bitte laden Sie zuerst ein Foto hoch, bevor Sie die KI-Erkennung starten."
             )
             return
         
@@ -352,8 +352,8 @@ class PostForm:
                         ft.Text(
                             "• Die KI-Erkennung dient nur als Vorschlag\n"
                             "• Es gibt keine Garantie für die Richtigkeit\n"
-                            "• Du kannst den Vorschlag ablehnen und selbst eintragen\n"
-                            "• Bei Unsicherheit kontaktiere ein Tierheim",
+                            "• Sie können den Vorschlag ablehnen und selbst eintragen\n"
+                            "• Bei Unsicherheit kontaktieren Sie ein Tierheim",
                             size=12,
                             color=ft.Colors.GREY_700,
                         ),
@@ -486,8 +486,8 @@ class PostForm:
                         self.page,
                         "Erkennung fehlgeschlagen",
                         result.get("error") or "Die KI konnte das Tier nicht sicher erkennen. "
-                        "Bitte versuche ein anderes Bild oder trage die Rasse manuell ein. "
-                        "Du kannst auch das Tierheim kontaktieren und das Tier beschreiben."
+                        "Bitte versuchen Sie ein anderes Bild oder tragen Sie die Rasse manuell ein. "
+                        "Sie können auch das Tierheim kontaktieren und das Tier beschreiben."
                     )
                 self._show_status("", is_error=False)
             # Fortschrittsdialog schließen
@@ -632,7 +632,7 @@ class PostForm:
         """Lehnt das KI-Erkennungsergebnis ab."""
         self.ai_result = None
         self.ai_result_container.visible = False
-        self._show_status("KI-Vorschlag abgelehnt. Bitte trage die Daten manuell ein.", is_error=False)
+        self._show_status("KI-Vorschlag abgelehnt. Bitte tragen Sie die Daten manuell ein.", is_error=False)
         self.page.update()
     
     # ════════════════════════════════════════════════════════════════════

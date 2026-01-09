@@ -1,20 +1,24 @@
-"""Dialog zum Speichern von Suchaufträgen."""
+"""
+Saved Search-Feature: UI und Logik für gespeicherte Suchaufträge.
+"""
 
 from __future__ import annotations
 
 from typing import Optional, Callable, Dict, Any
 import flet as ft
 
-from ui.constants import PRIMARY_COLOR
+from ui.constants import PRIMARY_COLOR, MESSAGE_COLOR_ERROR
 from ui.components import show_success_dialog
 from services.posts import SavedSearchService
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def show_save_search_dialog(
     page: ft.Page,
     saved_search_service: SavedSearchService,
     current_filters: Dict[str, Any],
-    ref_service: Optional[Any] = None,
     on_saved: Optional[Callable[[], None]] = None,
 ) -> None:
     """Zeigt Dialog zum Speichern der aktuellen Suche.
@@ -23,7 +27,6 @@ def show_save_search_dialog(
         page: Flet Page-Instanz
         saved_search_service: SavedSearchService-Instanz
         current_filters: Dictionary mit aktuellen Filterwerten
-        ref_service: Optional ReferenceService (wird nicht mehr verwendet, aber für Kompatibilität behalten)
         on_saved: Optional Callback nach erfolgreichem Speichern
     """
     name_field = ft.TextField(
@@ -31,12 +34,11 @@ def show_save_search_dialog(
         hint_text="z.B. 'Vermisste Katzen in Berlin'",
         width=300,
         autofocus=True,
-        value="",  # Sicherstellen, dass das Feld leer ist
-        key="saved_search_name_field",  # Eindeutige ID
+        value="",
+        key="saved_search_name_field",
     )
-    error_text = ft.Text("", color=ft.Colors.RED, size=12, visible=False)
+    error_text = ft.Text("", color=MESSAGE_COLOR_ERROR, size=12, visible=False)
 
-    # Aktive Filter anzeigen
     active_filters = []
     search_query = current_filters.get("search_query", "")
     if search_query:
@@ -60,32 +62,22 @@ def show_save_search_dialog(
     )
 
     def on_save(e):
-        # Sicherstellen, dass der Name korrekt aus dem TextField geholt wird
-        # Explizit den Wert aus dem TextField lesen, nicht aus current_filters
-        name_value = name_field.value if hasattr(name_field, "value") else None
-        if name_value is None:
-            name_value = ""
-        name = str(name_value).strip()
+        name = str(name_field.value or "").strip()
         
-        # Nur prüfen, dass der Name nicht leer ist
         if not name:
             error_text.value = "Bitte geben Sie einen Namen ein."
             error_text.visible = True
             page.update()
             return
 
-        # Alle anderen Validierungen entfernt - Nutzer kann alles eingeben
         sex_id = current_filters.get("sex_id")
         breed_id = current_filters.get("breed_id")
-        # Prüfen, ob "keine_angabe" ausgewählt ist
         filters_dict = current_filters.get("filters", {})
         geschlecht_value = filters_dict.get("geschlecht")
         rasse_value = filters_dict.get("rasse")
         if geschlecht_value == "keine_angabe":
-            # "keine_angabe" als speziellen Wert übergeben
             sex_id = "keine_angabe"
         if rasse_value == "keine_angabe":
-            # "keine_angabe" als speziellen Wert übergeben
             breed_id = "keine_angabe"
         
         success, error = saved_search_service.save_search(
@@ -108,6 +100,7 @@ def show_save_search_dialog(
             if on_saved:
                 on_saved()
         else:
+            logger.error(f"Fehler beim Speichern des Suchauftrags '{name}': {error}")
             error_text.value = error or "Fehler beim Speichern."
             error_text.visible = True
             page.update()
@@ -115,11 +108,7 @@ def show_save_search_dialog(
     def on_cancel(e):
         page.close(dialog)
 
-    # Sicherstellen, dass das name_field leer ist, bevor der Dialog geöffnet wird
-    # Explizit zurücksetzen, um sicherzustellen, dass kein alter Wert übernommen wird
     name_field.value = ""
-    if hasattr(name_field, "value"):
-        name_field.value = ""
     error_text.value = ""
     error_text.visible = False
     
@@ -150,4 +139,3 @@ def show_save_search_dialog(
         actions_alignment=ft.MainAxisAlignment.END,
     )
     page.open(dialog)
-
