@@ -4,19 +4,19 @@ PetBuddy UI Module.
 Dieses Modul enthält alle UI-Komponenten der PetBuddy-Anwendung.
 
 Struktur:
-├── auth.py          - Authentifizierung (Login/Registrierung)
+├── auth/            - Authentifizierung (Login/Registrierung)
 ├── theme.py         - Theme-Manager und UI-Hilfsfunktionen
-├── post_form.py     - Formular für Tier-Meldungen
+├── post_form/       - Formular für Tier-Meldungen
 ├── constants.py     - Zentrale Konstanten
 ├── helpers.py       - Hilfsfunktionen
-├── components/      - Wiederverwendbare UI-Komponenten
+├── shared_components.py - Wiederverwendbare UI-Komponenten
 ├── discover/        - Startseite mit Meldungsübersicht
 └── profile/         - Benutzer-Profil
 """
 
 # Hauptkomponenten
 from ui.auth import AuthView
-from ui.theme import ThemeManager, soft_card, chip
+from ui.theme import ThemeManager, soft_card, chip, get_theme_colors
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
@@ -33,7 +33,7 @@ from ui.constants import (
 )
 
 # Komponenten
-from ui.components import (
+from ui.shared_components import (
     show_login_required_dialog,
     show_confirm_dialog,
     show_success_dialog,
@@ -61,6 +61,7 @@ __all__ = [
     # Theme helpers
     "soft_card",
     "chip",
+    "get_theme_colors",
     # Konstanten
     "STATUS_COLORS",
     "SPECIES_COLORS",

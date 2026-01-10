@@ -38,6 +38,7 @@ POST_SELECT_FAVORITES = """
     event_date,
     created_at,
     is_active,
+    user_id,
     post_status(id, name),
     species(id, name),
     breed(id, name),
@@ -54,6 +55,7 @@ POST_SELECT_MY_POSTS = """
     event_date,
     created_at,
     is_active,
+    user_id,
     post_status(id, name),
     species(id, name),
     breed(id, name),
@@ -66,4 +68,9 @@ POST_SELECT_MY_POSTS = """
 POST_SELECT_MINIMAL = """
     id,
     post_image(url)
+"""
+
+# Comment-Select für vollständige Kommentare 
+COMMENT_SELECT_FULL = """
+    id, post_id, user_id, content, created_at, updated_at, is_deleted
 """

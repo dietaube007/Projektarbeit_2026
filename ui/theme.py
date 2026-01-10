@@ -10,7 +10,7 @@ Es definiert:
 
 """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Any, Dict
 
 import flet as ft
 from utils.logging_config import get_logger
@@ -36,6 +36,78 @@ THEME_LIGHT: str = "light"
 THEME_DARK: str = "dark"
 DEFAULT_CARD_PADDING: int = 16
 DEFAULT_CARD_ELEVATION: float = 2.0
+
+# ════════════════════════════════════════════════════════════════════
+# THEME-FARBEN 
+# ════════════════════════════════════════════════════════════════════
+
+from ui.constants import (
+    LIGHT_BACKGROUND,
+    LIGHT_CARD,
+    LIGHT_TEXT_PRIMARY,
+    LIGHT_TEXT_SECONDARY,
+    DARK_BACKGROUND,
+    DARK_CARD,
+    DARK_TEXT_PRIMARY,
+    DARK_TEXT_SECONDARY,
+)
+
+__all__ = [
+    "LIGHT_BACKGROUND",
+    "LIGHT_CARD",
+    "LIGHT_TEXT_PRIMARY",
+    "LIGHT_TEXT_SECONDARY",
+    "DARK_BACKGROUND",
+    "DARK_CARD",
+    "DARK_TEXT_PRIMARY",
+    "DARK_TEXT_SECONDARY",
+    "THEME_COLORS",
+    "get_theme_color",
+    "ThemeManager",
+    "soft_card",
+    "chip",
+]
+
+# Mapping für einfachen Zugriff
+THEME_COLORS: dict[str, dict[str, Any]] = {
+    "background": {
+        "light": LIGHT_BACKGROUND,
+        "dark": DARK_BACKGROUND,
+    },
+    "card": {
+        "light": LIGHT_CARD,
+        "dark": DARK_CARD,
+    },
+    "text_primary": {
+        "light": LIGHT_TEXT_PRIMARY,
+        "dark": DARK_TEXT_PRIMARY,
+    },
+    "text_secondary": {
+        "light": LIGHT_TEXT_SECONDARY,
+        "dark": DARK_TEXT_SECONDARY,
+    },
+}
+
+
+def get_theme_color(color_key: str, is_dark: bool) -> Any:
+    """
+    Gibt die passende Farbe für den aktuellen Theme-Modus zurück.
+    
+    Args:
+        color_key: "background", "card", "text_primary", "text_secondary"
+        is_dark: True für Dark-Modus, False für Light-Modus
+    
+    Returns:
+        Farbe als String oder ft.Color
+    
+    Raises:
+        KeyError: Wenn color_key nicht existiert
+    """
+    mode = "dark" if is_dark else "light"
+    if color_key not in THEME_COLORS:
+        logger.warning(f"Unbekannter Farb-Schlüssel '{color_key}'. Verwende 'background'.")
+        color_key = "background"
+    return THEME_COLORS[color_key][mode]
 
 
 class ThemeManager:
@@ -191,6 +263,52 @@ class ThemeManager:
             pass
         return self._toggle_button
     
+
+
+# ════════════════════════════════════════════════════════════════════
+# UI-KOMPONENTEN - Wiederverwendbare Design-Elemente
+# ════════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════════════
+# THEME-HELPER FUNKTIONEN
+# ════════════════════════════════════════════════════════════════════
+
+def get_theme_colors(page: ft.Page) -> Dict[str, Any]:
+    """Holt Theme-Farben für Light/Dark Mode.
+    
+    Args:
+        page: Flet Page-Instanz
+    
+    Returns:
+        Dictionary mit Theme-Farben:
+        - is_dark: bool - Ob Dark-Modus aktiv ist
+        - surface: Optional Color - Surface-Variant-Farbe
+        - outline: Optional Color - Outline-Variant-Farbe
+        - text: Color - Text-Farbe basierend auf Theme
+        - icon: Color - Icon-Farbe basierend auf Theme
+        - border: Color - Border-Farbe basierend auf Theme
+    """
+    is_dark = page.theme_mode == ft.ThemeMode.DARK
+    surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
+    outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+    on_surface_variant = getattr(ft.Colors, "ON_SURFACE_VARIANT", None)
+    
+    text_color = on_surface_variant if on_surface_variant else (
+        ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_700
+    )
+    icon_color = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_500
+    border_color = outline_color if outline_color else (
+        ft.Colors.GREY_600 if is_dark else ft.Colors.GREY_300
+    )
+    
+    return {
+        "is_dark": is_dark,
+        "surface": surface_color,
+        "outline": outline_color,
+        "text": text_color,
+        "icon": icon_color,
+        "border": border_color,
+    }
 
 
 # ════════════════════════════════════════════════════════════════════

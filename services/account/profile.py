@@ -86,6 +86,20 @@ class ProfileService:
             logger.error(f"Fehler beim Aktualisieren des Anzeigenamens: {e}", exc_info=True)
             return False, str(e)
 
+    def _prepare_user_ids(self, user_ids: Iterable[str]) -> List[str]:
+        """Bereitet User-IDs für Queries vor (dedupliziert, validiert).
+        
+        Args:
+            user_ids: Iterable mit User-IDs
+        
+        Returns:
+            Liste von deduplizierten User-IDs, leere Liste wenn ungültig
+        """
+        if not user_ids:
+            return []
+        user_ids_list = list(set(user_ids))
+        return user_ids_list if user_ids_list else []
+
     def get_user_display_names(self, user_ids: Iterable[str]) -> Dict[str, str]:
         """Lädt die Anzeigenamen für eine Liste von User-IDs.
 
@@ -95,27 +109,47 @@ class ProfileService:
         Returns:
             Dictionary mit user_id -> display_name Mapping
         """
-        if not user_ids:
-            return {}
+        # Nutze get_user_profiles() und extrahiere nur display_name
+        profiles = self.get_user_profiles(user_ids)
+        return {
+            user_id: profile.get("display_name", "")
+            for user_id, profile in profiles.items()
+        }
 
+    def get_user_profiles(self, user_ids: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+        """Lädt Profil-Daten (display_name + profile_image) für mehrere User-IDs.
+        
+        Args:
+            user_ids: Iterable mit User-IDs (wird automatisch dedupliziert)
+        
+        Returns:
+            Dictionary: user_id -> {"display_name": str, "profile_image": str | None}
+            Leeres Dictionary bei Fehler oder wenn keine user_ids vorhanden.
+        """
+        user_ids_list = self._prepare_user_ids(user_ids)
+        if not user_ids_list:
+            return {}
+        
         try:
-            # user_profiles View abfragen
-            user_ids_list = list(set(user_ids))
-            if not user_ids_list:
-                return {}
-            
+            # Nutze direkt user_profiles View (hat nur display_name)
             result = (
                 self.sb.table("user_profiles")
                 .select("id, display_name")
                 .in_("id", user_ids_list)
                 .execute()
             )
-
-            return {
-                row["id"]: row.get("display_name") or ""
-                for row in (result.data or [])
-            }
+            
+            profiles = {}
+            for row in (result.data or []):
+                user_id = row.get("id")
+                if user_id:
+                    profiles[user_id] = {
+                        "display_name": row.get("display_name") or "Unbekannt",
+                        "profile_image": None,  # profile_image_url ist in auth.users user_metadata, nicht direkt abfragbar
+                    }
+            
+            return profiles
         except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Laden der Benutzernamen: {e}", exc_info=True)
+            logger.error(f"Fehler beim Laden der Benutzerprofile: {e}", exc_info=True)
             return {}
-
+    

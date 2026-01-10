@@ -48,6 +48,9 @@ MAX_LOCATION_LENGTH = 200
 MAX_SEARCH_QUERY_LENGTH = 200
 """Maximale Länge für Suchbegriffe."""
 
+MAX_COMMENT_LENGTH = 1000
+"""Maximale Länge für Kommentar-Text."""
+
 TRUNCATE_TEXT_LENGTH = 100
 """Standard-Länge für Text-Kürzung in Vorschauen."""
 

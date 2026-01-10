@@ -1,0 +1,161 @@
+"""Service für Kommentar-Verwaltung."""
+
+from __future__ import annotations
+
+from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
+
+from supabase import Client
+
+from utils.logging_config import get_logger
+from utils.constants import MAX_COMMENT_LENGTH
+from utils.validators import validate_length
+from .queries import COMMENT_SELECT_FULL
+
+if TYPE_CHECKING:
+    from services.account.profile import ProfileService
+
+logger = get_logger(__name__)
+
+
+class CommentService:
+    """Service-Klasse für das Verwalten von Kommentaren."""
+
+    def __init__(
+        self,
+        sb: Client,
+        profile_service: Optional["ProfileService"] = None,
+    ) -> None:
+        """Initialisiert den CommentService.
+        
+        Args:
+            sb: Supabase Client-Instanz
+            profile_service: Optional ProfileService 
+        """
+        self.sb = sb
+        if profile_service is None:
+            from services.account.profile import ProfileService
+            self._profile_service = ProfileService(sb)
+        else:
+            self._profile_service = profile_service
+
+    def get_comments(self, post_id: str) -> List[Dict[str, Any]]:
+        """Lädt alle nicht gelöschten Kommentare für einen Post.
+        
+        Args:
+            post_id: UUID des Posts
+        
+        Returns:
+            Liste von Kommentar-Dictionaries mit User-Daten (display_name, profile_image).
+            Leere Liste bei Fehler oder wenn keine Kommentare vorhanden.
+        """
+        try:
+            # Kommentare laden 
+            response = (
+                self.sb.table("comment")
+                .select(COMMENT_SELECT_FULL)
+                .eq("post_id", post_id)
+                .eq("is_deleted", False)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            
+            comments = response.data if response and hasattr(response, "data") else []
+            
+            # User-Daten über ProfileService anreichern (konsistent mit SearchService)
+            if comments:
+                user_ids = {c.get("user_id") for c in comments if c.get("user_id")}
+                user_profiles = self._profile_service.get_user_profiles(user_ids)
+                
+                # User-Daten zu Kommentaren hinzufügen (konsistent mit comment_components Erwartung)
+                for comment in comments:
+                    user_id = comment.get("user_id")
+                    profile = user_profiles.get(user_id, {})
+                    comment["user"] = {
+                        "display_name": profile.get("display_name", "Unbekannt"),
+                        "profile_image": profile.get("profile_image"),
+                    }
+            
+            return comments
+            
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Kommentare für Post {post_id}: {e}", exc_info=True)
+            return []
+
+    def create_comment(
+        self,
+        post_id: str,
+        user_id: str,
+        content: str,
+    ) -> bool:
+        """Erstellt einen neuen Kommentar.
+        
+        Args:
+            post_id: UUID des Posts
+            user_id: UUID des Benutzers
+            content: Kommentar-Text (max. MAX_COMMENT_LENGTH Zeichen)
+        
+        Returns:
+            True bei Erfolg, False bei Fehler oder ungültiger Eingabe
+        """
+        # Validierung: Leerer Kommentar
+        if not content or not content.strip():
+            logger.warning("Versuch, leeren Kommentar zu erstellen")
+            return False
+        
+        # Validierung: Maximale Länge (1000 Zeichen)
+        length_valid, length_error = validate_length(
+            content.strip(),
+            max_length=MAX_COMMENT_LENGTH
+        )
+        if not length_valid:
+            logger.warning(f"Kommentar zu lang: {length_error}")
+            return False
+        
+        try:
+            # Kommentar-Daten vorbereiten
+            # Schema: id ist serial (auto-increment integer)
+            comment_data = {
+                "post_id": post_id,
+                "user_id": str(user_id),
+                "content": content.strip(),
+                "is_deleted": False,
+            }
+            
+            # Kommentar in Supabase speichern
+            self.sb.table("comment").insert(comment_data).execute()
+            
+            logger.info(f"Kommentar erstellt für Post {post_id} von User {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen des Kommentars: {e}", exc_info=True)
+            return False
+
+    def delete_comment(self, comment_id: Union[int, str]) -> bool:
+        """Soft-Delete: Setzt is_deleted auf True und updated_at.
+        
+        Args:
+            comment_id: ID des Kommentars (serial integer)
+        
+        Returns:
+            True bei Erfolg, False bei Fehler
+        """
+        try:
+            # Konvertiere comment_id zu int (falls als str übergeben)
+            comment_id_int = int(comment_id) if isinstance(comment_id, str) else comment_id
+            
+            # Soft Delete in Supabase (updated_at wird automatisch von DB-Trigger gesetzt)
+            self.sb.table("comment").update({
+                "is_deleted": True,
+                # updated_at sollte von DB-Trigger automatisch gesetzt werden
+            }).eq("id", comment_id_int).execute()
+            
+            logger.info(f"Kommentar {comment_id_int} als gelöscht markiert")
+            return True
+            
+        except (ValueError, TypeError) as e:
+            logger.error(f"Ungültige comment_id: {comment_id} ({type(comment_id)}): {e}", exc_info=True)
+            return False
+        except Exception as e:
+            logger.error(f"Fehler beim Löschen des Kommentars (ID: {comment_id}): {e}", exc_info=True)
+            return False

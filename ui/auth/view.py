@@ -1,7 +1,5 @@
 """
 Authentifizierungs-View mit Login, Registrierung und Theme-Toggle.
-
-Enthält UI-Komposition und koordiniert Auth-Features.
 """
 
 from typing import Callable, Optional
@@ -10,22 +8,15 @@ import flet as ft
 
 from ui.constants import (
     PRIMARY_COLOR,
-    BACKGROUND_COLOR,
-    CARD_COLOR,
-    TEXT_PRIMARY,
     TEXT_SECONDARY,
     MESSAGE_TYPE_ERROR,
     MESSAGE_TYPE_SUCCESS,
     MESSAGE_TYPE_INFO,
     MESSAGE_COLOR_MAP,
     MESSAGE_COLOR_INFO,
-    DARK_BACKGROUND,
-    DARK_CARD,
-    DARK_TEXT_PRIMARY,
-    DARK_TEXT_SECONDARY,
 )
 from services.account import AuthService, ProfileService
-from ui.theme import ThemeManager
+from ui.theme import ThemeManager, get_theme_color
 from .components import (
     create_login_email_field,
     create_login_password_field,
@@ -41,9 +32,7 @@ from .components import (
     create_registration_modal,
     create_login_card,
 )
-from .features.login import handle_login, handle_logout
-from .features.register import handle_register
-from .features.password_reset import show_password_reset_dialog_feature
+from .handlers import handle_login, handle_logout, handle_register, show_password_reset_dialog_feature
 
 
 class AuthView:
@@ -66,7 +55,7 @@ class AuthView:
         
         self.theme_manager = ThemeManager(page)
         
-        # UI-Komponenten (werden in build() initialisiert)
+        # UI-Komponenten-Referenzen (werden in _init_ui_elements() initialisiert)
         self._login_email: Optional[ft.TextField] = None
         self._login_pwd: Optional[ft.TextField] = None
         self._login_info: Optional[ft.Text] = None
@@ -83,6 +72,9 @@ class AuthView:
         self._welcome_text: Optional[ft.Text] = None
         self._title_text: Optional[ft.Text] = None
         self._subtitle_text: Optional[ft.Text] = None
+        
+        # UI wird sofort initialisiert (konsistent mit discover/view.py)
+        self._init_ui_elements()
 
     # ─────────────────────────────────────────────────────────────
     # Authentifizierungs-Methoden
@@ -97,8 +89,14 @@ class AuthView:
             email=email,
             password=password,
             show_message_callback=self._show_login_message,
-            on_success_callback=self.on_auth_success,
+            on_success_callback=self._on_login_success,
         )
+    
+    def _on_login_success(self) -> None:
+        """Wird nach erfolgreichem Login aufgerufen."""
+        self._update_login_card()
+        if self.on_auth_success:
+            self.on_auth_success()
 
     def _register(self):
         """Führt die Registrierung durch."""
@@ -124,6 +122,7 @@ class AuthView:
             auth_service=self.auth_service,
             show_message_callback=self._show_login_message,
         )
+        self._update_login_card()
 
     # ─────────────────────────────────────────────────────────────
     # Passwort vergessen
@@ -180,6 +179,55 @@ class AuthView:
         """
         self._show_message(self._reg_info, message, message_type)
 
+    def _update_login_card(self) -> None:
+        """Aktualisiert die Login-Card basierend auf dem aktuellen Login-Status."""
+        if not self._form_card:
+            return
+        
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        
+        # Login-Felder zurücksetzen, wenn nicht eingeloggt
+        if not self.is_logged_in():
+            if self._login_email:
+                self._login_email.value = ""
+                self._login_email.visible = True
+            if self._login_pwd:
+                self._login_pwd.value = ""
+                self._login_pwd.visible = True
+        
+        # Buttons neu erstellen
+        login_btn = create_login_button(lambda e: self._login())
+        register_btn = create_register_button(self._open_modal)
+        continue_btn = create_continue_button(
+            lambda e: self.on_continue_without_account() if self.on_continue_without_account else None
+        )
+        logout_btn = create_logout_button(lambda e: self._logout())
+        forgot_password_btn = ft.TextButton(
+            "Passwort vergessen?",
+            on_click=self._show_forgot_password_dialog,
+            style=ft.ButtonStyle(color=PRIMARY_COLOR),
+        )
+        
+        # Neue Card erstellen und Content aktualisieren
+        new_card = create_login_card(
+            email_field=self._login_email,
+            password_field=self._login_pwd,
+            info_text=self._login_info,
+            login_btn=login_btn,
+            register_btn=register_btn,
+            continue_btn=continue_btn,
+            is_logged_in=self.is_logged_in(),
+            logout_btn=logout_btn,
+            forgot_password_btn=forgot_password_btn,
+            is_dark=is_dark,
+        )
+        
+        # Card-Content und Eigenschaften aktualisieren
+        self._form_card.content = new_card.content
+        self._form_card.bgcolor = new_card.bgcolor
+        self._form_card.shadow = new_card.shadow
+        
+        self.page.update()
 
     def _update_ui_colors(self, is_dark: bool):
         """Aktualisiert View-spezifische UI-Farben nach Theme-Wechsel.
@@ -189,23 +237,23 @@ class AuthView:
         """
         # Icon-Farbe aktualisieren (ThemeManager aktualisiert Icon/Tooltip bereits)
         if self._theme_icon:
-            self._theme_icon.icon_color = DARK_TEXT_PRIMARY if is_dark else TEXT_SECONDARY
+            self._theme_icon.icon_color = get_theme_color("text_primary", is_dark)
         
         # Hintergrund-Farben aktualisieren
         if self._background:
-            self._background.bgcolor = DARK_BACKGROUND if is_dark else BACKGROUND_COLOR
+            self._background.bgcolor = get_theme_color("background", is_dark)
         if self._form_card:
-            self._form_card.bgcolor = DARK_CARD if is_dark else CARD_COLOR
+            self._form_card.bgcolor = get_theme_color("card", is_dark)
         if self._reg_modal_card:
-            self._reg_modal_card.bgcolor = DARK_CARD if is_dark else CARD_COLOR
+            self._reg_modal_card.bgcolor = get_theme_color("card", is_dark)
         
         # Überschriften-Farben aktualisieren
         if self._welcome_text:
-            self._welcome_text.color = DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY
+            self._welcome_text.color = get_theme_color("text_secondary", is_dark)
         if self._title_text:
-            self._title_text.color = DARK_TEXT_PRIMARY if is_dark else TEXT_PRIMARY
+            self._title_text.color = get_theme_color("text_primary", is_dark)
         if self._subtitle_text:
-            self._subtitle_text.color = DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY
+            self._subtitle_text.color = get_theme_color("text_secondary", is_dark)
     
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
@@ -273,8 +321,8 @@ class AuthView:
     # Build
     # ─────────────────────────────────────────────────────────────
 
-    def build(self) -> ft.Control:
-        """Erstellt und gibt die komplette Auth-UI zurück."""
+    def _init_ui_elements(self) -> None:
+        """Initialisiert alle UI-Elemente."""
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         
         # Login-Formular Felder
@@ -295,7 +343,7 @@ class AuthView:
         # Theme-Toggle (mit Callback für View-spezifische UI-Updates)
         self._theme_icon = self.theme_manager.create_toggle_button(
             on_after_toggle=self._update_ui_colors,
-            icon_color=ft.Colors.WHITE if is_dark else TEXT_SECONDARY,
+            icon_color=get_theme_color("text_primary", is_dark) if is_dark else TEXT_SECONDARY,
         )
         
         # Registrierungs-Modal
@@ -360,18 +408,18 @@ class AuthView:
         self._welcome_text = ft.Text(
             "Willkommen bei",
             size=16,
-            color=DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY,
+            color=get_theme_color("text_secondary", is_dark),
         )
         self._title_text = ft.Text(
             "PetBuddy",
             size=32,
             weight=ft.FontWeight.BOLD,
-            color=DARK_TEXT_PRIMARY if is_dark else TEXT_PRIMARY,
+            color=get_theme_color("text_primary", is_dark),
         )
         self._subtitle_text = ft.Text(
             "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
             size=14,
-            color=DARK_TEXT_SECONDARY if is_dark else TEXT_SECONDARY,
+            color=get_theme_color("text_secondary", is_dark),
             text_align=ft.TextAlign.CENTER,
         )
         
@@ -398,8 +446,10 @@ class AuthView:
                     right=16,
                 ),
             ]),
-            bgcolor=DARK_BACKGROUND if is_dark else BACKGROUND_COLOR,
+            bgcolor=get_theme_color("background", is_dark),
             expand=True,
         )
-        
+    
+    def build(self) -> ft.Control:
+        """Erstellt und gibt die komplette Auth-UI zurück."""
         return self._background

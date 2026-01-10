@@ -6,8 +6,8 @@ für das Erstellen von Tier-Meldungen (vermisst/gefunden).
 
 Struktur:
 - view.py: Hauptklasse PostForm (UI-Komposition und Koordinierung)
-- components.py: Gemeinsame UI-Komponenten (statische Builder)
-- features/: Feature-Module (AI Recognition, Photo Upload, Post Upload, Validation, References)
+- components/: UI-Komponenten (Form Fields, Photo Components, AI Components)
+- handlers/: Handler-Module (AI Recognition, Photo Upload, Post Upload, Validation, References, UI Handler)
 """
 
 # Re-export der Hauptklasse für einfachen Import
