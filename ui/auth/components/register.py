@@ -58,11 +58,40 @@ def create_register_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Te
     )
 
 
+def create_registration_error_banner() -> tuple[ft.Container, ft.Text]:
+    """Erstellt den Fehler-Banner für das Registrierungs-Modal.
+    
+    Returns:
+        Tuple (banner_container, error_text_widget)
+        - banner_container: Container mit rotem Hintergrund
+        - error_text_widget: Text-Widget für die Fehlermeldung
+    """
+    error_text = ft.Text(
+        "",
+        size=13,
+        weight=ft.FontWeight.W_500,
+        color=ft.Colors.WHITE,
+        expand=True,
+    )
+    banner = ft.Container(
+        content=ft.Row([
+            ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.WHITE, size=20),
+            error_text,
+        ], spacing=8, tight=True),
+        padding=ft.padding.symmetric(horizontal=16, vertical=12),
+        bgcolor=ft.Colors.RED_600,
+        border_radius=8,
+        visible=False,
+        margin=ft.margin.only(top=-10, bottom=4) 
+    )
+    return banner, error_text
+
 def create_registration_modal(
     email_field: ft.TextField,
     password_field: ft.TextField,
     password_confirm_field: ft.TextField,
     username_field: ft.TextField,
+    error_banner: ft.Container,
     info_text: ft.Text,
     on_register: Callable[[ft.ControlEvent], None],
     on_close: Callable[[ft.ControlEvent], None],
@@ -76,6 +105,8 @@ def create_registration_modal(
                 ft.IconButton(ft.Icons.CLOSE, on_click=on_close)
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Divider(),
+            # Fehler-Banner oben (wird sichtbar/unsichtbar gemacht)
+            error_banner,
             email_field,
             password_field,
             password_confirm_field,

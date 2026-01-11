@@ -135,22 +135,28 @@ def badge_for_species(species: str) -> ft.Control:
 # PLATZHALTER
 # ══════════════════════════════════════════════════════════════════════
 
-def image_placeholder(height: int = 160, icon_size: int = 48, expand: bool = False) -> ft.Container:
+def image_placeholder(height: int = 160, icon_size: int = 48, expand: bool = False, page: Optional[ft.Page] = None) -> ft.Container:
     """Erstellt einen Bild-Platzhalter.
     
     Args:
         height: Höhe des Platzhalters (Standard: 160)
         icon_size: Größe des Platzhalter-Icons (Standard: 48)
         expand: Ob der Container expandieren soll (Standard: False)
+        page: Optional Page-Instanz für Theme-Erkennung
     
     Returns:
         Container mit Platzhalter-Icon
     """
+    from ui.theme import get_theme_color
+    
+    is_dark = page.theme_mode == ft.ThemeMode.DARK if page else False
+    bg_color = get_theme_color("card", is_dark) if page else ft.Colors.GREY_200
+    
     return ft.Container(
         content=ft.Icon(ft.Icons.PETS, size=icon_size, color=ft.Colors.GREY_400),
         height=height,
         alignment=ft.alignment.center,
-        bgcolor=ft.Colors.GREY_200,
+        bgcolor=bg_color,
         border_radius=12,
         expand=expand,
     )

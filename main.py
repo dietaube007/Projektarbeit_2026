@@ -41,17 +41,15 @@ if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
     upload_dir_abs = os.path.join(base_dir, "image_uploads")
     os.makedirs(upload_dir_abs, exist_ok=True)
-    # Für Konsistenz auch als Umgebungsvariable bereitstellen
     os.environ["UPLOAD_DIR"] = upload_dir_abs
     
-    # Öffne Browser automatisch mit localhost (nur lokal, nicht auf Fly.io)
     if os.getenv("FLY_APP_NAME") is None:
         webbrowser.open(f"http://localhost:{port}")
     
     ft.app(
         target=main,
         upload_dir=upload_dir_abs,
-        view=None,  # Kein automatischer Browser-Start durch Flet
+        view=None,
         port=port,
         host="0.0.0.0"
     )

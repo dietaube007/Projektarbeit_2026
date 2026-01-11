@@ -24,7 +24,7 @@ from utils.constants import (
 
 PRIMARY_COLOR = "#5B6EE1"          # Blau für Buttons und Akzente
 PRIMARY_SEED = "#4C6FFF"           # Material 3 Seed-Farbe
-BORDER_COLOR = "#E5E7EB"            # Hellgrauer Rahmen
+BORDER_COLOR = "#D1D5DB"            # Grauer Rahmen
 
 # ══════════════════════════════════════════════════════════════════════
 # THEME-FARBEN (Light & Dark Mode)

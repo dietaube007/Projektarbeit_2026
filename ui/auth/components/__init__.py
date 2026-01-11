@@ -17,6 +17,7 @@ from .register import (
     create_register_password_confirm_field,
     create_register_username_field,
     create_register_button,
+    create_registration_error_banner,
     create_registration_modal,
 )
 from .password_reset import (
@@ -41,6 +42,7 @@ __all__ = [
     "create_register_password_confirm_field",
     "create_register_username_field",
     "create_register_button",
+    "create_registration_error_banner",
     "create_registration_modal",
     # Password Reset
     "create_password_reset_email_field",

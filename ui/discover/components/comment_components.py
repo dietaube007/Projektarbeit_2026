@@ -6,6 +6,8 @@ import flet as ft
 from typing import Optional
 
 from ui.helpers import format_time
+from ui.theme import get_theme_color
+from ui.constants import PRIMARY_COLOR
 from services.posts import CommentService
 from utils.logging_config import get_logger
 from utils.constants import MAX_COMMENT_LENGTH
@@ -39,6 +41,7 @@ class CommentSection(ft.Container):
         self.comment_service = CommentService(supabase, profile_service=profile_service)
         # Antwort-Funktion deaktiviert, da kein parent_comment_id im Schema
         self.replying_to = None
+        self.is_dark = page.theme_mode == ft.ThemeMode.DARK
         
         # Kommentar-Liste (scrollbar)
         self.comments_list = ft.Column(
@@ -52,9 +55,9 @@ class CommentSection(ft.Container):
         # Antwort-Info-Banner (zeigt an, auf welchen Kommentar geantwortet wird)
         self.reply_banner = ft.Container(
             content=ft.Row([
-                ft.Icon(ft.Icons.REPLY, size=16, color=ft.Colors.BLUE),
-                ft.Text("Antwort auf ", size=12, color=ft.Colors.BLUE),
-                ft.Text("", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+                ft.Icon(ft.Icons.REPLY, size=16, color=PRIMARY_COLOR),
+                ft.Text("Antwort auf ", size=12, color=PRIMARY_COLOR),
+                ft.Text("", size=12, weight=ft.FontWeight.BOLD, color=PRIMARY_COLOR),
                 ft.Container(expand=True),
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
@@ -63,7 +66,7 @@ class CommentSection(ft.Container):
                     on_click=self.cancel_reply
                 )
             ], spacing=5),
-            bgcolor=ft.Colors.BLUE_50,
+            bgcolor=get_theme_color("card", self.is_dark),
             padding=8,
             border_radius=8,
             visible=False
@@ -76,8 +79,8 @@ class CommentSection(ft.Container):
             min_lines=1,
             max_lines=4,
             expand=True,
-            border_color=ft.Colors.GREY_400,
-            focused_border_color=ft.Colors.BLUE_600,
+            border_color=get_theme_color("text_secondary", self.is_dark),
+            focused_border_color=PRIMARY_COLOR,
             border_radius=8,
             content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
             on_submit=self.post_comment,
@@ -89,22 +92,23 @@ class CommentSection(ft.Container):
             icon=ft.Icons.SEND,  # FIX: Icons mit großem I
             tooltip="Kommentar senden",
             on_click=self.post_comment,
-            icon_color=ft.Colors.BLUE,
+            icon_color=PRIMARY_COLOR,
             disabled=False
         )
         
         super().__init__(
             content=ft.Column([
-                ft.Divider(height=1, color=ft.Colors.GREY_300),
+                ft.Divider(height=1, color=get_theme_color("text_secondary", self.is_dark)),
                 
                 # Header
                 ft.Container(
                     content=ft.Row([
-                        ft.Icon(ft.Icons.COMMENT, size=24, color=ft.Colors.BLUE),
+                        ft.Icon(ft.Icons.COMMENT, size=24, color=PRIMARY_COLOR),
                         ft.Text(
                             "Kommentare",
                             size=18,
-                            weight=ft.FontWeight.BOLD
+                            weight=ft.FontWeight.BOLD,
+                            color=get_theme_color("text_primary", self.is_dark)
                         ),
                         self.loading
                     ], spacing=10),
@@ -131,8 +135,8 @@ class CommentSection(ft.Container):
                         self.send_button
                     ], spacing=10),
                     padding=10,
-                    border=ft.border.only(top=ft.BorderSide(1, ft.Colors.GREY_300)),
-                    bgcolor=ft.Colors.WHITE
+                    border=ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", self.is_dark))),
+                    bgcolor=get_theme_color("background", self.is_dark)
                 )
             ], spacing=0),
             expand=True
@@ -158,22 +162,23 @@ class CommentSection(ft.Container):
     
     def _create_empty_state(self) -> ft.Control:
         """Erstellt den Empty-State-UI für keine Kommentare."""
+        is_dark = self._page.theme_mode == ft.ThemeMode.DARK
         return ft.Container(
             content=ft.Column([
                 ft.Icon(
                     ft.Icons.COMMENT_OUTLINED,
                     size=48,
-                    color=ft.Colors.GREY_400
+                    color=get_theme_color("text_secondary", is_dark)
                 ),
                 ft.Text(
                     "Noch keine Kommentare",
                     size=16,
-                    color=ft.Colors.GREY_600
+                    color=get_theme_color("text_primary", is_dark)
                 ),
                 ft.Text(
                     "Sei der Erste, der kommentiert!",
                     size=12,
-                    color=ft.Colors.GREY_500
+                    color=get_theme_color("text_secondary", is_dark)
                 )
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -203,6 +208,7 @@ class CommentSection(ft.Container):
         Returns:
             Container mit Kommentar-Karte
         """
+        is_dark = self._page.theme_mode == ft.ThemeMode.DARK
         current_user_id = self.profile_service.get_user_id() if self.profile_service else None
         is_author = (str(current_user_id) == str(comment.get('user_id')))
         
@@ -219,7 +225,7 @@ class CommentSection(ft.Container):
             ft.CircleAvatar(
                 foreground_image_url=profile_image if profile_image else None,
                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE) if not profile_image else None,
-                bgcolor=ft.Colors.BLUE_400,
+                bgcolor=PRIMARY_COLOR,
                 radius=20 if not is_reply else 16
             ),
             
@@ -231,12 +237,12 @@ class CommentSection(ft.Container):
                         username,
                         weight=ft.FontWeight.BOLD,
                         size=14 if not is_reply else 13,
-                        color=ft.Colors.BLACK87
+                        color=get_theme_color("text_primary", is_dark)
                     ),
                     ft.Text(
                         format_time(comment.get('created_at')),
                         size=12 if not is_reply else 11,
-                        color=ft.Colors.GREY_600
+                        color=get_theme_color("text_secondary", is_dark)
                     )
                 ], spacing=10),
                 
@@ -245,7 +251,7 @@ class CommentSection(ft.Container):
                     comment.get('content', ''),
                     size=14 if not is_reply else 13,
                     selectable=True,
-                    color=ft.Colors.BLACK
+                    color=get_theme_color("text_primary", is_dark)
                 ),
                 
                 # Aktionen (Antworten, Löschen)
@@ -270,9 +276,9 @@ class CommentSection(ft.Container):
             content=card_content,
             padding=12,
             margin=ft.margin.only(left=50 if is_reply else 0),
-            bgcolor=ft.Colors.GREY_50 if not is_reply else ft.Colors.BLUE_50,
+            bgcolor=get_theme_color("card", is_dark),
             border_radius=10,
-            border=ft.border.only(left=ft.BorderSide(3, ft.Colors.BLUE_300)) if is_reply else None,
+            border=ft.border.only(left=ft.BorderSide(3, PRIMARY_COLOR)) if is_reply else None,
             animate=ft.animation.Animation(300, ft.AnimationCurve.EASE_OUT)
         )
     

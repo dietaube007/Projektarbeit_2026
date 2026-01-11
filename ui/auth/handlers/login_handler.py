@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from utils.logging_config import get_logger
+from utils.validators import validate_email
 from services.account import AuthService, AuthResult
 from ui.constants import MESSAGE_TYPE_INFO, MESSAGE_TYPE_SUCCESS, MESSAGE_TYPE_ERROR
 from .error_handler import handle_auth_error
@@ -23,7 +24,15 @@ def handle_login(
 ) -> None:
     """Führt Login durch (Service-Aufruf + UI-Feedback)."""
     try:
-        show_message_callback("Anmeldung läuft...", MESSAGE_TYPE_INFO)
+        # E-Mail-Format clientseitig validieren
+        if email and email.strip():
+            is_valid_email, email_error = validate_email(email)
+            if not is_valid_email:
+                show_message_callback(
+                    email_error or "Ungültige E-Mail-Adresse.",
+                    MESSAGE_TYPE_ERROR
+                )
+                return
         
         result: AuthResult = auth_service.login(email, password)
         

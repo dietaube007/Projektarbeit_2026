@@ -47,7 +47,7 @@ def create_base_textfield(
         keyboard_type=keyboard_type,
         border_radius=border_radius,
         border_color=BORDER_COLOR,
-        border_width=1,
+        border_width=1.5,
         focused_border_color=PRIMARY_COLOR,
         focused_border_width=2,
         content_padding=ft.padding.symmetric(horizontal=16, vertical=14),

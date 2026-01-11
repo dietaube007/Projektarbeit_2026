@@ -29,6 +29,7 @@ from .components import (
     create_continue_button,
     create_logout_button,
     create_forgot_password_button,
+    create_registration_error_banner,
     create_registration_modal,
     create_login_card,
 )
@@ -64,6 +65,8 @@ class AuthView:
         self._reg_pwd_confirm: Optional[ft.TextField] = None
         self._reg_username: Optional[ft.TextField] = None
         self._reg_info: Optional[ft.Text] = None
+        self._reg_error_banner: Optional[ft.Container] = None
+        self._reg_error_text: Optional[ft.Text] = None
         self._form_card: Optional[ft.Container] = None
         self._reg_modal_card: Optional[ft.Container] = None
         self._reg_modal_bg: Optional[ft.Container] = None
@@ -72,6 +75,11 @@ class AuthView:
         self._welcome_text: Optional[ft.Text] = None
         self._title_text: Optional[ft.Text] = None
         self._subtitle_text: Optional[ft.Text] = None
+        # Button-Referenzen für Deaktivierung beim Modal-Öffnen
+        self._login_btn: Optional[ft.ElevatedButton] = None
+        self._register_btn: Optional[ft.TextButton] = None
+        self._continue_btn: Optional[ft.TextButton] = None
+        self._forgot_password_btn: Optional[ft.TextButton] = None
         
         # UI wird sofort initialisiert (konsistent mit discover/view.py)
         self._init_ui_elements()
@@ -177,7 +185,24 @@ class AuthView:
             message: Nachricht
             message_type: "info", "success", "error"
         """
-        self._show_message(self._reg_info, message, message_type)
+        if message_type == MESSAGE_TYPE_ERROR:
+            # Fehler als roter Banner oben anzeigen
+            if self._reg_error_text:
+                self._reg_error_text.value = message
+            if self._reg_error_banner:
+                self._reg_error_banner.visible = True
+            # Info-Text leeren
+            if self._reg_info:
+                self._reg_info.value = ""
+        else:
+            # Info/Success als Text unten anzeigen
+            if self._reg_error_banner:
+                self._reg_error_banner.visible = False
+            if self._reg_error_text:
+                self._reg_error_text.value = ""
+            self._show_message(self._reg_info, message, message_type)
+        
+        self.page.update()
 
     def _update_login_card(self) -> None:
         """Aktualisiert die Login-Card basierend auf dem aktuellen Login-Status."""
@@ -231,14 +256,14 @@ class AuthView:
 
     def _update_ui_colors(self, is_dark: bool):
         """Aktualisiert View-spezifische UI-Farben nach Theme-Wechsel.
-        
+
         Args:
             is_dark: True wenn Dark-Modus aktiv, False für Light-Modus
         """
         # Icon-Farbe aktualisieren (ThemeManager aktualisiert Icon/Tooltip bereits)
         if self._theme_icon:
             self._theme_icon.icon_color = get_theme_color("text_primary", is_dark)
-        
+
         # Hintergrund-Farben aktualisieren
         if self._background:
             self._background.bgcolor = get_theme_color("background", is_dark)
@@ -246,7 +271,7 @@ class AuthView:
             self._form_card.bgcolor = get_theme_color("card", is_dark)
         if self._reg_modal_card:
             self._reg_modal_card.bgcolor = get_theme_color("card", is_dark)
-        
+
         # Überschriften-Farben aktualisieren
         if self._welcome_text:
             self._welcome_text.color = get_theme_color("text_secondary", is_dark)
@@ -262,6 +287,26 @@ class AuthView:
             self._login_email.disabled = True
         if self._login_pwd:
             self._login_pwd.disabled = True
+        
+        # Alle Buttons im Hintergrund deaktivieren damit Tab nicht dorthin springt
+        if self._login_btn:
+            self._login_btn.disabled = True
+        if self._register_btn:
+            self._register_btn.disabled = True
+        if self._continue_btn:
+            self._continue_btn.disabled = True
+        if self._forgot_password_btn:
+            self._forgot_password_btn.disabled = True
+        if self._theme_icon:
+            self._theme_icon.disabled = True
+        
+        # Fehler-Banner beim Öffnen verstecken
+        if self._reg_error_banner:
+            self._reg_error_banner.visible = False
+        if self._reg_error_text:
+            self._reg_error_text.value = ""
+        if self._reg_info:
+            self._reg_info.value = ""
         
         self._reg_modal_bg.visible = True
         if self._reg_modal_bg not in self.page.overlay:
@@ -283,6 +328,24 @@ class AuthView:
             self._login_email.disabled = False
         if self._login_pwd:
             self._login_pwd.disabled = False
+        
+        # Alle Buttons im Hintergrund wieder aktivieren
+        if self._login_btn:
+            self._login_btn.disabled = False
+        if self._register_btn:
+            self._register_btn.disabled = False
+        if self._continue_btn:
+            self._continue_btn.disabled = False
+        if self._forgot_password_btn:
+            self._forgot_password_btn.disabled = False
+        if self._theme_icon:
+            self._theme_icon.disabled = False
+        
+        # Fehler-Banner verstecken
+        if self._reg_error_banner:
+            self._reg_error_banner.visible = False
+        if self._reg_error_text:
+            self._reg_error_text.value = ""
         
         # Felder zurücksetzen
         if self._reg_email:
@@ -340,6 +403,9 @@ class AuthView:
         self._reg_username = create_register_username_field()
         self._reg_info = ft.Text("", size=12, weight=ft.FontWeight.W_500)
         
+        # Fehler-Banner für Registrierung (aus Komponente)
+        self._reg_error_banner, self._reg_error_text = create_registration_error_banner()
+        
         # Theme-Toggle (mit Callback für View-spezifische UI-Updates)
         self._theme_icon = self.theme_manager.create_toggle_button(
             on_after_toggle=self._update_ui_colors,
@@ -352,6 +418,7 @@ class AuthView:
             password_field=self._reg_pwd,
             password_confirm_field=self._reg_pwd_confirm,
             username_field=self._reg_username,
+            error_banner=self._reg_error_banner,
             info_text=self._reg_info,
             on_register=lambda e: self._register(),
             on_close=self._close_modal,
@@ -381,6 +448,12 @@ class AuthView:
             on_click=self._show_forgot_password_dialog,
             style=ft.ButtonStyle(color=PRIMARY_COLOR),
         )
+        
+        # Button-Referenzen speichern (für Deaktivierung beim Modal-Öffnen)
+        self._login_btn = login_btn
+        self._register_btn = register_btn
+        self._continue_btn = continue_btn
+        self._forgot_password_btn = forgot_password_btn
         
         # Login-Card
         self._form_card = create_login_card(
@@ -438,7 +511,6 @@ class AuthView:
                         ft.Container(height=32),
                         self._form_card,
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    ft.Container(expand=True),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
                 ft.Container(
                     content=ft.Row([self._theme_icon], spacing=8),

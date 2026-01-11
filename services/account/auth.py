@@ -118,7 +118,7 @@ class AuthService:
                 logger.warning(f"Ungültige Anmeldedaten für: {self._normalize_email(email)}")
                 return AuthResult(
                     success=False,
-                    message="E-Mail oder Passwort falsch.",
+                    message="E-Mail oder Passwort ist falsch.",
                     code=AuthErrorCode.INVALID_CREDENTIALS,
                 )
             if "email not confirmed" in error_str:
@@ -149,19 +149,19 @@ class AuthService:
         if not email or not email.strip():
             return AuthResult(
                 success=False,
-                message="E-Mail darf nicht leer sein.",
+                message="Bitte E-Mail-Adresse eingeben.",
                 code=AuthErrorCode.INVALID_EMAIL,
             )
         if not password:
             return AuthResult(
                 success=False,
-                message="Passwort darf nicht leer sein.",
+                message="Bitte Passwort eingeben.",
                 code=AuthErrorCode.INVALID_PASSWORD,
             )
         if not username or not username.strip():
             return AuthResult(
                 success=False,
-                message="Benutzername darf nicht leer sein.",
+                message="Bitte Anzeigename eingeben.",
                 code=AuthErrorCode.UNKNOWN_ERROR,
             )
 
@@ -211,15 +211,33 @@ class AuthService:
             logger.info(f"Benutzer erfolgreich registriert: {normalized_email}")
             return AuthResult(success=True)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  
             error_str = str(e).lower()
+            
+            # E-Mail bereits registriert
             if "already registered" in error_str or "user already registered" in error_str:
-                logger.warning(f"E-Mail bereits registriert (Exception): {self._normalize_email(email)}")
                 return AuthResult(
                     success=False,
                     message="E-Mail bereits registriert.",
                     code=AuthErrorCode.EMAIL_EXISTS,
                 )
+            
+            # Ungültiges E-Mail-Format
+            if "invalid format" in error_str or ("invalid" in error_str and "email" in error_str):
+                return AuthResult(
+                    success=False,
+                    message="Ungültige E-Mail-Adresse.",
+                    code=AuthErrorCode.INVALID_EMAIL,
+                )
+            
+            # Passwort-Validierungsfehler
+            if "password" in error_str:
+                return AuthResult(
+                    success=False,
+                    message="Das Passwort muss mindestens 8 Zeichen haben, einen Groß- und Kleinbuchstaben, eine Zahl und ein Sonderzeichen enthalten.",
+                    code=AuthErrorCode.INVALID_PASSWORD,
+                )
+            
             logger.error(f"Fehler bei der Registrierung: {e}", exc_info=True)
             return AuthResult(
                 success=False,

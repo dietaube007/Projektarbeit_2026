@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Callable, Optional, Dict, Any
 import flet as ft
 
-from ui.theme import soft_card
+from ui.theme import soft_card, get_theme_color
 from ui.constants import (
     CARD_IMAGE_HEIGHT, LIST_IMAGE_HEIGHT, DIALOG_IMAGE_HEIGHT,
     DEFAULT_PLACEHOLDER
@@ -41,18 +41,19 @@ def build_small_card(
         Container mit kleiner Karten-Komponente
     """
     data = extract_item_data(item)
+    is_dark = page.theme_mode == ft.ThemeMode.DARK
 
     visual_content = (
         ft.Image(src=data["img_src"], height=CARD_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
-        else image_placeholder(CARD_IMAGE_HEIGHT, expand=True)
+        else image_placeholder(CARD_IMAGE_HEIGHT, expand=True, page=page)
     )
 
     visual = ft.Container(
         content=visual_content,
         border_radius=16,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-        bgcolor=ft.Colors.GREY_200,
+        bgcolor=get_theme_color("card", is_dark),
     )
 
     badges = ft.Row(
@@ -121,18 +122,19 @@ def build_big_card(
         Container mit großer Karten-Komponente
     """
     data = extract_item_data(item)
+    is_dark = page.theme_mode == ft.ThemeMode.DARK
 
     visual_content = (
         ft.Image(src=data["img_src"], height=LIST_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
-        else image_placeholder(LIST_IMAGE_HEIGHT, icon_size=64, expand=True)
+        else image_placeholder(LIST_IMAGE_HEIGHT, icon_size=64, expand=True, page=page)
     )
 
     visual = ft.Container(
         content=visual_content,
         border_radius=16,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-        bgcolor=ft.Colors.GREY_200,
+        bgcolor=get_theme_color("card", is_dark),
     )
 
     badges = ft.Row(
@@ -287,10 +289,12 @@ def show_detail_dialog(
     """
     data = extract_item_data(item)
 
+    is_dark = page.theme_mode == ft.ThemeMode.DARK
+    
     visual = (
         ft.Image(src=data["img_src"], height=DIALOG_IMAGE_HEIGHT, fit=ft.ImageFit.COVER)
         if data["img_src"]
-        else image_placeholder(DIALOG_IMAGE_HEIGHT, icon_size=72)
+        else image_placeholder(DIALOG_IMAGE_HEIGHT, icon_size=72, page=page)
     )
 
     # Favoriten-Button

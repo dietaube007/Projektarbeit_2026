@@ -93,13 +93,13 @@ def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Contain
         on_click: Callback für Klick
     
     Returns:
-        Container mit Farben-Header
+        Container mit Farben-Header (Farben werden in view.py basierend auf Theme gesetzt)
     """
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18, color=ft.Colors.GREY_700),
-                ft.Text("Farben wählen", size=14, color=ft.Colors.GREY_900),
+                ft.Icon(ft.Icons.PALETTE, size=18),
+                ft.Text("Farben wählen", size=14),
                 ft.Container(expand=True),
                 toggle_icon,
             ],
@@ -108,8 +108,7 @@ def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Contain
         padding=8,
         on_click=on_click,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-        border=ft.border.all(1, ft.Colors.GREY_200),
+        # bgcolor und border werden in view.py basierend auf Theme gesetzt
     )
 
 

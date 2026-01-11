@@ -12,7 +12,7 @@ from services.posts.references import ReferenceService
 from services.posts import SavedSearchService, FavoritesService, SearchService
 from services.account import ProfileService
 from utils.logging_config import get_logger
-from ui.theme import soft_card
+from ui.theme import soft_card, get_theme_color
 from ui.shared_components import show_error_dialog, show_login_required_snackbar, create_empty_state_card
 
 from .components import (
@@ -126,6 +126,8 @@ class DiscoverView:
 
     def _init_ui_elements(self) -> None:
         """Initialisiert alle UI-Elemente."""
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        
         # Callbacks für Filter-Änderungen
         def on_filter_change(_: Optional[ft.ControlEvent] = None) -> None:
             handle_view_filter_change(
@@ -234,12 +236,27 @@ class DiscoverView:
             content=self._farben_filter_container,
             padding=12,
             visible=self.farben_panel_visible["visible"],
+            bgcolor=get_theme_color("card", is_dark),
         )
 
         self._farben_header = create_farben_header(
             toggle_icon=self._farben_toggle_icon,
             on_click=on_toggle_farben_panel,
         )
+        
+        # Theme-Farben für Farben-Header setzen
+        if self._farben_header:
+            self._farben_header.bgcolor = get_theme_color("card", is_dark)
+            # Text- und Icon-Farben setzen
+            if hasattr(self._farben_header.content, 'controls'):
+                for control in self._farben_header.content.controls:
+                    if isinstance(control, ft.Text):
+                        control.color = get_theme_color("text_primary", is_dark)
+                    elif isinstance(control, ft.Icon):
+                        control.color = get_theme_color("text_secondary", is_dark)
+            # Border-Farbe setzen
+            border_color = get_theme_color("text_secondary", is_dark)
+            self._farben_header.border = ft.border.all(1, border_color)
 
         self._sort_dropdown = create_sort_dropdown(
             on_change=on_filter_change
