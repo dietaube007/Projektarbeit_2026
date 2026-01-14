@@ -13,6 +13,8 @@ from typing import Callable
 
 import flet as ft
 
+from ui.constants import PRIMARY_COLOR
+
 
 
 def create_login_required_dialog(
@@ -97,6 +99,9 @@ def create_login_banner(on_login_click: Callable) -> ft.Container:
                     "Anmelden",
                     icon=ft.Icons.LOGIN,
                     on_click=on_login_click,
+                    style=ft.ButtonStyle(
+                        color=PRIMARY_COLOR,  # Oder PRIMARY_COLOR verwenden
+                    )
                 ),
             ],
             spacing=12,

@@ -213,6 +213,8 @@ class ThemeManager:
         # Icon-Update im Button (wenn vorhanden)
         if self._toggle_button:
             self._toggle_button.icon = self._get_current_icon()
+            # Icon-Farbe basierend auf neuem Theme aktualisieren
+            self._toggle_button.icon_color = ft.Colors.WHITE if new_is_dark else ft.Colors.GREY_700
             tip = self._get_current_tooltip()
             self._toggle_button.tooltip = tip
             try:
