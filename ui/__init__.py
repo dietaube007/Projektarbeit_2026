@@ -16,7 +16,7 @@ Struktur:
 
 # Hauptkomponenten
 from ui.auth import AuthView
-from ui.theme import ThemeManager, soft_card, chip, get_theme_colors
+from ui.theme import ThemeManager, soft_card, chip
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
@@ -61,7 +61,6 @@ __all__ = [
     # Theme helpers
     "soft_card",
     "chip",
-    "get_theme_colors",
     # Konstanten
     "STATUS_COLORS",
     "SPECIES_COLORS",

@@ -89,20 +89,34 @@ THEME_COLORS: dict[str, dict[str, Any]] = {
 }
 
 
-def get_theme_color(color_key: str, is_dark: bool) -> Any:
+def get_theme_color(
+    color_key: str, 
+    is_dark: Optional[bool] = None, 
+    page: Optional[ft.Page] = None
+) -> Any:
     """
     Gibt die passende Farbe für den aktuellen Theme-Modus zurück.
     
     Args:
         color_key: "background", "card", "text_primary", "text_secondary"
-        is_dark: True für Dark-Modus, False für Light-Modus
+        is_dark: True für Dark-Modus, False für Light-Modus (optional wenn page gegeben)
+        page: Flet Page-Instanz (optional, wird verwendet um is_dark automatisch zu ermitteln)
     
     Returns:
         Farbe als String oder ft.Color
     
     Raises:
         KeyError: Wenn color_key nicht existiert
+        ValueError: Wenn weder is_dark noch page angegeben werden
     """
+    # is_dark automatisch aus Page ermitteln, falls nicht gegeben
+    if is_dark is None:
+        if page:
+            is_dark = page.theme_mode == ft.ThemeMode.DARK
+        else:
+            logger.warning("is_dark oder page muss angegeben werden. Verwende Light-Modus.")
+            is_dark = False
+    
     mode = "dark" if is_dark else "light"
     if color_key not in THEME_COLORS:
         logger.warning(f"Unbekannter Farb-Schlüssel '{color_key}'. Verwende 'background'.")
@@ -274,46 +288,6 @@ class ThemeManager:
 # UI-KOMPONENTEN - Wiederverwendbare Design-Elemente
 # ════════════════════════════════════════════════════════════════════
 
-# ════════════════════════════════════════════════════════════════════
-# THEME-HELPER FUNKTIONEN
-# ════════════════════════════════════════════════════════════════════
-
-def get_theme_colors(page: ft.Page) -> Dict[str, Any]:
-    """Holt Theme-Farben für Light/Dark Mode.
-    
-    Args:
-        page: Flet Page-Instanz
-    
-    Returns:
-        Dictionary mit Theme-Farben:
-        - is_dark: bool - Ob Dark-Modus aktiv ist
-        - surface: Optional Color - Surface-Variant-Farbe
-        - outline: Optional Color - Outline-Variant-Farbe
-        - text: Color - Text-Farbe basierend auf Theme
-        - icon: Color - Icon-Farbe basierend auf Theme
-        - border: Color - Border-Farbe basierend auf Theme
-    """
-    is_dark = page.theme_mode == ft.ThemeMode.DARK
-    surface_color = getattr(ft.Colors, "SURFACE_VARIANT", None)
-    outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
-    on_surface_variant = getattr(ft.Colors, "ON_SURFACE_VARIANT", None)
-    
-    text_color = on_surface_variant if on_surface_variant else (
-        ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_700
-    )
-    icon_color = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_500
-    border_color = outline_color if outline_color else (
-        ft.Colors.GREY_600 if is_dark else ft.Colors.GREY_300
-    )
-    
-    return {
-        "is_dark": is_dark,
-        "surface": surface_color,
-        "outline": outline_color,
-        "text": text_color,
-        "icon": icon_color,
-        "border": border_color,
-    }
 
 
 # ════════════════════════════════════════════════════════════════════

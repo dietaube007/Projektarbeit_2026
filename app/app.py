@@ -492,12 +492,20 @@ class PetBuddyApp:
             def on_theme_toggle(is_dark: bool) -> None:
                 if self.discover_view:
                     self.discover_view._update_farben_colors()
-                    self.page.update()
+                # AppBar mit neuer Hintergrundfarbe neu erstellen
+                self.page.appbar = create_app_bar(
+                    self.is_logged_in,
+                    lambda _: self._logout(),
+                    self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
+                    page=self.page
+                )
+                self.page.update()
             
             self.page.appbar = create_app_bar(
                 self.is_logged_in,
                 lambda _: self._logout(),
-                self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle)
+                self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
+                page=self.page 
             )
             self.page.navigation_bar = self.nav
             self.page.add(self.body)

@@ -22,7 +22,7 @@ from ui.constants import (
 )
 from ui.shared_components import show_validation_dialog, show_success_dialog, show_error_dialog
 from ui.constants import MAX_HEADLINE_LENGTH, MAX_DESCRIPTION_LENGTH
-from ui.theme import get_theme_colors
+from ui.theme import get_theme_color
 
 from .components import (
     create_meldungsart_button,
@@ -150,16 +150,13 @@ class PostForm:
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
         
-        # Theme-Farben holen
-        theme_colors = get_theme_colors(self.page)
-        
         # Farben-Header und -Panel erstellen
         self.farben_header, self.farben_panel = create_farben_header_and_panel(
             farben_container=self.farben_container,
             farben_toggle_icon=self.farben_toggle_icon,
             farben_panel_visible=self.farben_panel_visible,
             on_toggle=on_toggle_farben_panel,
-            theme_colors=theme_colors,
+            page=self.page,
         )
         
         # Beschreibung & Standort
@@ -369,16 +366,12 @@ class PostForm:
     
     def build(self) -> ft.Column:
         """Baut und gibt das Formular-Layout zurück."""
-        # Theme-Farben holen
-        theme_colors = get_theme_colors(self.page)
-        text_color = theme_colors["text"]
-        
         # Photo-Upload-Bereich erstellen
         photo_area = create_photo_upload_area(
             photo_preview=self.photo_preview,
             on_pick_photo=lambda _: self.page.run_task(self._pick_photo),
             on_remove_photo=lambda _: self._remove_photo(),
-            theme_colors=theme_colors,
+            page=self.page,
         )
         
         # Formular-Layout aus Components erstellen
@@ -398,7 +391,7 @@ class PostForm:
             save_button=self.save_button,
             status_text=self.status_text,
             photo_area=photo_area,
-            text_color=text_color,
+            page=self.page,
         )
         
         return ft.Column(

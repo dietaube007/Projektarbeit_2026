@@ -244,7 +244,7 @@ def create_farben_header_and_panel(
     farben_toggle_icon: ft.Icon,
     farben_panel_visible: dict,
     on_toggle: Callable,
-    theme_colors: dict,
+    page: ft.Page,
 ) -> Tuple[ft.Container, ft.Container]:
     """Erstellt Farben-Header und -Panel-Container (ohne Checkboxes).
     
@@ -253,18 +253,27 @@ def create_farben_header_and_panel(
         farben_toggle_icon: Icon für Toggle-Button
         farben_panel_visible: Dictionary mit "visible" key
         on_toggle: Callback-Funktion für Toggle
-        theme_colors: Dictionary mit Theme-Farben (surface, outline)
+        page: Flet Page-Instanz für Theme-Erkennung
     
     Returns:
         Tuple mit (farben_header, farben_panel)
     """
+    from ui.theme import get_theme_color
+    
+    # Theme-Farben holen
+    bgcolor = get_theme_color("card", page=page)
+    # Material-3 outline als Fallback, sonst text_secondary
+    outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
+    if not outline_color:
+        outline_color = get_theme_color("text_secondary", page=page)
+    
     farben_panel = ft.Container(
         content=farben_container,
         padding=12,
         visible=farben_panel_visible["visible"],
-        bgcolor=theme_colors.get("surface"),
+        bgcolor=bgcolor,
         border_radius=8,
-        border=ft.border.all(1, theme_colors["outline"]) if theme_colors.get("outline") else None,
+        border=ft.border.all(1, outline_color) if outline_color else None,
     )
     
     farben_header = ft.Container(
@@ -280,8 +289,8 @@ def create_farben_header_and_panel(
         padding=8,
         on_click=on_toggle,
         border_radius=8,
-        bgcolor=theme_colors.get("surface"),
-        border=ft.border.all(1, theme_colors["outline"]) if theme_colors.get("outline") else None,
+        bgcolor=bgcolor,
+        border=ft.border.all(1, outline_color) if outline_color else None,
     )
     
     return farben_header, farben_panel
@@ -319,16 +328,19 @@ def create_form_header() -> List[ft.Control]:
     ]
 
 
-def create_form_photo_section(photo_area: ft.Control, text_color: str) -> List[ft.Control]:
+def create_form_photo_section(photo_area: ft.Control, page: ft.Page) -> List[ft.Control]:
     """Erstellt die Foto-Upload-Sektion.
     
     Args:
         photo_area: Container mit Photo-Upload-Bereich
-        text_color: Textfarbe für Labels
+        page: Flet Page-Instanz für Theme-Erkennung
     
     Returns:
         Liste von Controls für die Foto-Sektion
     """
+    from ui.theme import get_theme_color
+    text_color = get_theme_color("text_primary", page=page)
+    
     return [
         ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
         photo_area,
@@ -388,7 +400,7 @@ def create_form_details_section(
     ai_result_container: ft.Container,
     location_tf: ft.TextField,
     date_tf: ft.TextField,
-    text_color: str,
+    page: ft.Page,
 ) -> List[ft.Control]:
     """Erstellt die Details-Sektion (Beschreibung, Standort, Datum).
     
@@ -398,11 +410,14 @@ def create_form_details_section(
         ai_result_container: Container für AI-Ergebnisse
         location_tf: TextField für Standort
         date_tf: TextField für Datum
-        text_color: Textfarbe für Labels
+        page: Flet Page-Instanz für Theme-Erkennung
     
     Returns:
         Liste von Controls für die Details-Sektion
     """
+    from ui.theme import get_theme_color
+    text_color = get_theme_color("text_primary", page=page)
+    
     return [
         ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
         info_tf,
@@ -451,7 +466,7 @@ def create_form_layout(
     save_button: ft.FilledButton,
     status_text: ft.Text,
     photo_area: ft.Control,
-    text_color: str,
+    page: ft.Page,
 ) -> ft.Column:
     """Erstellt das komplette Formular-Layout.
     
@@ -471,7 +486,7 @@ def create_form_layout(
         save_button: Button zum Speichern
         status_text: Text-Widget für Status-Nachrichten
         photo_area: Container mit Photo-Upload-Bereich
-        text_color: Textfarbe für Labels
+        page: Flet Page-Instanz für Theme-Erkennung
     
     Returns:
         Column mit komplettem Formular-Layout
@@ -483,7 +498,7 @@ def create_form_layout(
     controls.extend(create_form_header())
     
     # Foto-Sektion
-    controls.extend(create_form_photo_section(photo_area, text_color))
+    controls.extend(create_form_photo_section(photo_area, page))
     
     # Basis-Info-Sektion
     controls.extend(create_form_basic_info_section(
@@ -495,7 +510,7 @@ def create_form_layout(
     
     # Details-Sektion
     controls.extend(create_form_details_section(
-        info_tf, ai_button, ai_result_container, location_tf, date_tf, text_color
+        info_tf, ai_button, ai_result_container, location_tf, date_tf, page
     ))
     
     # Action-Sektion

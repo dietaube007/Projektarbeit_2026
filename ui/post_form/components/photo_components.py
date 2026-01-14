@@ -33,7 +33,7 @@ def create_photo_upload_area(
     photo_preview: ft.Image,
     on_pick_photo: Callable[[ft.ControlEvent], None],
     on_remove_photo: Callable[[ft.ControlEvent], None],
-    theme_colors: Optional[dict] = None,
+    page: Optional[ft.Page] = None,
 ) -> ft.Container:
     """Erstellt den Foto-Upload Bereich.
     
@@ -41,15 +41,17 @@ def create_photo_upload_area(
         photo_preview: Image-Widget für Vorschau
         on_pick_photo: Callback für Foto-Auswahl
         on_remove_photo: Callback für Foto-Entfernung
-        theme_colors: Optional Dictionary mit Theme-Farben (text, icon, border)
+        page: Optional Flet Page-Instanz für Theme-Erkennung
     
     Returns:
         Container mit Upload-Bereich und Vorschau
     """
-    if theme_colors:
-        text_color = theme_colors.get("text", ft.Colors.GREY_700)
-        icon_color = theme_colors.get("icon", ft.Colors.GREY_500)
-        border_color = theme_colors.get("border", ft.Colors.GREY_300)
+    from ui.theme import get_theme_color
+    
+    if page:
+        text_color = get_theme_color("text_secondary", page=page)
+        icon_color = get_theme_color("text_secondary", page=page)
+        border_color = get_theme_color("text_secondary", page=page)
     else:
         text_color = ft.Colors.GREY_700
         icon_color = ft.Colors.GREY_500

@@ -8,7 +8,7 @@ Enthält Funktionen zum Erstellen von:
 
 from __future__ import annotations
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import flet as ft
 
@@ -49,9 +49,13 @@ def create_navigation_bar(
 def create_app_bar(
     is_logged_in: bool,
     on_logout: Callable[[ft.ControlEvent], None],
-    theme_toggle_button: ft.Control
+    theme_toggle_button: ft.Control,
+    page: Optional[ft.Page] = None  # Page-Instanz hinzufügen
 ) -> ft.AppBar:
     """Erstellt die App-Bar."""
+    from ui.theme import get_theme_color
+    from typing import Optional
+    
     actions = [theme_toggle_button]
     
     if is_logged_in:
@@ -61,8 +65,17 @@ def create_app_bar(
             on_click=on_logout
         ))
     
+    bgcolor = None
+    if page:
+        bgcolor = get_theme_color("background", page=page)
+    else:
+        bgcolor = get_theme_color("background", is_dark=False)
+    
     return ft.AppBar(
         title=ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600),
         center_title=True,
         actions=actions,
+        bgcolor=bgcolor,  
+        elevation=0,
+        surface_tint_color=ft.Colors.TRANSPARENT,
     )
