@@ -11,7 +11,7 @@ Es definiert:
 """
 
 from typing import Callable, Optional, Any, Dict
-
+from ui.constants import TEXT_SECONDARY
 import flet as ft
 from utils.logging_config import get_logger
 
@@ -252,7 +252,7 @@ class ThemeManager:
         
         # Icon-Farbe: manuell gesetzt oder automatisch basierend auf Theme
         if icon_color is None:
-            icon_color = ft.Colors.WHITE if is_dark else ft.Colors.GREY_700
+            icon_color=get_theme_color("text_secondary", is_dark) if is_dark else TEXT_SECONDARY
         
         self._toggle_button = ft.IconButton(
             icon=self._get_current_icon(),

@@ -406,10 +406,10 @@ class AuthView:
         # Fehler-Banner für Registrierung (aus Komponente)
         self._reg_error_banner, self._reg_error_text = create_registration_error_banner()
         
-        # Theme-Toggle (mit Callback für View-spezifische UI-Updates)
+        # Theme-Toggle
         self._theme_icon = self.theme_manager.create_toggle_button(
             on_after_toggle=self._update_ui_colors,
-            icon_color=get_theme_color("text_primary", is_dark) if is_dark else TEXT_SECONDARY,
+            icon_color=get_theme_color("text_secondary", is_dark) if is_dark else TEXT_SECONDARY,
         )
         
         # Registrierungs-Modal
@@ -518,7 +518,7 @@ class AuthView:
                     right=0,
                     padding=ft.padding.only(
                         top=8,
-                        right=8
+                        right=0
                     ),
                     alignment=ft.alignment.top_right,
                 ),
