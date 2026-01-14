@@ -295,17 +295,18 @@ class DiscoverView:
         ]):
             self.search_row = ft.ResponsiveRow(
                 controls=[
-                    ft.Container(self._search_q, col={"xs": 12, "md": 5}),
+                    ft.Container(self._search_q, col={"xs": 12, "md": 2}),
                     ft.Container(self._filter_typ, col={"xs": 6, "md": 2}),
                     ft.Container(self._filter_art, col={"xs": 6, "md": 2}),
                     ft.Container(self._filter_geschlecht, col={"xs": 6, "md": 2}),
-                    ft.Container(self._filter_rasse, col={"xs": 6, "md": 1}),
+                    ft.Container(self._filter_rasse, col={"xs": 6, "md": 2}),
+                    ft.Container(self._sort_dropdown, col={"xs": 6, "md": 2}),
+                    ft.Container(self._farben_header, col={"xs": 12, "md": 12}),
+                    ft.Container(self._farben_panel, col={"xs": 12, "md": 12}),
                     ft.Container(
                         ft.Row([self._reset_btn, self._save_search_btn], spacing=8),
                         col={"xs": 12, "md": 12},
-                    ),
-                    ft.Container(self._farben_header, col={"xs": 12, "md": 12}),
-                    ft.Container(self._farben_panel, col={"xs": 12, "md": 12}),
+                    )
                 ],
                 spacing=10,
                 run_spacing=10,
