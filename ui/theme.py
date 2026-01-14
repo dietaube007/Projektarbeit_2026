@@ -206,6 +206,10 @@ class ThemeManager:
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         self.page.theme_mode = ft.ThemeMode.LIGHT if is_dark else ft.ThemeMode.DARK
         
+        # Page-Hintergrund aktualisieren
+        new_is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        self.page.bgcolor = get_theme_color("background", new_is_dark)
+        
         # Icon-Update im Button (wenn vorhanden)
         if self._toggle_button:
             self._toggle_button.icon = self._get_current_icon()
@@ -218,7 +222,6 @@ class ThemeManager:
                 pass
         
         # Callback für View-spezifische UI-Updates nach Theme-Wechsel
-        new_is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         if self._on_after_toggle:
             self._on_after_toggle(new_is_dark)
         

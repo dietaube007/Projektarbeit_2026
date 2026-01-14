@@ -25,7 +25,6 @@ def create_search_field(on_change: Optional[Callable[[ft.ControlEvent], None]] =
         expand=True,
         on_change=on_change,
         border_radius=12,
-        border_color=ft.Colors.BLACK,
         focused_border_color=PRIMARY_COLOR,
         content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
     )
@@ -85,21 +84,33 @@ def populate_dropdown(
         )
 
 
-def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Container:
+def create_farben_header(toggle_icon: ft.Icon, on_click: Callable, page: Optional[ft.Page] = None) -> ft.Container:
     """Erstellt den Header für das Farben-Panel.
-    
+
     Args:
         toggle_icon: Icon für Toggle-Button
         on_click: Callback für Klick
-    
+        page: Optional Page-Instanz für Theme-Erkennung
+
     Returns:
-        Container mit Farben-Header (Farben werden in view.py basierend auf Theme gesetzt)
+        Container mit Farben-Header (verwendet Material-3 Farben für automatische Theme-Anpassung)
     """
+    # Theme-Farben für Light/Dark Mode mit Fallback
+    if page:
+        from ui.theme import get_theme_color
+        is_dark = page.theme_mode == ft.ThemeMode.DARK
+        text_color = get_theme_color("text_primary", is_dark)
+        icon_color = get_theme_color("text_secondary", is_dark)
+    else:
+        # Fallback wenn keine Page verfügbar
+        text_color = ft.Colors.GREY_800
+        icon_color = ft.Colors.GREY_600
+    
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18),
-                ft.Text("Farben wählen", size=14),
+                ft.Icon(ft.Icons.PALETTE, size=18, color=icon_color),
+                ft.Text("Farben wählen", size=14, color=text_color),
                 ft.Container(expand=True),
                 toggle_icon,
             ],
@@ -108,7 +119,6 @@ def create_farben_header(toggle_icon: ft.Icon, on_click: Callable) -> ft.Contain
         padding=8,
         on_click=on_click,
         border_radius=8,
-        # bgcolor und border werden in view.py basierend auf Theme gesetzt
     )
 
 

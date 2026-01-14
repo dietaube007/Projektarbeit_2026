@@ -232,31 +232,19 @@ class DiscoverView:
 
         self._farben_filter_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
         self._farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN)
+        
         self._farben_panel = ft.Container(
             content=self._farben_filter_container,
             padding=12,
             visible=self.farben_panel_visible["visible"],
-            bgcolor=get_theme_color("card", is_dark),
+            border_radius=8,
         )
 
         self._farben_header = create_farben_header(
             toggle_icon=self._farben_toggle_icon,
             on_click=on_toggle_farben_panel,
+            page=self.page,  # Page übergeben für Theme-Erkennung
         )
-        
-        # Theme-Farben für Farben-Header setzen
-        if self._farben_header:
-            self._farben_header.bgcolor = get_theme_color("card", is_dark)
-            # Text- und Icon-Farben setzen
-            if hasattr(self._farben_header.content, 'controls'):
-                for control in self._farben_header.content.controls:
-                    if isinstance(control, ft.Text):
-                        control.color = get_theme_color("text_primary", is_dark)
-                    elif isinstance(control, ft.Icon):
-                        control.color = get_theme_color("text_secondary", is_dark)
-            # Border-Farbe setzen
-            border_color = get_theme_color("text_secondary", is_dark)
-            self._farben_header.border = ft.border.all(1, border_color)
 
         self._sort_dropdown = create_sort_dropdown(
             on_change=on_filter_change
@@ -313,6 +301,18 @@ class DiscoverView:
             )
         else:
             self.search_row = ft.ResponsiveRow(controls=[], spacing=10, run_spacing=10)
+    
+    def _update_farben_colors(self) -> None:
+        """Aktualisiert die Farben des Farben-Panels basierend auf aktuellem Theme."""
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        if self._farben_header:
+            # Text- und Icon-Farben aktualisieren
+            if hasattr(self._farben_header.content, 'controls'):
+                for control in self._farben_header.content.controls:
+                    if isinstance(control, ft.Text):
+                        control.color = get_theme_color("text_primary", is_dark)
+                    elif isinstance(control, ft.Icon):
+                        control.color = get_theme_color("text_secondary", is_dark)
     
     # ─────────────────────────────────────────────────────────────
     # Private Methoden für Handler-Callbacks

@@ -93,6 +93,11 @@ class PetBuddyApp:
             self.theme_manager = ThemeManager(self.page)
             self.theme_manager.apply_theme("light")
             
+            # Page-Hintergrund Theme-bewusst setzen
+            from ui.theme import get_theme_color
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            self.page.bgcolor = get_theme_color("background", is_dark)
+            
             # Supabase-Client initialisieren
             self.sb = get_client()
 
@@ -482,10 +487,17 @@ class PetBuddyApp:
             
             # Seite leeren und neu aufbauen
             self.page.controls.clear()
+            
+            # Callback für Theme-Wechsel erstellen
+            def on_theme_toggle(is_dark: bool) -> None:
+                if self.discover_view:
+                    self.discover_view._update_farben_colors()
+                    self.page.update()
+            
             self.page.appbar = create_app_bar(
                 self.is_logged_in,
                 lambda _: self._logout(),
-                self.theme_manager.create_toggle_button()
+                self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle)
             )
             self.page.navigation_bar = self.nav
             self.page.add(self.body)
