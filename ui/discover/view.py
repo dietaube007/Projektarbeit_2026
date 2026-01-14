@@ -148,6 +148,7 @@ class DiscoverView:
                     page=self.page,
                 ),
             )
+            on_filter_change(e)
         
         def on_reset_filters(_: Optional[ft.ControlEvent] = None) -> None:
             handle_view_reset_filters(
@@ -219,10 +220,6 @@ class DiscoverView:
         self._filter_geschlecht = create_dropdown(
             label="Geschlecht",
             on_change=on_filter_change,
-            initial_options=[
-                ft.dropdown.Option("alle", "Alle"),
-                ft.dropdown.Option("keine_angabe", "Keine Angabe"),
-            ],
         )
 
         self._filter_rasse = create_dropdown(

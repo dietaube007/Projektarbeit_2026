@@ -53,7 +53,6 @@ def load_and_populate_references(
         sex_options = ref_service.get_sex() or []
         filter_geschlecht.options = [
             ft.dropdown.Option("alle", "Alle"),
-            ft.dropdown.Option("keine_angabe", "Keine Angabe"),
         ]
         for it in sex_options:
             filter_geschlecht.options.append(
@@ -106,7 +105,6 @@ def update_breeds_dropdown(
     """
     filter_rasse.options = [
         ft.dropdown.Option("alle", "Alle"),
-        ft.dropdown.Option("keine_angabe", "Keine Angabe"),
     ]
     try:
         if filter_art.value and filter_art.value != "alle":

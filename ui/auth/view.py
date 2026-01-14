@@ -514,8 +514,13 @@ class AuthView:
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
                 ft.Container(
                     content=ft.Row([self._theme_icon], spacing=8),
-                    top=8,
-                    right=8,
+                    top=0,
+                    right=0,
+                    padding=ft.padding.only(
+                        top=8,
+                        right=8
+                    ),
+                    alignment=ft.alignment.top_right,
                 ),
             ]),
             bgcolor=get_theme_color("background", is_dark),
