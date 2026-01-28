@@ -72,5 +72,5 @@ POST_SELECT_MINIMAL = """
 
 # Comment-Select für vollständige Kommentare 
 COMMENT_SELECT_FULL = """
-    id, post_id, user_id, content, created_at, updated_at, is_deleted
+    id, post_id, user_id, content, created_at, updated_at, is_deleted, parent_comment_id
 """

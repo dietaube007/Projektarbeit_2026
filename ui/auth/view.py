@@ -260,9 +260,9 @@ class AuthView:
         Args:
             is_dark: True wenn Dark-Modus aktiv, False für Light-Modus
         """
-        # Icon-Farbe aktualisieren (ThemeManager aktualisiert Icon/Tooltip bereits)
+        # Icon-Farbe
         if self._theme_icon:
-            self._theme_icon.icon_color = get_theme_color("text_primary", is_dark)
+            self._theme_icon.icon_color = ft.Colors.WHITE if is_dark else ft.Colors.GREY_700
 
         # Hintergrund-Farben aktualisieren
         if self._background:
@@ -409,7 +409,6 @@ class AuthView:
         # Theme-Toggle
         self._theme_icon = self.theme_manager.create_toggle_button(
             on_after_toggle=self._update_ui_colors,
-            icon_color=get_theme_color("text_secondary", is_dark) if is_dark else TEXT_SECONDARY,
         )
         
         # Registrierungs-Modal

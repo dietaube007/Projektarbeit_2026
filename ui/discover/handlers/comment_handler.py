@@ -52,9 +52,17 @@ def handle_load_comments(
             # Keine Kommentare vorhanden
             comments_list.controls.append(create_empty_state())
         else:
-            # Kommentare einfach auflisten (keine hierarchische Struktur, da kein parent_comment_id im Schema)
+            # Kommentare hierarchisch rendern
+            def render_comment_with_replies(comment, is_reply=False):
+                """Rendert einen Kommentar mit allen seinen Antworten."""
+                comments_list.controls.append(create_comment_card(comment, is_reply=is_reply))
+                # Antworten rekursiv rendern
+                replies = comment.get("replies", [])
+                for reply in replies:
+                    render_comment_with_replies(reply, is_reply=True)
+            
             for comment in comments:
-                comments_list.controls.append(create_comment_card(comment, is_reply=False))
+                render_comment_with_replies(comment, is_reply=False)
         
     except Exception as e:
         logger.error(f"Fehler beim Laden der Kommentare: {e}", exc_info=True)
@@ -115,10 +123,18 @@ def handle_post_comment(
     
     try:
         # Kommentar über Service speichern
+        parent_id = None
+        if replying_to:
+            try:
+                parent_id = int(replying_to) if isinstance(replying_to, str) else replying_to
+            except (ValueError, TypeError):
+                logger.warning(f"Ungültige parent_comment_id: {replying_to}")
+        
         success = comment_service.create_comment(
             post_id=post_id,
             user_id=user_id,
             content=content,
+            parent_comment_id=parent_id,
         )
         
         if success:

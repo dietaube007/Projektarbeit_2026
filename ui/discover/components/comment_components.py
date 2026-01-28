@@ -39,7 +39,6 @@ class CommentSection(ft.Container):
         self.post_id = post_id  # UUID des Posts
         self.profile_service = profile_service
         self.comment_service = CommentService(supabase, profile_service=profile_service)
-        # Antwort-Funktion deaktiviert, da kein parent_comment_id im Schema
         self.replying_to = None
         self.is_dark = page.theme_mode == ft.ThemeMode.DARK
         
@@ -217,13 +216,19 @@ class CommentSection(ft.Container):
         username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         profile_image = user_data.get('profile_image') if isinstance(user_data, dict) else None
         
-        # Antworten-Funktion entfernt, da kein parent_comment_id im Schema
-        reply_button = ft.Container(width=0)
+        # Antwort-Button
+        reply_button = ft.IconButton(
+            icon=ft.Icons.REPLY,
+            icon_size=18,
+            icon_color=PRIMARY_COLOR,
+            tooltip="Antworten",
+            on_click=lambda e, c=comment: self.start_reply(c)
+        )
         
         card_content = ft.Row([
             # Profilbild
             ft.CircleAvatar(
-                foreground_image_url=profile_image if profile_image else None,
+                foreground_image_src=profile_image if profile_image else None,
                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE) if not profile_image else None,
                 bgcolor=PRIMARY_COLOR,
                 radius=20 if not is_reply else 16
@@ -279,7 +284,7 @@ class CommentSection(ft.Container):
             bgcolor=get_theme_color("card", is_dark),
             border_radius=10,
             border=ft.border.only(left=ft.BorderSide(3, PRIMARY_COLOR)) if is_reply else None,
-            animate=ft.animation.Animation(300, ft.AnimationCurve.EASE_OUT)
+            animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT)
         )
     
     def start_reply(self, comment):

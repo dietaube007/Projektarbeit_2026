@@ -46,6 +46,7 @@ class CommentService:
         
         Returns:
             Liste von Kommentar-Dictionaries mit User-Daten (display_name, profile_image).
+            Kommentare sind hierarchisch strukturiert mit 'replies' Liste für Antworten.
             Leere Liste bei Fehler oder wenn keine Kommentare vorhanden.
         """
         try:
@@ -74,8 +75,38 @@ class CommentService:
                         "display_name": profile.get("display_name", "Unbekannt"),
                         "profile_image": profile.get("profile_image"),
                     }
+                    comment["replies"] = []  # Initialisiere replies-Liste
             
-            return comments
+            # Hierarchische Struktur aufbauen
+            top_level = []
+            replies_map = {}
+            
+            for comment in comments:
+                parent_id = comment.get("parent_comment_id")
+                if parent_id is None:
+                    # Top-Level Kommentar
+                    top_level.append(comment)
+                else:
+                    # Antwort - zu replies_map hinzufügen
+                    parent_id_str = str(parent_id)
+                    if parent_id_str not in replies_map:
+                        replies_map[parent_id_str] = []
+                    replies_map[parent_id_str].append(comment)
+            
+            # Antworten zu ihren Eltern zuordnen
+            def attach_replies(comment_list):
+                for comment in comment_list:
+                    comment_id_str = str(comment.get("id"))
+                    if comment_id_str in replies_map:
+                        comment["replies"] = sorted(
+                            replies_map[comment_id_str],
+                            key=lambda x: x.get("created_at", "")
+                        )
+                        attach_replies(comment["replies"])  # Rekursiv für verschachtelte Antworten
+            
+            attach_replies(top_level)
+            
+            return top_level
             
         except Exception as e:
             logger.error(f"Fehler beim Laden der Kommentare für Post {post_id}: {e}", exc_info=True)
@@ -86,6 +117,7 @@ class CommentService:
         post_id: str,
         user_id: str,
         content: str,
+        parent_comment_id: Optional[Union[int, str]] = None,
     ) -> bool:
         """Erstellt einen neuen Kommentar.
         
@@ -93,6 +125,7 @@ class CommentService:
             post_id: UUID des Posts
             user_id: UUID des Benutzers
             content: Kommentar-Text (max. MAX_COMMENT_LENGTH Zeichen)
+            parent_comment_id: Optional ID des übergeordneten Kommentars (für Antworten)
         
         Returns:
             True bei Erfolg, False bei Fehler oder ungültiger Eingabe
@@ -120,6 +153,8 @@ class CommentService:
                 "content": content.strip(),
                 "is_deleted": False,
             }
+            if parent_comment_id is not None:
+                comment_data["parent_comment_id"] = int(parent_comment_id) if isinstance(parent_comment_id, str) else parent_comment_id
             
             # Kommentar in Supabase speichern
             self.sb.table("comment").insert(comment_data).execute()

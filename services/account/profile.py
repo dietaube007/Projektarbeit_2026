@@ -140,12 +140,23 @@ class ProfileService:
             )
             
             profiles = {}
+            PROFILE_IMAGE_BUCKET = "profile-images"
+            
             for row in (result.data or []):
                 user_id = row.get("id")
                 if user_id:
+                    # Profilbild-URL aus Storage generieren
+                    # Format: {user_id}/avatar.jpg (wie in ProfileImageService)
+                    storage_path = f"{user_id}/avatar.jpg"
+                    try:
+                        profile_image_url = self.sb.storage.from_(PROFILE_IMAGE_BUCKET).get_public_url(storage_path)
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug(f"Konnte Profilbild-URL nicht generieren für User {user_id}: {e}")
+                        profile_image_url = None
+                    
                     profiles[user_id] = {
                         "display_name": row.get("display_name") or "Unbekannt",
-                        "profile_image": None,  # profile_image_url ist in auth.users user_metadata, nicht direkt abfragbar
+                        "profile_image": profile_image_url,
                     }
             
             return profiles
