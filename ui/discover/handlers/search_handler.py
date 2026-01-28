@@ -104,6 +104,8 @@ def handle_render_items(
         profile_service: Optional ProfileService für Kommentare
     """
     try:
+        if getattr(page, "_theme_listeners", None) is not None:
+            page._theme_listeners.clear()
         if not items:
             no_results = create_no_results_card()
             list_view.controls = [no_results]

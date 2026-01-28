@@ -54,3 +54,36 @@
 # flyctl launch added from .venv/.gitignore
 .venv/**/*
 fly.toml
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+*.txt
+!requirements.txt
+
+# Tests
+**/test_*.py
+**/tests/
+**/*_test.py
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Image uploads
+image_uploads/
+uploads/
+
+# Deploy directory selbst

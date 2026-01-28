@@ -61,6 +61,7 @@ class CommentSection(ft.Container):
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
                     icon_size=16,
+                    icon_color=get_theme_color("text_secondary", self.is_dark),
                     tooltip="Abbrechen",
                     on_click=self.cancel_reply
                 )
@@ -80,6 +81,9 @@ class CommentSection(ft.Container):
             expand=True,
             border_color=get_theme_color("text_secondary", self.is_dark),
             focused_border_color=PRIMARY_COLOR,
+            hint_style=ft.TextStyle(color=get_theme_color("text_secondary", self.is_dark)),
+            color=get_theme_color("text_primary", self.is_dark),
+            bgcolor=get_theme_color("card", self.is_dark),
             border_radius=8,
             content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
             on_submit=self.post_comment,
@@ -96,6 +100,7 @@ class CommentSection(ft.Container):
         )
         
         super().__init__(
+            bgcolor=get_theme_color("background", self.is_dark),
             content=ft.Column([
                 ft.Divider(height=1, color=get_theme_color("text_secondary", self.is_dark)),
                 
@@ -114,12 +119,13 @@ class CommentSection(ft.Container):
                     padding=ft.padding.only(top=20, bottom=10, left=10, right=10)
                 ),
                 
-                # Kommentare Container
-                ft.Container(
-                    content=self.comments_list,
-                    padding=10,
-                    expand=True
-                ),
+        # Kommentare Container
+        ft.Container(
+            content=self.comments_list,
+            padding=10,
+            expand=True,
+            bgcolor=get_theme_color("background", self.is_dark)
+        ),
                 
                 # Antwort-Banner
                 ft.Container(
@@ -140,7 +146,110 @@ class CommentSection(ft.Container):
             ], spacing=0),
             expand=True
         )
+        self._apply_theme()
+        if not hasattr(self._page, "_theme_listeners"):
+            self._page._theme_listeners = []
+        self._page._theme_listeners.append(self)
     
+    def _apply_theme(self) -> None:
+        """Aktualisiert alle Theme-abhängigen Farben (Hintergrund, Text, Rahmen).
+        Wird beim Erstellen, bei load_comments() und beim Theme-Wechsel aufgerufen.
+        """
+        self.is_dark = self._page.theme_mode == ft.ThemeMode.DARK
+        is_dark = self.is_dark
+        
+        # Haupt-Container Hintergrund
+        self.bgcolor = get_theme_color("background", is_dark)
+        
+        # Column mit allen Controls
+        col = self.content
+        
+        # Divider (Index 0)
+        col.controls[0].color = get_theme_color("text_secondary", is_dark)
+        
+        # Header Container (Index 1) -> Row -> Text (Index 1)
+        col.controls[1].content.controls[1].color = get_theme_color("text_primary", is_dark)
+        
+        # Kommentare Container (Index 2)
+        col.controls[2].bgcolor = get_theme_color("background", is_dark)
+        
+        # Antwort-Banner Container (Index 3) -> reply_banner
+        self.reply_banner.bgcolor = get_theme_color("card", is_dark)
+        # Reply-Banner Row: IconButton Close (Index 4)
+        self.reply_banner.content.controls[4].icon_color = get_theme_color("text_secondary", is_dark)
+        
+        # Eingabe-Bereich Container (Index 4)
+        col.controls[4].bgcolor = get_theme_color("background", is_dark)
+        col.controls[4].border = ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", is_dark)))
+        
+        # Kommentar-TextField
+        self.comment_input.border_color = get_theme_color("text_secondary", is_dark)
+        self.comment_input.hint_style = ft.TextStyle(color=get_theme_color("text_secondary", is_dark))
+        self.comment_input.color = get_theme_color("text_primary", is_dark)
+        self.comment_input.bgcolor = get_theme_color("card", is_dark)
+        
+        # Alle bereits gerenderten Kommentar-Karten aktualisieren
+        self._update_comment_cards_theme()
+    
+    def _update_comment_cards_theme(self) -> None:
+        """Aktualisiert die Theme-Farben aller bereits gerenderten Kommentar-Karten."""
+        is_dark = self._page.theme_mode == ft.ThemeMode.DARK
+        page = self._page
+        
+        def c(key: str):
+            return get_theme_color(key, page=page)
+        
+        for card_control in self.comments_list.controls:
+            if not isinstance(card_control, ft.Container):
+                continue
+            
+            # Prüfe ob es ein Empty-State oder Error-State ist
+            if hasattr(card_control, "content") and isinstance(card_control.content, ft.Column):
+                # Empty-State: Column mit Icon, Text, Text
+                col = card_control.content
+                if len(col.controls) >= 2:
+                    for control in col.controls:
+                        if isinstance(control, ft.Icon):
+                            control.color = c("text_secondary")
+                        elif isinstance(control, ft.Text):
+                            if "keine Kommentare" in control.value or "Erste" in control.value:
+                                control.color = c("text_primary") if "keine Kommentare" in control.value else c("text_secondary")
+                            elif "Fehler" in control.value:
+                                control.color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
+                continue
+            
+            # Kommentar-Karte Container: bgcolor = card
+            card_control.bgcolor = c("card")
+            
+            # content ist ein Row mit [CircleAvatar, Column]
+            if not hasattr(card_control, "content") or not isinstance(card_control.content, ft.Row):
+                continue
+            
+            row = card_control.content
+            if len(row.controls) < 2 or not isinstance(row.controls[1], ft.Column):
+                continue
+            
+            # Column mit [Row(Name+Zeit), Text(Kommentar), Row(Aktionen)]
+            col = row.controls[1]
+            
+            # Name + Zeit Row (Index 0)
+            if len(col.controls) > 0 and isinstance(col.controls[0], ft.Row):
+                name_time_row = col.controls[0]
+                if len(name_time_row.controls) > 0 and isinstance(name_time_row.controls[0], ft.Text):
+                    name_time_row.controls[0].color = c("text_primary")
+                if len(name_time_row.controls) > 1 and isinstance(name_time_row.controls[1], ft.Text):
+                    name_time_row.controls[1].color = c("text_secondary")
+            
+            # Kommentar-Text (Index 1)
+            if len(col.controls) > 1 and isinstance(col.controls[1], ft.Text):
+                col.controls[1].color = c("text_primary")
+            
+            # Aktionen Row (Index 2) - Delete-Button Icon-Farbe
+            if len(col.controls) > 2 and isinstance(col.controls[2], ft.Row):
+                actions_row = col.controls[2]
+                for action_control in actions_row.controls:
+                    if isinstance(action_control, ft.IconButton) and action_control.icon == ft.Icons.DELETE_OUTLINE:
+                        action_control.icon_color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
     
     def load_comments(self):
         """Lädt alle nicht gelöschten Kommentare für diesen Post.
@@ -148,6 +257,7 @@ class CommentSection(ft.Container):
         Zeigt einen Loading-Indikator während des Ladens und rendert die
         Kommentare in der Kommentar-Liste.
         """
+        self._apply_theme()
         handle_load_comments(
             comment_service=self.comment_service,
             post_id=self.post_id,
@@ -188,10 +298,12 @@ class CommentSection(ft.Container):
     
     def _create_error_state(self, error_message: str) -> ft.Control:
         """Erstellt den Error-State-UI für Fehler beim Laden."""
+        is_dark = self._page.theme_mode == ft.ThemeMode.DARK
+        error_color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
         return ft.Container(
             content=ft.Text(
                 f"Fehler beim Laden: {error_message}",
-                color=ft.Colors.RED_400,
+                color=error_color,
                 size=14
             ),
             padding=20
@@ -265,7 +377,7 @@ class CommentSection(ft.Container):
                     ft.IconButton(
                         icon=ft.Icons.DELETE_OUTLINE,
                         icon_size=18,
-                        icon_color=ft.Colors.RED_400,
+                        icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
                         tooltip="Löschen",
                         visible=is_author,
                         on_click=lambda e, cid=comment.get('id'): self.delete_comment(cid)

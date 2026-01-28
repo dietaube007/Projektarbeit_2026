@@ -492,6 +492,10 @@ class PetBuddyApp:
             def on_theme_toggle(is_dark: bool) -> None:
                 if self.discover_view:
                     self.discover_view._update_farben_colors()
+                # Alle offenen Kommentarbereiche aktualisieren
+                for control in getattr(self.page, "_theme_listeners", []):
+                    if hasattr(control, "_apply_theme"):
+                        control._apply_theme()
                 # AppBar mit neuer Hintergrundfarbe neu erstellen
                 self.page.appbar = create_app_bar(
                     self.is_logged_in,
