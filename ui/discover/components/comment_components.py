@@ -66,7 +66,7 @@ class CommentSection(ft.Container):
                     on_click=self.cancel_reply
                 )
             ], spacing=5),
-            bgcolor=get_theme_color("card", self.is_dark),
+            bgcolor=None,  # Transparent
             padding=8,
             border_radius=8,
             visible=False
@@ -83,7 +83,7 @@ class CommentSection(ft.Container):
             focused_border_color=PRIMARY_COLOR,
             hint_style=ft.TextStyle(color=get_theme_color("text_secondary", self.is_dark)),
             color=get_theme_color("text_primary", self.is_dark),
-            bgcolor=get_theme_color("card", self.is_dark),
+            bgcolor=None,  # Transparent
             border_radius=8,
             content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
             on_submit=self.post_comment,
@@ -100,7 +100,7 @@ class CommentSection(ft.Container):
         )
         
         super().__init__(
-            bgcolor=get_theme_color("background", self.is_dark),
+            bgcolor=None,  # Transparent 
             content=ft.Column([
                 ft.Divider(height=1, color=get_theme_color("text_secondary", self.is_dark)),
                 
@@ -119,13 +119,13 @@ class CommentSection(ft.Container):
                     padding=ft.padding.only(top=20, bottom=10, left=10, right=10)
                 ),
                 
-        # Kommentare Container
-        ft.Container(
-            content=self.comments_list,
-            padding=10,
-            expand=True,
-            bgcolor=get_theme_color("background", self.is_dark)
-        ),
+                # Kommentare Container
+                ft.Container(
+                    content=self.comments_list,
+                    padding=10,
+                    expand=True,
+                    bgcolor=None  # Transparent
+                ),
                 
                 # Antwort-Banner
                 ft.Container(
@@ -141,7 +141,7 @@ class CommentSection(ft.Container):
                     ], spacing=10),
                     padding=10,
                     border=ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", self.is_dark))),
-                    bgcolor=get_theme_color("background", self.is_dark)
+                    bgcolor=None  # Transparent
                 )
             ], spacing=0),
             expand=True
@@ -158,8 +158,7 @@ class CommentSection(ft.Container):
         self.is_dark = self._page.theme_mode == ft.ThemeMode.DARK
         is_dark = self.is_dark
         
-        # Haupt-Container Hintergrund
-        self.bgcolor = get_theme_color("background", is_dark)
+        self.bgcolor = None
         
         # Column mit allen Controls
         col = self.content
@@ -170,23 +169,23 @@ class CommentSection(ft.Container):
         # Header Container (Index 1) -> Row -> Text (Index 1)
         col.controls[1].content.controls[1].color = get_theme_color("text_primary", is_dark)
         
-        # Kommentare Container (Index 2)
-        col.controls[2].bgcolor = get_theme_color("background", is_dark)
+        # Kommentare Container (Index 2) - transparent
+        col.controls[2].bgcolor = None
         
-        # Antwort-Banner Container (Index 3) -> reply_banner
-        self.reply_banner.bgcolor = get_theme_color("card", is_dark)
+        # Antwort-Banner Container (Index 3) -> reply_banner - transparent
+        self.reply_banner.bgcolor = None
         # Reply-Banner Row: IconButton Close (Index 4)
         self.reply_banner.content.controls[4].icon_color = get_theme_color("text_secondary", is_dark)
         
-        # Eingabe-Bereich Container (Index 4)
-        col.controls[4].bgcolor = get_theme_color("background", is_dark)
+        # Eingabe-Bereich Container (Index 4) - transparent
+        col.controls[4].bgcolor = None
         col.controls[4].border = ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", is_dark)))
         
-        # Kommentar-TextField
+        # Kommentar-TextField - transparent
         self.comment_input.border_color = get_theme_color("text_secondary", is_dark)
         self.comment_input.hint_style = ft.TextStyle(color=get_theme_color("text_secondary", is_dark))
         self.comment_input.color = get_theme_color("text_primary", is_dark)
-        self.comment_input.bgcolor = get_theme_color("card", is_dark)
+        self.comment_input.bgcolor = None
         
         # Alle bereits gerenderten Kommentar-Karten aktualisieren
         self._update_comment_cards_theme()
@@ -218,8 +217,11 @@ class CommentSection(ft.Container):
                                 control.color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
                 continue
             
-            # Kommentar-Karte Container: bgcolor = card
-            card_control.bgcolor = c("card")
+            # Kommentar-Karte Container: heller als Umgebung
+            if is_dark:
+                card_control.bgcolor = ft.Colors.with_opacity(0.08, ft.Colors.WHITE)
+            else:
+                card_control.bgcolor = ft.Colors.with_opacity(0.35, ft.Colors.WHITE)
             
             # content ist ein Row mit [CircleAvatar, Column]
             if not hasattr(card_control, "content") or not isinstance(card_control.content, ft.Row):
@@ -328,10 +330,10 @@ class CommentSection(ft.Container):
         username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         profile_image = user_data.get('profile_image') if isinstance(user_data, dict) else None
         
-        # Antwort-Button
+        # Antwort-Button 
         reply_button = ft.IconButton(
             icon=ft.Icons.REPLY,
-            icon_size=18,
+            icon_size=16,
             icon_color=PRIMARY_COLOR,
             tooltip="Antworten",
             on_click=lambda e, c=comment: self.start_reply(c)
@@ -341,9 +343,9 @@ class CommentSection(ft.Container):
             # Profilbild
             ft.CircleAvatar(
                 foreground_image_src=profile_image if profile_image else None,
-                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE) if not profile_image else None,
+                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=14) if not profile_image else None,
                 bgcolor=PRIMARY_COLOR,
-                radius=20 if not is_reply else 16
+                radius=16 if not is_reply else 14
             ),
             
             # Kommentar-Inhalt
@@ -353,20 +355,20 @@ class CommentSection(ft.Container):
                     ft.Text(
                         username,
                         weight=ft.FontWeight.BOLD,
-                        size=14 if not is_reply else 13,
+                        size=13 if not is_reply else 12,
                         color=get_theme_color("text_primary", is_dark)
                     ),
                     ft.Text(
                         format_time(comment.get('created_at')),
-                        size=12 if not is_reply else 11,
+                        size=11 if not is_reply else 10,
                         color=get_theme_color("text_secondary", is_dark)
                     )
-                ], spacing=10),
+                ], spacing=8),
                 
                 # Kommentar-Text
                 ft.Text(
                     comment.get('content', ''),
-                    size=14 if not is_reply else 13,
+                    size=13 if not is_reply else 12,
                     selectable=True,
                     color=get_theme_color("text_primary", is_dark)
                 ),
@@ -376,26 +378,31 @@ class CommentSection(ft.Container):
                     reply_button,
                     ft.IconButton(
                         icon=ft.Icons.DELETE_OUTLINE,
-                        icon_size=18,
+                        icon_size=16,
                         icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
                         tooltip="Löschen",
                         visible=is_author,
                         on_click=lambda e, cid=comment.get('id'): self.delete_comment(cid)
                     ) if is_author else ft.Container(width=0)
-                ], spacing=5)
+                ], spacing=0)
                 
-            ], spacing=5, expand=True),
+            ], spacing=2, expand=True),
             
-        ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START)
+        ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.START)
         
         # Container mit Einrückung für Antworten
+        # Hintergrundfarbe: heller als Umgebung (beide Modi)
+        if is_dark:
+            card_bg = ft.Colors.with_opacity(0.08, ft.Colors.WHITE)
+        else:
+            card_bg = ft.Colors.with_opacity(0.35, ft.Colors.WHITE)
+        
         return ft.Container(
             content=card_content,
-            padding=12,
-            margin=ft.margin.only(left=50 if is_reply else 0),
-            bgcolor=get_theme_color("card", is_dark),
-            border_radius=10,
-            border=ft.border.only(left=ft.BorderSide(3, PRIMARY_COLOR)) if is_reply else None,
+            padding=8,
+            margin=ft.margin.only(left=40 if is_reply else 0),
+            bgcolor=card_bg,
+            border_radius=8,
             animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT)
         )
     

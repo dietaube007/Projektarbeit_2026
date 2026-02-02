@@ -280,16 +280,9 @@ def handle_view_show_detail_dialog(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     on_favorite_click: Optional[Callable[[Dict[str, Any], ft.IconButton], None]] = None,
     profile_service=None,
+    supabase=None,
 ) -> None:
-    """Zeigt den Detail-Dialog für eine Meldung (View-Wrapper).
-    
-    Args:
-        item: Post-Dictionary mit allen Daten
-        page: Flet Page-Instanz
-        on_contact_click: Optional Callback für Kontakt-Button
-        on_favorite_click: Optional Callback für Favoriten-Toggle
-        profile_service: Optional ProfileService
-    """
+    """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentare (View-Wrapper)."""
     from ..components.post_card_components import show_detail_dialog
     show_detail_dialog(
         item=item,
@@ -297,6 +290,7 @@ def handle_view_show_detail_dialog(
         on_contact_click=on_contact_click,
         on_favorite_click=on_favorite_click,
         profile_service=profile_service,
+        supabase=supabase,
     )
 
 

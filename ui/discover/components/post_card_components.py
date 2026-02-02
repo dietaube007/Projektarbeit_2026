@@ -224,7 +224,7 @@ def build_big_card(
                 )
                 page.update()
                 
-                # CommentSection erstellen
+                # CommentSection erstellen - transparent, Card-Hintergrund scheint durch
                 comment_section = CommentSection(page, post_id, supabase, profile_service=profile_service)
                 comments_container.content = comment_section
                 comment_section.load_comments()
@@ -261,6 +261,7 @@ def build_big_card(
         content=card,
         animate_scale=300,
         scale=ft.Scale(1.0),
+        on_click=lambda e, it=item: on_card_click(it) if on_card_click else None,
     )
 
     def on_hover(e: ft.HoverEvent):
@@ -277,16 +278,9 @@ def show_detail_dialog(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     on_favorite_click: Optional[Callable[[Dict[str, Any], ft.Control], None]] = None,
     profile_service=None,
+    supabase=None,
 ) -> None:
-    """Zeigt den Detail-Dialog für eine Meldung.
-    
-    Args:
-        page: Flet Page-Instanz
-        item: Post-Dictionary mit allen Daten
-        on_contact_click: Optionaler Callback (item) für Kontakt-Button
-        on_favorite_click: Optionaler Callback (item, control) für Favoriten-Toggle
-        profile_service: Optional ProfileService (wird aktuell nicht verwendet, aber für zukünftige Erweiterungen)
-    """
+    """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentarbereich."""
     data = extract_item_data(item)
 
     is_dark = page.theme_mode == ft.ThemeMode.DARK
@@ -317,21 +311,47 @@ def show_detail_dialog(
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     ) if favorite_btn else ft.Text(data["title"])
 
+    # Links: Infos (Bild, Beschreibung, Metadaten) | Rechts: Kommentare
+    post_id = str(item.get("id") or "")
+    details_column = ft.Column(
+        [
+            ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+            ft.Container(height=8),
+            ft.Text(item.get("description") or "Keine Beschreibung.", color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Container(height=8),
+            meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
+            meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
+            meta_row(ft.Icons.PERSON, data["username"]),
+            meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
+        ],
+        tight=True,
+        spacing=8,
+        scroll=ft.ScrollMode.AUTO,
+        expand=True,
+    )
+
+    if supabase and post_id and profile_service is not None:
+        comment_section = CommentSection(page, post_id, supabase, profile_service=profile_service)
+        # CommentSection transparent - Dialog-Hintergrund scheint durch
+        right_column = ft.Container(
+            content=comment_section,
+            width=550,
+            height=500,
+            padding=ft.padding.only(left=16),
+        )
+        dialog_content = ft.Row(
+            [details_column, right_column],
+            spacing=0,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+    else:
+        dialog_content = details_column
+
     dlg = ft.AlertDialog(
         title=title_row,
-        content=ft.Column(
-            [
-                ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-                ft.Container(height=8),
-                ft.Text(item.get("description") or "Keine Beschreibung.", color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Container(height=8),
-                meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
-                meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-                meta_row(ft.Icons.PERSON, data["username"]),
-                meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
-            ],
-            tight=True,
-            spacing=8,
+        content=ft.Container(
+            content=dialog_content,
+            width=1400,
         ),
         actions=[
             ft.TextButton("Schließen", on_click=lambda _: page.close(dlg)),
@@ -343,3 +363,7 @@ def show_detail_dialog(
         ],
     )
     page.open(dlg)
+    # Kommentare nach Öffnen laden (Dialog muss bereits in der Page sein)
+    if supabase and post_id and profile_service is not None:
+        comment_section.load_comments()
+        page.update()

@@ -386,13 +386,14 @@ class DiscoverView:
         )
     
     def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
-        """Zeigt den Detail-Dialog für eine Meldung."""
+        """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentare."""
         handle_view_show_detail_dialog(
             item=item,
             page=self.page,
             on_contact_click=self.on_contact_click,
             on_favorite_click=self._toggle_favorite,
             profile_service=self.profile_service,
+            supabase=self.sb,
         )
     
     def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
