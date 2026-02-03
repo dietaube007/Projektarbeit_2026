@@ -227,6 +227,7 @@ def show_ai_result(
     
     ai_result_container.content = result_content
     ai_result_container.visible = True
+    ai_result_container.update()
     page.update()
 
 

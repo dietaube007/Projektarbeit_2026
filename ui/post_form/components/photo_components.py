@@ -46,16 +46,10 @@ def create_photo_upload_area(
     Returns:
         Container mit Upload-Bereich und Vorschau
     """
-    from ui.theme import get_theme_color
-    
-    if page:
-        text_color = get_theme_color("text_secondary", page=page)
-        icon_color = get_theme_color("text_secondary", page=page)
-        border_color = get_theme_color("text_secondary", page=page)
-    else:
-        text_color = ft.Colors.GREY_700
-        icon_color = ft.Colors.GREY_500
-        border_color = ft.Colors.GREY_300
+    # Theme-aware Farben (lesbar in Hell- und Dunkelmodus)
+    text_color = ft.Colors.ON_SURFACE_VARIANT
+    icon_color = ft.Colors.ON_SURFACE_VARIANT
+    border_color = getattr(ft.Colors, "OUTLINE_VARIANT", None) or ft.Colors.ON_SURFACE_VARIANT
     
     return ft.Container(
         content=ft.Column([

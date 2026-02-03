@@ -24,12 +24,15 @@ def create_ai_recognition_button(on_click: Callable) -> ft.ElevatedButton:
 
 def create_ai_result_container() -> ft.Container:
     """Erstellt den Container für KI-Erkennungsergebnisse."""
+    outline = getattr(ft.Colors, "OUTLINE_VARIANT", None) or ft.Colors.PURPLE_200
+    surface_low = getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.PURPLE_50
     return ft.Container(
+        content=ft.Column([], spacing=8),
         visible=False,
         padding=15,
-        border=ft.border.all(2, ft.Colors.PURPLE_200),
+        border=ft.border.all(2, outline),
         border_radius=8,
-        bgcolor=ft.Colors.PURPLE_50,
+        bgcolor=surface_low,
     )
 
 
@@ -51,7 +54,7 @@ def create_consent_dialog(
         title=ft.Row(
             [
                 ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.PURPLE_600, size=24),
-                ft.Text("KI-Rassenerkennung", size=16, weight=ft.FontWeight.W_600),
+                ft.Text("KI-Rassenerkennung", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             ],
             spacing=8,
         ),
@@ -62,18 +65,20 @@ def create_consent_dialog(
                         "Einverständniserklärung:",
                         size=14,
                         weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.ON_SURFACE,
                     ),
                     ft.Text(
                         "Das hochgeladene Bild wird durch eine KI analysiert, um die Tierart und Rasse zu erkennen. "
                         "Die Analyse erfolgt lokal und das Bild wird nicht an externe Dienste gesendet.",
                         size=12,
-                        color=ft.Colors.GREY_700,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.Divider(),
                     ft.Text(
                         "Wichtige Hinweise:",
                         size=14,
                         weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.ON_SURFACE,
                     ),
                     ft.Text(
                         "• Die KI-Erkennung dient nur als Vorschlag\n"
@@ -81,7 +86,7 @@ def create_consent_dialog(
                         "• Sie können den Vorschlag ablehnen und selbst eintragen\n"
                         "• Bei Unsicherheit kontaktieren Sie ein Tierheim",
                         size=12,
-                        color=ft.Colors.GREY_700,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                 ],
                 spacing=8,
@@ -123,8 +128,13 @@ def create_ai_result_content(
     Returns:
         Column mit Ergebnis-Anzeige
     """
-    confidence_percent = int(result["confidence"] * 100)
-    
+    confidence = result.get("confidence", 0.0)
+    species = result.get("species") or "—"
+    breed = result.get("breed") or "—"
+    confidence_percent = int(confidence * 100)
+    outline = getattr(ft.Colors, "OUTLINE_VARIANT", None) or ft.Colors.PURPLE_200
+    surface_low = getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.ORANGE_50
+
     return ft.Column(
         [
             ft.Row(
@@ -134,39 +144,41 @@ def create_ai_result_content(
                         "KI-Erkennungsergebnis",
                         size=14,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.PURPLE_900,
+                        color=ft.Colors.ON_SURFACE,
                     ),
                 ],
                 spacing=8,
             ),
-            ft.Divider(height=10, color=ft.Colors.PURPLE_200),
+            ft.Divider(height=10, color=outline),
             ft.Text(
-                f"Tierart: {result['species']}",
+                f"Tierart: {species}",
                 size=13,
                 weight=ft.FontWeight.W_600,
+                color=ft.Colors.ON_SURFACE,
             ),
             ft.Text(
-                f"Rasse: {result['breed']}",
+                f"Rasse: {breed}",
                 size=13,
                 weight=ft.FontWeight.W_600,
+                color=ft.Colors.ON_SURFACE,
             ),
             ft.Text(
                 f"Konfidenz: {confidence_percent}%",
                 size=12,
-                color=ft.Colors.GREY_700,
+                color=ft.Colors.ON_SURFACE_VARIANT,
             ),
             ft.Container(
                 content=ft.Text(
                     "Hinweis: Dies ist nur ein KI-Vorschlag ohne Garantie auf Richtigkeit.",
                     size=11,
-                    color=ft.Colors.ORANGE_800,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
                     italic=True,
                 ),
                 padding=8,
-                bgcolor=ft.Colors.ORANGE_50,
+                bgcolor=surface_low,
                 border_radius=4,
             ),
-            ft.Divider(height=10, color=ft.Colors.PURPLE_200),
+            ft.Divider(height=10, color=outline),
             ft.Row(
                 [
                     ft.TextButton(
@@ -213,24 +225,24 @@ def create_ai_suggestion_dialog(
     
     suggestion_dlg = ft.AlertDialog(
         modal=True,
-        title=ft.Text("KI-Vorschlag (niedrige Konfidenz)"),
+        title=ft.Text("KI-Vorschlag (niedrige Konfidenz)", color=ft.Colors.ON_SURFACE),
         content=ft.Container(
             content=ft.Column(
                 [
-                    ft.Text(error_message, size=12),
+                    ft.Text(error_message, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                     ft.Divider(),
-                    ft.Text(f"Vorgeschlagene Rasse: {suggested_breed}", size=13, weight=ft.FontWeight.W_600),
-                    suggested_species and ft.Text(f"Vorgeschlagene Tierart: {suggested_species}", size=13),
-                    ft.Text(f"Konfidenz: {confidence_percent}%", size=12, color=ft.Colors.GREY_700),
+                    ft.Text(f"Vorgeschlagene Rasse: {suggested_breed}", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    suggested_species and ft.Text(f"Vorgeschlagene Tierart: {suggested_species}", size=13, color=ft.Colors.ON_SURFACE),
+                    ft.Text(f"Konfidenz: {confidence_percent}%", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                     ft.Container(
                         content=ft.Text(
                             "Hinweis: Die Konfidenz ist niedrig. Bitte prüfen Sie den Vorschlag sorgfältig.",
                             size=11,
-                            color=ft.Colors.ORANGE_800,
+                            color=ft.Colors.ON_SURFACE_VARIANT,
                             italic=True,
                         ),
                         padding=8,
-                        bgcolor=ft.Colors.ORANGE_50,
+                        bgcolor=getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.ORANGE_50,
                         border_radius=4,
                     ),
                 ],

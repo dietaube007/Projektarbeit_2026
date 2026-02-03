@@ -36,7 +36,7 @@ def create_meldungsart_button(on_change: Callable[[ft.ControlEvent], None]) -> f
     """
     return ft.SegmentedButton(
         selected={"1"},
-        segments=[ft.Segment(value="1", label=ft.Text("Vermisst"))],
+        segments=[ft.Segment(value="1", label=ft.Text("Vermisst", color=ft.Colors.ON_SURFACE))],
         allow_empty_selection=False,
         allow_multiple_selection=False,
         on_change=on_change,
@@ -71,7 +71,7 @@ def create_title_label() -> ft.Text:
         "Name﹡",
         size=14,
         weight=ft.FontWeight.W_600,
-        color=ft.Colors.GREY_700
+        color=ft.Colors.ON_SURFACE,
     )
 
 
@@ -224,8 +224,8 @@ def create_farben_panel(
     farben_header = ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18),
-                ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600),
+                ft.Icon(ft.Icons.PALETTE, size=18, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                 ft.Container(expand=True),
                 farben_toggle_icon,
             ],
@@ -233,7 +233,7 @@ def create_farben_panel(
         ),
         padding=8,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_100,
+        bgcolor=ft.Colors.TRANSPARENT,
     )
     
     return farben_container, farben_panel, farben_header, farben_toggle_icon, farben_checkboxes
@@ -260,8 +260,6 @@ def create_farben_header_and_panel(
     """
     from ui.theme import get_theme_color
     
-    # Theme-Farben holen
-    bgcolor = get_theme_color("card", page=page)
     # Material-3 outline als Fallback, sonst text_secondary
     outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", None)
     if not outline_color:
@@ -271,7 +269,7 @@ def create_farben_header_and_panel(
         content=farben_container,
         padding=12,
         visible=farben_panel_visible["visible"],
-        bgcolor=bgcolor,
+        bgcolor=ft.Colors.TRANSPARENT,
         border_radius=8,
         border=ft.border.all(1, outline_color) if outline_color else None,
     )
@@ -279,8 +277,8 @@ def create_farben_header_and_panel(
     farben_header = ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.PALETTE, size=18),
-                ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600),
+                ft.Icon(ft.Icons.PALETTE, size=18, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                 ft.Container(expand=True),
                 farben_toggle_icon,
             ],
@@ -289,7 +287,7 @@ def create_farben_header_and_panel(
         padding=8,
         on_click=on_toggle,
         border_radius=8,
-        bgcolor=bgcolor,
+        bgcolor=ft.Colors.TRANSPARENT,
         border=ft.border.all(1, outline_color) if outline_color else None,
     )
     
@@ -323,7 +321,7 @@ def create_form_header() -> List[ft.Control]:
         Liste von Controls für den Header (Titel + Divider)
     """
     return [
-        ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD),
+        ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
         ft.Divider(height=20),
     ]
 
@@ -338,11 +336,8 @@ def create_form_photo_section(photo_area: ft.Control, page: ft.Page) -> List[ft.
     Returns:
         Liste von Controls für die Foto-Sektion
     """
-    from ui.theme import get_theme_color
-    text_color = get_theme_color("text_primary", page=page)
-    
     return [
-        ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
+        ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         photo_area,
         ft.Divider(height=20),
     ]
@@ -415,16 +410,13 @@ def create_form_details_section(
     Returns:
         Liste von Controls für die Details-Sektion
     """
-    from ui.theme import get_theme_color
-    text_color = get_theme_color("text_primary", page=page)
-    
     return [
-        ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
+        ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         info_tf,
         ai_button,
         ai_result_container,
         ft.Divider(height=20),
-        ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=text_color),
+        ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         location_tf,
         date_tf,
         ft.Divider(height=20),
