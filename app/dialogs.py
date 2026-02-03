@@ -4,6 +4,8 @@ Dialoge - Login-Dialoge und Banner für PetBuddy.
 Enthält Funktionen zum Erstellen von:
 - Login-Required Dialoge
 - Favoriten-Login-Dialoge
+- Suche-speichern-Login-Dialoge
+- Kommentar-Login-Dialoge
 - Login-Banner für Gäste
 """
 
@@ -74,6 +76,26 @@ def create_saved_search_login_dialog(
         title=ft.Text("Anmeldung erforderlich"),
         content=ft.Text(
             "Bitte melden Sie sich an, um Suchen zu speichern."
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel_click),
+            ft.ElevatedButton("Anmelden", on_click=on_login_click),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
+def create_comment_login_dialog(
+    page: ft.Page,
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
+) -> ft.AlertDialog:
+    """Erstellt einen Dialog wenn Gast kommentieren möchte."""
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Anmeldung erforderlich"),
+        content=ft.Text(
+            "Bitte melden Sie sich an, um zu kommentieren."
         ),
         actions=[
             ft.TextButton("Abbrechen", on_click=on_cancel_click),

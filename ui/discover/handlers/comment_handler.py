@@ -23,6 +23,7 @@ def handle_load_comments(
     create_empty_state: Callable[[], ft.Control],
     create_comment_card: Callable[[Dict[str, Any], bool], ft.Control],
     create_error_state: Callable[[str], ft.Control],
+    on_comments_loaded: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
 ) -> None:
     """Lädt alle nicht gelöschten Kommentare für einen Post.
     
@@ -35,6 +36,7 @@ def handle_load_comments(
         create_empty_state: Funktion zum Erstellen des Empty-State-UI
         create_comment_card: Funktion zum Erstellen einer Kommentar-Karte
         create_error_state: Funktion zum Erstellen des Error-State-UI
+        on_comments_loaded: Optionaler Callback mit der geladenen Kommentar-Liste (für Inline-Refresh)
     """
     loading_indicator.visible = True
     comments_list.controls.clear()
@@ -47,6 +49,8 @@ def handle_load_comments(
     try:
         # Kommentare über Service laden
         comments = comment_service.get_comments(post_id)
+        if on_comments_loaded is not None:
+            on_comments_loaded(comments or [])
         
         if not comments:
             # Keine Kommentare vorhanden

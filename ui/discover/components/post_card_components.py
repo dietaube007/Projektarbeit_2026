@@ -106,6 +106,7 @@ def build_big_card(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     supabase=None,
     profile_service=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> ft.Control:
     """Erstellt eine große Listen-Karte für die Listen-Ansicht.
     
@@ -117,6 +118,7 @@ def build_big_card(
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
         supabase: Optional Supabase-Client für Kommentare
         profile_service: Optional ProfileService für Kommentare
+        on_comment_login_required: Optional Callback wenn Login zum Kommentieren erforderlich
     
     Returns:
         Container mit großer Karten-Komponente
@@ -225,7 +227,11 @@ def build_big_card(
                 page.update()
                 
                 # CommentSection erstellen - transparent, Card-Hintergrund scheint durch
-                comment_section = CommentSection(page, post_id, supabase, profile_service=profile_service)
+                comment_section = CommentSection(
+                    page, post_id, supabase,
+                    profile_service=profile_service,
+                    on_login_required=on_comment_login_required,
+                )
                 comments_container.content = comment_section
                 comment_section.load_comments()
             elif comment_section:
@@ -279,6 +285,7 @@ def show_detail_dialog(
     on_favorite_click: Optional[Callable[[Dict[str, Any], ft.Control], None]] = None,
     profile_service=None,
     supabase=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
     """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentarbereich."""
     data = extract_item_data(item)
@@ -331,7 +338,11 @@ def show_detail_dialog(
     )
 
     if supabase and post_id and profile_service is not None:
-        comment_section = CommentSection(page, post_id, supabase, profile_service=profile_service)
+        comment_section = CommentSection(
+            page, post_id, supabase,
+            profile_service=profile_service,
+            on_login_required=on_comment_login_required,
+        )
         # CommentSection transparent - Dialog-Hintergrund scheint durch
         right_column = ft.Container(
             content=comment_section,

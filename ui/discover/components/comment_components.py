@@ -2,19 +2,23 @@
 Kommentar-Komponenten für die Discover-View.
 """
 
-import flet as ft
-from typing import Optional
+from __future__ import annotations
 
+from typing import Callable, Optional
+
+import flet as ft
+
+from services.posts import CommentService
+from ui.constants import PRIMARY_COLOR
 from ui.helpers import format_time
 from ui.theme import get_theme_color
-from ui.constants import PRIMARY_COLOR
-from services.posts import CommentService
-from utils.logging_config import get_logger
 from utils.constants import MAX_COMMENT_LENGTH
+from utils.logging_config import get_logger
+
 from ..handlers.comment_handler import (
+    handle_delete_comment,
     handle_load_comments,
     handle_post_comment,
-    handle_delete_comment,
 )
 
 logger = get_logger(__name__)
@@ -26,7 +30,14 @@ class CommentSection(ft.Container):
     Funktioniert mit Supabase und der bestehenden comment-Tabelle
     """
     
-    def __init__(self, page: ft.Page, post_id: str, supabase, profile_service=None):
+    def __init__(
+        self,
+        page: ft.Page,
+        post_id: str,
+        supabase,
+        profile_service=None,
+        on_login_required: Optional[Callable[[], None]] = None,
+    ):
         """Initialisiert die CommentSection.
         
         Args:
@@ -34,14 +45,18 @@ class CommentSection(ft.Container):
             post_id: UUID des Posts für den Kommentare angezeigt werden
             supabase: Supabase-Client für Datenbankzugriffe
             profile_service: Optional ProfileService für User-ID-Abfragen
+            on_login_required: Optional Callback wenn Gast kommentieren möchte (Login-Dialog)
         """
         self._page = page  # Verwende _page statt page um Konflikt zu vermeiden
         self.post_id = post_id  # UUID des Posts
         self.profile_service = profile_service
+        self.on_login_required = on_login_required
         self.comment_service = CommentService(supabase, profile_service=profile_service)
         self.replying_to = None
         self.is_dark = page.theme_mode == ft.ThemeMode.DARK
-        
+        self._current_comments = []
+        self._delete_confirming_id = None
+
         # Kommentar-Liste (scrollbar)
         self.comments_list = ft.Column(
             spacing=10,
@@ -253,12 +268,13 @@ class CommentSection(ft.Container):
                     if isinstance(action_control, ft.IconButton) and action_control.icon == ft.Icons.DELETE_OUTLINE:
                         action_control.icon_color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
     
-    def load_comments(self):
+    def load_comments(self) -> None:
         """Lädt alle nicht gelöschten Kommentare für diesen Post.
         
         Zeigt einen Loading-Indikator während des Ladens und rendert die
         Kommentare in der Kommentar-Liste.
         """
+        self._delete_confirming_id = None
         self._apply_theme()
         handle_load_comments(
             comment_service=self.comment_service,
@@ -269,7 +285,22 @@ class CommentSection(ft.Container):
             create_empty_state=self._create_empty_state,
             create_comment_card=self.create_comment_card,
             create_error_state=self._create_error_state,
+            on_comments_loaded=lambda cs: setattr(self, "_current_comments", cs or []),
         )
+
+    def _refresh_comments_ui(self) -> None:
+        """Baut die Kommentar-Liste aus _current_comments neu (ohne erneutes Laden)."""
+        self.comments_list.controls.clear()
+        if not self._current_comments:
+            self.comments_list.controls.append(self._create_empty_state())
+        else:
+            def render(c, is_reply=False):
+                self.comments_list.controls.append(self.create_comment_card(c, is_reply=is_reply))
+                for r in c.get("replies", []):
+                    render(r, is_reply=True)
+            for c in self._current_comments:
+                render(c, is_reply=False)
+        self._page.update()
     
     def _create_empty_state(self) -> ft.Control:
         """Erstellt den Empty-State-UI für keine Kommentare."""
@@ -311,7 +342,49 @@ class CommentSection(ft.Container):
             padding=20
         )
     
-    def create_comment_card(self, comment, is_reply=False):
+    def _build_comment_actions_row(
+        self, comment, is_reply: bool, is_author: bool, is_dark: bool, reply_button: ft.IconButton
+    ) -> ft.Row:
+        """Baut die Aktionen-Zeile: Antworten + Löschen-Icon oder Inline-Bestätigung."""
+        cid = comment.get("id")
+        is_confirming = is_author and (self._delete_confirming_id == cid)
+        if is_confirming:
+            return ft.Row(
+                [
+                    reply_button,
+                    ft.Text(
+                        "Wirklich löschen?",
+                        size=12,
+                        color=get_theme_color("text_secondary", is_dark),
+                    ),
+                    ft.TextButton(
+                        "Abbrechen",
+                        on_click=lambda e: self._cancel_delete_confirm(),
+                    ),
+                    ft.FilledButton(
+                        "Löschen",
+                        on_click=lambda e, cid=cid: self._do_delete_comment(cid),
+                    ),
+                ],
+                spacing=8,
+            )
+        if is_author:
+            return ft.Row(
+                [
+                    reply_button,
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE,
+                        icon_size=16,
+                        icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
+                        tooltip="Löschen",
+                        on_click=lambda e, cid=cid: self._request_delete_comment(cid),
+                    ),
+                ],
+                spacing=0,
+            )
+        return ft.Row([reply_button], spacing=0)
+
+    def create_comment_card(self, comment: dict, is_reply: bool = False) -> ft.Container:
         """Erstellt eine Kommentar-Karte.
         
         Args:
@@ -323,7 +396,11 @@ class CommentSection(ft.Container):
         """
         is_dark = self._page.theme_mode == ft.ThemeMode.DARK
         current_user_id = self.profile_service.get_user_id() if self.profile_service else None
-        is_author = (str(current_user_id) == str(comment.get('user_id')))
+        comment_user_id = comment.get("user_id")
+        is_author = bool(
+            current_user_id and comment_user_id
+            and str(current_user_id).strip().lower() == str(comment_user_id).strip().lower()
+        )
         
         # User-Daten extrahieren (Schema: user-Tabelle hat display_name, nicht username)
         user_data = comment.get('user', {})
@@ -373,18 +450,14 @@ class CommentSection(ft.Container):
                     color=get_theme_color("text_primary", is_dark)
                 ),
                 
-                # Aktionen (Antworten, Löschen)
-                ft.Row([
-                    reply_button,
-                    ft.IconButton(
-                        icon=ft.Icons.DELETE_OUTLINE,
-                        icon_size=16,
-                        icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
-                        tooltip="Löschen",
-                        visible=is_author,
-                        on_click=lambda e, cid=comment.get('id'): self.delete_comment(cid)
-                    ) if is_author else ft.Container(width=0)
-                ], spacing=0)
+                # Aktionen (Antworten, Löschen oder Inline-Bestätigung)
+                self._build_comment_actions_row(
+                    comment=comment,
+                    is_reply=is_reply,
+                    is_author=is_author,
+                    is_dark=is_dark,
+                    reply_button=reply_button,
+                )
                 
             ], spacing=2, expand=True),
             
@@ -406,8 +479,8 @@ class CommentSection(ft.Container):
             animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT)
         )
     
-    def start_reply(self, comment):
-        """Startet den Antwort-Modus für einen Kommentar"""
+    def start_reply(self, comment: dict) -> None:
+        """Startet den Antwort-Modus für einen Kommentar."""
         self.replying_to = comment['id']
         
         # Username extrahieren (Schema: user-Tabelle hat display_name)
@@ -424,7 +497,7 @@ class CommentSection(ft.Container):
         
         self._page.update()
     
-    def cancel_reply(self, e=None):
+    def cancel_reply(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Bricht den Antwort-Modus ab.
         
         Args:
@@ -435,15 +508,18 @@ class CommentSection(ft.Container):
         self.comment_input.hint_text = "Schreibe einen Kommentar..."
         self._page.update()
     
-    def post_comment(self, e):
-        """Speichert einen neuen Kommentar.
+    def post_comment(self, e: ft.ControlEvent) -> None:
+        """Speichert einen neuen Kommentar (oder zeigt Login-Dialog im Gastmodus).
         
         Args:
             e: ControlEvent vom Button-Klick
         """
         current_user_id = self.profile_service.get_user_id() if self.profile_service else None
+        if not current_user_id and self.on_login_required:
+            self.on_login_required()
+            return
         content = self.comment_input.value or ""
-        
+
         def on_success_callback():
             """Callback nach erfolgreichem Speichern."""
             self.load_comments()
@@ -465,12 +541,18 @@ class CommentSection(ft.Container):
             show_snackbar=self.show_snackbar,
         )
     
-    def delete_comment(self, comment_id):
-        """Soft-Delete: Setzt is_deleted auf True.
-        
-        Args:
-            comment_id: ID des zu löschenden Kommentars
-        """
+    def _request_delete_comment(self, comment_id) -> None:
+        """Zeigt Inline-Bestätigung (Detail-Dialog bleibt offen)."""
+        self._delete_confirming_id = comment_id
+        self._refresh_comments_ui()
+
+    def _cancel_delete_confirm(self) -> None:
+        """Bricht die Inline-Löschbestätigung ab."""
+        self._delete_confirming_id = None
+        self._refresh_comments_ui()
+
+    def _do_delete_comment(self, comment_id) -> None:
+        """Führt den Soft-Delete aus (nach Bestätigung)."""
         handle_delete_comment(
             comment_service=self.comment_service,
             comment_id=comment_id,
@@ -479,7 +561,7 @@ class CommentSection(ft.Container):
             show_snackbar=self.show_snackbar,
         )
     
-    def show_snackbar(self, message: str, bgcolor: str):
+    def show_snackbar(self, message: str, bgcolor: str) -> None:
         """Zeigt eine Snackbar-Nachricht.
         
         Args:

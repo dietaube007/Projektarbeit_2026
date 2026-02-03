@@ -87,6 +87,7 @@ def handle_render_items(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     supabase=None,
     profile_service=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
     """Rendert Post-Items in List- oder Grid-Ansicht.
     
@@ -102,6 +103,7 @@ def handle_render_items(
         on_contact_click: Optional Callback für Kontakt-Klick
         supabase: Optional Supabase-Client für Kommentare
         profile_service: Optional ProfileService für Kommentare
+        on_comment_login_required: Optional Callback wenn Login zum Kommentieren erforderlich
     """
     try:
         if getattr(page, "_theme_listeners", None) is not None:
@@ -141,6 +143,7 @@ def handle_render_items(
                     on_contact_click=on_contact_click,
                     supabase=supabase,
                     profile_service=profile_service,
+                    on_comment_login_required=on_comment_login_required,
                 )
                 for it in items
             ]
@@ -241,6 +244,7 @@ def handle_view_render_items(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     supabase=None,
     profile_service=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
     """Rendert die geladenen Items in der aktuellen View-Mode (View-Wrapper).
     
@@ -257,6 +261,7 @@ def handle_view_render_items(
         on_contact_click: Optional Callback für Kontakt-Klick
         supabase: Optional Supabase-Client für Kommentare
         profile_service: Optional ProfileService für Kommentare
+        on_comment_login_required: Optional Callback wenn Login zum Kommentieren erforderlich
     """
     current_items["items"] = items
     handle_render_items(
@@ -271,6 +276,7 @@ def handle_view_render_items(
         on_contact_click=on_contact_click,
         supabase=supabase,
         profile_service=profile_service,
+        on_comment_login_required=on_comment_login_required,
     )
 
 
@@ -281,6 +287,7 @@ def handle_view_show_detail_dialog(
     on_favorite_click: Optional[Callable[[Dict[str, Any], ft.IconButton], None]] = None,
     profile_service=None,
     supabase=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
     """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentare (View-Wrapper)."""
     from ..components.post_card_components import show_detail_dialog
@@ -291,6 +298,7 @@ def handle_view_show_detail_dialog(
         on_favorite_click=on_favorite_click,
         profile_service=profile_service,
         supabase=supabase,
+        on_comment_login_required=on_comment_login_required,
     )
 
 
@@ -307,6 +315,7 @@ def handle_view_view_change(
     on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
     supabase=None,
     profile_service=None,
+    on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
     """Wird aufgerufen wenn die View-Ansicht geändert wird (View-Wrapper).
     
@@ -344,4 +353,5 @@ def handle_view_view_change(
         on_contact_click=on_contact_click,
         supabase=supabase,
         profile_service=profile_service,
+        on_comment_login_required=on_comment_login_required,
     )

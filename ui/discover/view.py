@@ -54,6 +54,7 @@ class DiscoverView:
         on_melden_click: Optional[Callable[[], None]] = None,
         on_login_required: Optional[Callable[[], None]] = None,
         on_save_search_login_required: Optional[Callable[[], None]] = None,
+        on_comment_login_required: Optional[Callable[[], None]] = None,
     ) -> None:
         """Initialisiert die DiscoverView."""
         self.page = page
@@ -62,6 +63,7 @@ class DiscoverView:
         self.on_melden_click = on_melden_click
         self.on_login_required = on_login_required
         self.on_save_search_login_required = on_save_search_login_required
+        self.on_comment_login_required = on_comment_login_required
 
         # Services
         self.ref_service = ReferenceService(self.sb)
@@ -186,6 +188,7 @@ class DiscoverView:
                 on_contact_click=self.on_contact_click,
                 supabase=self.sb,
                 profile_service=self.profile_service,
+                on_comment_login_required=self.on_comment_login_required,
             )
         
         def on_show_save_search_dialog(e: Optional[ft.ControlEvent] = None) -> None:
@@ -383,6 +386,7 @@ class DiscoverView:
             on_contact_click=self.on_contact_click,
             supabase=self.sb,
             profile_service=self.profile_service,
+            on_comment_login_required=self.on_comment_login_required,
         )
     
     def _show_detail_dialog(self, item: Dict[str, Any]) -> None:
@@ -394,6 +398,7 @@ class DiscoverView:
             on_favorite_click=self._toggle_favorite,
             profile_service=self.profile_service,
             supabase=self.sb,
+            on_comment_login_required=self.on_comment_login_required,
         )
     
     def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
