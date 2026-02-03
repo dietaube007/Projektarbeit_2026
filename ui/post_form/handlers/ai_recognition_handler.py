@@ -209,6 +209,7 @@ def show_ai_result(
     on_accept: Callable[[], None],
     on_reject: Callable[[], None],
     page: ft.Page,
+    form_scroll_column: Optional[ft.Control] = None,
 ) -> None:
     """Zeigt das KI-Erkennungsergebnis an.
     
@@ -218,6 +219,7 @@ def show_ai_result(
         on_accept: Callback wenn Nutzer Ergebnis übernimmt
         on_reject: Callback wenn Nutzer Ergebnis ablehnt
         page: Flet Page-Instanz
+        form_scroll_column: Optionale scrollbare Column, um zum Ergebnis zu scrollen
     """
     result_content = create_ai_result_content(
         result=result,
@@ -229,6 +231,17 @@ def show_ai_result(
     ai_result_container.visible = True
     ai_result_container.update()
     page.update()
+    
+    # Ergebnis in den sichtbaren Bereich scrollen
+    if form_scroll_column and hasattr(form_scroll_column, "scroll_to"):
+        try:
+            form_scroll_column.scroll_to(
+                scroll_key="ai_result_container",
+                duration=300,
+            )
+            page.update()
+        except Exception:
+            pass
 
 
 def show_ai_suggestion_dialog(
@@ -346,6 +359,7 @@ def handle_view_show_ai_result(
     on_accept: Callable[[], None],
     on_reject: Callable[[], None],
     page: ft.Page,
+    form_scroll_column: Optional[ft.Control] = None,
 ) -> None:
     """Zeigt das KI-Erkennungsergebnis an (View-Wrapper).
     
@@ -356,6 +370,7 @@ def handle_view_show_ai_result(
         on_accept: Callback wenn Nutzer Ergebnis übernimmt
         on_reject: Callback wenn Nutzer Ergebnis ablehnt
         page: Flet Page-Instanz
+        form_scroll_column: Optionale scrollbare Column zum Ergebnis
     """
     ai_result["result"] = result
     show_ai_result(
@@ -364,6 +379,7 @@ def handle_view_show_ai_result(
         on_accept=on_accept,
         on_reject=on_reject,
         page=page,
+        form_scroll_column=form_scroll_column,
     )
 
 
@@ -508,6 +524,7 @@ async def handle_ai_recognition_flow(
     ai_result_container: ft.Container,
     show_status_callback: Callable[[str, bool, bool], None],
     update_breeds_callback: Callable[[], None],
+    form_scroll_column: Optional[ft.Control] = None,
 ) -> None:
     """Kompletter AI-Recognition-Flow von Start bis Ergebnis.
     
@@ -531,6 +548,7 @@ async def handle_ai_recognition_flow(
         ai_result_container: Container für KI-Ergebnis
         show_status_callback: Callback für Status-Nachrichten
         update_breeds_callback: Callback zum Aktualisieren der Rassen-Dropdown
+        form_scroll_column: Optionale scrollbare Column zum KI-Ergebnis
     """
     # Callback für Consent-Dialog
     async def show_consent_dialog_callback() -> None:
@@ -561,6 +579,7 @@ async def handle_ai_recognition_flow(
             on_accept=accept_ai_result_callback,
             on_reject=reject_ai_result_callback,
             page=page,
+            form_scroll_column=form_scroll_column,
         )
     
     # Callback für AI-Ergebnis akzeptieren

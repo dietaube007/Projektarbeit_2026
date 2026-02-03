@@ -27,6 +27,7 @@ def create_ai_result_container() -> ft.Container:
     outline = getattr(ft.Colors, "OUTLINE_VARIANT", None) or ft.Colors.PURPLE_200
     surface_low = getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.PURPLE_50
     return ft.Container(
+        key="ai_result_container",
         content=ft.Column([], spacing=8),
         visible=False,
         padding=15,

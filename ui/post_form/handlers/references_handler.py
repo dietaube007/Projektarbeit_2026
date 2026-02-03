@@ -82,7 +82,7 @@ async def load_and_populate_references(
             if s["name"].lower() in ALLOWED_POST_STATUSES
         ]
         meldungsart.segments = [
-            ft.Segment(value=str(s["id"]), label=ft.Text(s["name"]))
+            ft.Segment(value=str(s["id"]), label=ft.Text(s["name"], color=ft.Colors.ON_SURFACE))
             for s in post_statuses
         ]
         if post_statuses:

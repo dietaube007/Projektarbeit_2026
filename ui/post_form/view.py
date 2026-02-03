@@ -251,6 +251,7 @@ class PostForm:
     
     async def _start_ai_recognition_flow(self):
         """Startet den kompletten KI-Rassenerkennungs-Flow."""
+        scroll_column = getattr(self, "_form_scroll_column", None)
         await handle_ai_recognition_flow(
             page=self.page,
             recognition_service=self.recognition_service,
@@ -268,6 +269,7 @@ class PostForm:
             ai_result_container=self.ai_result_container,
             show_status_callback=self._show_status,
             update_breeds_callback=lambda: self.page.run_task(self._update_breeds),
+            form_scroll_column=scroll_column,
         )
     
     async def _pick_photo(self):
@@ -392,10 +394,12 @@ class PostForm:
             status_text=self.status_text,
             photo_area=photo_area,
             page=self.page,
+            meldungsart=self.meldungsart,
         )
         
-        return ft.Column(
+        self._form_scroll_column = ft.Column(
             [form_column],
             scroll=ft.ScrollMode.AUTO,
             expand=True,
         )
+        return self._form_scroll_column

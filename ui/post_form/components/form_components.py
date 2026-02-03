@@ -326,6 +326,22 @@ def create_form_header() -> List[ft.Control]:
     ]
 
 
+def create_form_meldungsart_section(meldungsart: ft.SegmentedButton) -> List[ft.Control]:
+    """Erstellt die Meldungsart-Sektion (Vermisst/Fundtier).
+    
+    Args:
+        meldungsart: SegmentedButton für Meldungsart
+    
+    Returns:
+        Liste von Controls für die Meldungsart-Sektion
+    """
+    return [
+        ft.Text("Meldungsart﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+        meldungsart,
+        ft.Divider(height=20),
+    ]
+
+
 def create_form_photo_section(photo_area: ft.Control, page: ft.Page) -> List[ft.Control]:
     """Erstellt die Foto-Upload-Sektion.
     
@@ -369,6 +385,26 @@ def create_form_basic_info_section(
     ]
 
 
+def create_form_ai_section(
+    ai_button: ft.Control,
+    ai_result_container: ft.Container,
+) -> List[ft.Control]:
+    """Erstellt die KI-Rassenerkennungs-Sektion (unterhalb des Bildes).
+    
+    Args:
+        ai_button: Button für KI-Erkennung
+        ai_result_container: Container für KI-Ergebnisse
+    
+    Returns:
+        Liste von Controls für die KI-Sektion
+    """
+    return [
+        ai_button,
+        ai_result_container,
+        ft.Divider(height=20),
+    ]
+
+
 def create_form_colors_section(
     farben_header: ft.Container,
     farben_panel: ft.Container,
@@ -391,8 +427,6 @@ def create_form_colors_section(
 
 def create_form_details_section(
     info_tf: ft.TextField,
-    ai_button: ft.Control,
-    ai_result_container: ft.Container,
     location_tf: ft.TextField,
     date_tf: ft.TextField,
     page: ft.Page,
@@ -401,8 +435,6 @@ def create_form_details_section(
     
     Args:
         info_tf: TextField für Beschreibung
-        ai_button: Button für KI-Erkennung
-        ai_result_container: Container für AI-Ergebnisse
         location_tf: TextField für Standort
         date_tf: TextField für Datum
         page: Flet Page-Instanz für Theme-Erkennung
@@ -413,8 +445,6 @@ def create_form_details_section(
     return [
         ft.Text("Beschreibung & Merkmale﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         info_tf,
-        ai_button,
-        ai_result_container,
         ft.Divider(height=20),
         ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         location_tf,
@@ -459,6 +489,7 @@ def create_form_layout(
     status_text: ft.Text,
     photo_area: ft.Control,
     page: ft.Page,
+    meldungsart: ft.SegmentedButton,
 ) -> ft.Column:
     """Erstellt das komplette Formular-Layout.
     
@@ -479,6 +510,7 @@ def create_form_layout(
         status_text: Text-Widget für Status-Nachrichten
         photo_area: Container mit Photo-Upload-Bereich
         page: Flet Page-Instanz für Theme-Erkennung
+        meldungsart: SegmentedButton für Meldungsart (Vermisst/Fundtier)
     
     Returns:
         Column mit komplettem Formular-Layout
@@ -492,6 +524,12 @@ def create_form_layout(
     # Foto-Sektion
     controls.extend(create_form_photo_section(photo_area, page))
     
+    # KI-Rassenerkennung (unterhalb des Bildes)
+    controls.extend(create_form_ai_section(ai_button, ai_result_container))
+    
+    # Meldungsart-Sektion (zwischen Bild und Name/Überschrift)
+    controls.extend(create_form_meldungsart_section(meldungsart))
+    
     # Basis-Info-Sektion
     controls.extend(create_form_basic_info_section(
         title_label, name_tf, species_dd, breed_dd, sex_dd
@@ -501,9 +539,7 @@ def create_form_layout(
     controls.extend(create_form_colors_section(farben_header, farben_panel))
     
     # Details-Sektion
-    controls.extend(create_form_details_section(
-        info_tf, ai_button, ai_result_container, location_tf, date_tf, page
-    ))
+    controls.extend(create_form_details_section(info_tf, location_tf, date_tf, page))
     
     # Action-Sektion
     controls.extend(create_form_action_section(save_button, status_text))
