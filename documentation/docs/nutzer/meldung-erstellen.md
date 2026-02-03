@@ -64,4 +64,10 @@ Deine erstellten Meldungen findest du unter:
 
 **Profil** → **Meine Meldungen**
 
-*Diese Funktion wird in einer zukünftigen Version verfügbar sein.*
+Dort kannst du:
+
+- Alle deine Meldungen einsehen
+- Meldungen bearbeiten (z.B. Status auf "Wiedervereint" setzen)
+- Meldungen löschen
+
+Mehr dazu: [Meine Meldungen verwalten](meine-meldungen.md)

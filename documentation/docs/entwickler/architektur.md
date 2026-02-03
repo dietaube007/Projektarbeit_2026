@@ -16,51 +16,111 @@
 
 ```
 Projektarbeit_2026/
-├── main.py                 # Einstiegspunkt, PetBuddyApp-Klasse
-├── pyproject.toml          # Projekt-Konfiguration
-├── .env                    # Umgebungsvariablen (nicht in Git)
+├── main.py                     # Einstiegspunkt
+├── pyproject.toml              # Projekt-Konfiguration
+├── .env                        # Umgebungsvariablen (nicht in Git)
 │
-├── ui/                     # UI-Komponenten
-│   ├── __init__.py
-│   ├── auth.py             # AuthView - Login/Registrierung
-│   ├── discover.py         # DiscoverView - Startseite
-│   ├── post_form.py        # PostForm - Meldungsformular
-│   ├── profile.py          # ProfileView - Profilbereich
-│   └── theme.py            # ThemeManager, UI-Komponenten
+├── ui/                         # UI-Layer
+│   ├── constants.py            # Konstanten (Farben, Größen)
+│   ├── helpers.py              # Hilfsfunktionen
+│   ├── shared_components.py    # Gemeinsame Komponenten
+│   ├── theme.py                # ThemeManager, UI-Komponenten
+│   │
+│   ├── auth/                   # Authentifizierung
+│   │   ├── view.py             # AuthView - Login/Registrierung
+│   │   ├── components/         # Login, Register, Password Reset
+│   │   └── handlers/           # Auth-Handler
+│   │
+│   ├── discover/               # Startseite
+│   │   ├── view.py             # DiscoverView - Meldungsliste
+│   │   ├── components/         # Post-Cards, Filter, Kommentare
+│   │   └── handlers/           # Search, Filter, Favorites, Comments
+│   │
+│   ├── post_form/              # Meldungsformular
+│   │   ├── view.py             # PostForm - Neue Meldung
+│   │   ├── components/         # Formular, Foto, KI-Erkennung
+│   │   └── handlers/           # Validation, Upload, AI
+│   │
+│   └── profile/                # Profilbereich
+│       ├── view.py             # ProfileView - Profil, Einstellungen
+│       ├── components/         # Menu, Edit, Favorites, Posts
+│       └── handlers/           # Profile, Settings, Posts
 │
-├── services/               # Backend-Services
-│   ├── __init__.py
-│   ├── supabase_client.py  # Supabase-Client-Singleton
-│   ├── posts.py            # PostService - CRUD für Meldungen
-│   └── references.py       # ReferenceService - Stammdaten
+├── services/                   # Backend-Services
+│   ├── supabase_client.py      # Supabase-Client-Singleton
+│   │
+│   ├── account/                # Benutzer-Services
+│   │   ├── auth.py             # AuthService - Login/Logout
+│   │   ├── profile.py          # ProfileService - Profildaten
+│   │   ├── profile_image.py    # ProfileImageService
+│   │   └── account_deletion.py # Kontolöschung
+│   │
+│   ├── posts/                  # Meldungs-Services
+│   │   ├── post.py             # PostService - CRUD
+│   │   ├── search.py           # SearchService - Suche
+│   │   ├── filters.py          # FilterService
+│   │   ├── references.py       # ReferenceService - Stammdaten
+│   │   ├── favorites.py        # FavoritesService
+│   │   ├── saved_search.py     # SavedSearchService
+│   │   ├── comment.py          # CommentService
+│   │   └── queries.py          # SQL-Queries
+│   │
+│   └── ai/                     # KI-Services
+│       └── pet_recognition.py  # PetRecognitionService
 │
-├── docs/                   # MkDocs-Dokumentation
-└── image_uploads/          # Temporäre Bild-Uploads
+├── i18n/                       # Internationalisierung
+│   ├── translator.py           # Übersetzungs-Engine
+│   ├── de.json                 # Deutsche Texte
+│   └── en.json                 # Englische Texte
+│
+├── utils/                      # Utilities
+│   ├── logging_config.py       # Logging
+│   ├── validators.py           # Eingabevalidierung
+│   └── constants.py            # Globale Konstanten
+│
+└── documentation/              # MkDocs-Dokumentation
 ```
 
 ## Schichtenarchitektur
 
 ```
-┌─────────────────────────────────────────┐
-│              UI Layer (Flet)            │
-│  ┌─────────┐ ┌─────────┐ ┌───────────┐  │
-│  │AuthView │ │Discover │ │ PostForm  │  │
-│  └─────────┘ └─────────┘ └───────────┘  │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│            Service Layer                │
-│  ┌─────────────┐ ┌──────────────────┐   │
-│  │ PostService │ │ ReferenceService │   │
-│  └─────────────┘ └──────────────────┘   │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│         Supabase Client                 │
-│  ┌──────┐ ┌─────────┐ ┌─────────────┐   │
-│  │ Auth │ │Database │ │   Storage   │   │
-│  └──────┘ └─────────┘ └─────────────┘   │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   UI Layer (Flet)                       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐   │
+│  │ AuthView │ │ Discover │ │ PostForm │ │ProfileView│   │
+│  └──────────┘ └──────────┘ └──────────┘ └───────────┘   │
+│        │            │            │            │         │
+│        └────────────┴────────────┴────────────┘         │
+│                         │                               │
+│  ┌──────────────────────▼──────────────────────────┐    │
+│  │              UI Handlers                        │    │
+│  │  (Search, Filter, Favorite, Comment, ...)       │    │
+│  └──────────────────────┬──────────────────────────┘    │
+└─────────────────────────┼───────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│                    Service Layer                        │
+│  ┌─────────────────┐  ┌─────────────────┐               │
+│  │ Account         │  │ Posts           │               │
+│  │ ├─ AuthService  │  │ ├─ PostService  │               │
+│  │ ├─ Profile      │  │ ├─ SearchService│               │
+│  │ └─ ProfileImage │  │ ├─ Favorites    │               │
+│  └─────────────────┘  │ ├─ SavedSearch  │               │
+│                       │ ├─ Comments     │               │
+│  ┌─────────────────┐  │ └─ References   │               │
+│  │ AI              │  └─────────────────┘               │
+│  │ └─ PetRecognit. │                                    │
+│  └─────────────────┘                                    │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│                  Supabase Client                        │
+│  ┌──────────┐  ┌────────────┐  ┌─────────────────────┐  │
+│  │   Auth   │  │  Database  │  │      Storage        │  │
+│  │          │  │ (Postgres) │  │   (pet-images,      │  │
+│  │          │  │            │  │    profile-images)  │  │
+│  └──────────┘  └────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## Hauptklassen
@@ -121,20 +181,89 @@ Benutzer-Profilbereich:
 
 ## Services
 
-### PostService
+### Account-Services
+
+#### AuthService
+Authentifizierung und Session-Management.
+
+```python
+class AuthService:
+    def login(email, password) -> AuthResult
+    def register(email, password, display_name) -> AuthResult
+    def logout() -> AuthResult
+    def reset_password(email) -> AuthResult
+    def change_password(new_password) -> AuthResult
+```
+
+#### ProfileService
+Benutzerprofil-Verwaltung.
+
+```python
+class ProfileService:
+    def get_current_user() -> User | None
+    def get_user_id() -> str | None
+    def get_display_name() -> str
+    def get_email() -> str | None
+    def get_profile_image_url() -> str | None
+    def update_display_name(name) -> bool
+    def get_user_profiles(user_ids) -> Dict[str, Dict]
+```
+
+### Post-Services
+
+#### PostService
+CRUD-Operationen für Meldungen.
 
 ```python
 class PostService:
-    def create(self, payload: Dict) -> Dict
-    def update(self, post_id: str, payload: Dict) -> Dict
-    def delete(self, post_id: str) -> bool
-    def get_by_id(self, post_id: str) -> Dict | None
-    def get_all(self, limit: int = 200) -> List[Dict]
-    def add_color(self, post_id: str, color_id: int)
-    def add_photo(self, post_id: str, photo_url: str)
+    def create(payload: Dict) -> Dict
+    def update(post_id: str, payload: Dict) -> Dict
+    def delete(post_id: str) -> bool
+    def get_by_id(post_id: str) -> Dict | None
 ```
 
-### ReferenceService
+#### SearchService
+Suche und Filterung von Meldungen.
+
+```python
+class SearchService:
+    def search(filters: Dict, limit: int = 200) -> List[Dict]
+```
+
+#### FavoritesService
+Favoriten-Verwaltung.
+
+```python
+class FavoritesService:
+    def get_favorites() -> List[Dict]
+    def add_favorite(post_id: str) -> bool
+    def remove_favorite(post_id: str) -> bool
+    def is_favorite(post_id: str) -> bool
+    def get_favorite_ids(user_id: str) -> Set[str]
+```
+
+#### SavedSearchService
+Gespeicherte Suchaufträge.
+
+```python
+class SavedSearchService:
+    def get_saved_searches() -> List[Dict]
+    def save_search(name, filters...) -> Tuple[bool, str]
+    def delete_search(search_id: int) -> Tuple[bool, str]
+```
+
+#### CommentService
+Kommentar-Verwaltung.
+
+```python
+class CommentService:
+    def get_comments(post_id: str) -> List[Dict]
+    def create_comment(post_id, user_id, content, parent_id) -> bool
+    def delete_comment(comment_id: int) -> bool
+```
+
+#### ReferenceService
+Stammdaten (gecacht).
 
 ```python
 class ReferenceService:
@@ -144,6 +273,17 @@ class ReferenceService:
     def get_colors() -> List[Dict]
     def get_sex() -> List[Dict]
     def clear_cache()
+```
+
+### AI-Services
+
+#### PetRecognitionService
+KI-gestützte Tierart-/Rassenerkennung.
+
+```python
+class PetRecognitionService:
+    def recognize_pet(image_data: bytes) -> Dict
+    # Returns: {success, species, breed, confidence, error}
 ```
 
 ## Authentifizierung

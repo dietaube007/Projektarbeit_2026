@@ -48,10 +48,18 @@ nav:
   - Nutzerdokumentation:
     - Erste Schritte: nutzer/erste-schritte.md
     - Konto & Anmeldung: nutzer/konto.md
+    - Profil verwalten: nutzer/profil.md
     - Meldung erstellen: nutzer/meldung-erstellen.md
+    - Meine Meldungen: nutzer/meine-meldungen.md
     - Suchen & Filtern: nutzer/suchen.md
+    - Favoriten: nutzer/favoriten.md
+    - Gespeicherte Suchaufträge: nutzer/suchauftraege.md
+    - Kommentare: nutzer/kommentare.md
+    - KI-Rassenerkennung: nutzer/ki-rassenerkennung.md
   - Entwicklerdokumentation:
     - Installation: entwickler/installation.md
     - Architektur: entwickler/architektur.md
     - Datenbank: entwickler/datenbank.md
     - API-Referenz: entwickler/api.md
+    - Mehrsprachigkeit (i18n): entwickler/i18n.md
+    - KI-Rassenerkennung: entwickler/ki-rassenerkennung.md

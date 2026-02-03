@@ -37,6 +37,19 @@ Wenn du nur stöbern möchtest:
 3. Tippe auf **Abmelden**
 4. Du wirst zur Login-Seite weitergeleitet
 
-## Passwort vergessen?
+## Passwort vergessen
 
-*Diese Funktion wird in einer zukünftigen Version verfügbar sein.*
+Falls du dein Passwort vergessen hast:
+
+1. Gehe zur **Login-Seite**
+2. Klicke auf **Passwort vergessen?**
+3. Gib deine **E-Mail-Adresse** ein
+4. Klicke auf **Link senden**
+5. Prüfe dein E-Mail-Postfach
+6. Klicke auf den Link in der E-Mail
+7. Setze ein **neues Passwort**
+
+!!! info "Keine E-Mail erhalten?"
+    - Prüfe deinen Spam-Ordner
+    - Stelle sicher, dass die E-Mail-Adresse korrekt ist
+    - Warte einige Minuten und versuche es erneut

@@ -64,3 +64,24 @@ Jede Meldung zeigt:
 - Standort
 - Datum
 - Farben
+
+### Interaktion
+
+- **Karte anklicken**: Öffnet den Detail-Dialog mit Kommentarbereich
+- **Herz-Icon**: Fügt die Meldung zu deinen [Favoriten](favoriten.md) hinzu
+- **Kommentare-Button**: Klappt den Kommentarbereich direkt unter der Karte auf
+
+Mehr zu Kommentaren: [Kommentare nutzen](kommentare.md)
+
+## Suche speichern
+
+Du kannst deine aktuelle Filtereinstellung speichern:
+
+1. Stelle deine gewünschten Filter ein
+2. Klicke auf das **Lesezeichen**-Icon (neben "Suchen")
+3. Gib einen Namen ein
+4. Klicke auf **Speichern**
+
+Gespeicherte Suchen findest du unter **Profil** → **Gespeicherte Suchaufträge**.
+
+Mehr dazu: [Gespeicherte Suchaufträge](suchauftraege.md)

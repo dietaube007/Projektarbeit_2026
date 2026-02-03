@@ -9,7 +9,10 @@ PetBuddy ist eine Plattform für vermisste und gefundene Haustiere. Du kannst:
 - Dein vermisstes Tier melden
 - Ein gefundenes Tier registrieren
 - Nach Meldungen in deiner Nähe suchen
-- Mit anderen Nutzern in Kontakt treten
+- Kommentare schreiben und mit anderen Nutzern austauschen
+- Meldungen favorisieren und später wiederfinden
+- Suchaufträge speichern für regelmäßige Suchen
+- KI-Rassenerkennung für Fundtiere nutzen
 
 ## App starten
 
@@ -40,5 +43,11 @@ Für das Erstellen von Meldungen und den Profilbereich ist ein Account erforderl
 ## Nächste Schritte
 
 - [Konto erstellen](konto.md)
+- [Profil verwalten](profil.md)
 - [Meldung erstellen](meldung-erstellen.md)
+- [Meine Meldungen](meine-meldungen.md)
 - [Suchen & Filtern](suchen.md)
+- [Favoriten](favoriten.md)
+- [Gespeicherte Suchaufträge](suchauftraege.md)
+- [Kommentare](kommentare.md)
+- [KI-Rassenerkennung](ki-rassenerkennung.md)

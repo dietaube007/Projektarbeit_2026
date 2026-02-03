@@ -145,6 +145,86 @@ Farben zu Meldungen (m:n).
 | post_id | UUID | FK → post |
 | color_id | INT | FK → color |
 
+### profile
+
+Erweiterte Benutzerprofile.
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| id | UUID | Primary Key (= auth.users.id) |
+| display_name | TEXT | Anzeigename |
+| profile_image | TEXT | URL zum Profilbild |
+| created_at | TIMESTAMP | Erstellungszeitpunkt |
+| updated_at | TIMESTAMP | Letzte Aktualisierung |
+
+### favorite
+
+Favorisierte Meldungen.
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| id | UUID | Primary Key |
+| user_id | UUID | FK → auth.users |
+| post_id | UUID | FK → post |
+| created_at | TIMESTAMP | Erstellungszeitpunkt |
+
+**Unique Constraint:** `(user_id, post_id)`
+
+### saved_search
+
+Gespeicherte Suchaufträge.
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| id | SERIAL | Primary Key |
+| user_id | UUID | FK → auth.users |
+| name | TEXT | Name des Suchauftrags |
+| filters | JSONB | Filter als JSON |
+| created_at | TIMESTAMP | Erstellungszeitpunkt |
+
+**Unique Constraint:** `(user_id, name)`
+
+**Filters-JSON Struktur:**
+```json
+{
+  "search_query": "suchbegriff",
+  "status_id": 1,
+  "species_id": 2,
+  "breed_id": 5,
+  "sex_id": 1,
+  "colors": [1, 3, 5]
+}
+```
+
+### comment
+
+Kommentare zu Meldungen.
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| id | SERIAL | Primary Key |
+| post_id | UUID | FK → post |
+| user_id | UUID | FK → auth.users |
+| content | TEXT | Kommentar-Text |
+| parent_comment_id | INT | FK → comment (für Antworten) |
+| is_deleted | BOOLEAN | Soft-Delete Flag |
+| created_at | TIMESTAMP | Erstellungszeitpunkt |
+| updated_at | TIMESTAMP | Letzte Aktualisierung |
+
+### comment_reaction
+
+Emoji-Reaktionen auf Kommentare.
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| id | UUID | Primary Key |
+| comment_id | INT | FK → comment |
+| user_id | UUID | FK → auth.users |
+| emoji | TEXT | Emoji-Zeichen |
+| created_at | TIMESTAMP | Erstellungszeitpunkt |
+
+**Unique Constraint:** `(comment_id, user_id, emoji)`
+
 ## SQL-Schema
 
 ```sql
