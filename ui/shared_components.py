@@ -12,92 +12,6 @@ from ui.theme import soft_card, chip
 
 
 # ══════════════════════════════════════════════════════════════════════
-# DIALOGE
-# ══════════════════════════════════════════════════════════════════════
-
-def show_login_required_dialog(
-    page: ft.Page,
-    message: str,
-    on_login: Callable[[], None],
-    on_cancel: Optional[Callable[[], None]] = None,
-    title: str = "Anmeldung erforderlich"
-) -> None:
-    """Zeigt einen Dialog wenn Login erforderlich ist.
-    
-    Args:
-        page: Flet Page-Instanz
-        message: Nachricht die angezeigt werden soll
-        on_login: Callback-Funktion für Login-Button
-        on_cancel: Optionaler Callback für Abbrechen-Button
-        title: Titel des Dialogs (Standard: "Anmeldung erforderlich")
-    """
-    def handle_login(e):
-        page.close(dialog)
-        on_login()
-    
-    def handle_cancel(e):
-        page.close(dialog)
-        if on_cancel:
-            on_cancel()
-    
-    dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text(title),
-        content=ft.Text(message),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=handle_cancel),
-            ft.ElevatedButton("Anmelden", on_click=handle_login),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
-    
-    page.open(dialog)
-
-
-def show_confirm_dialog(
-    page: ft.Page,
-    title: str,
-    message: str,
-    on_confirm: Callable[[], None],
-    on_cancel: Optional[Callable[[], None]] = None,
-    confirm_text: str = "Bestätigen",
-    cancel_text: str = "Abbrechen"
-) -> None:
-    """Zeigt einen Bestätigungs-Dialog.
-    
-    Args:
-        page: Flet Page-Instanz
-        title: Titel des Dialogs
-        message: Nachricht die angezeigt werden soll
-        on_confirm: Callback-Funktion für Bestätigen-Button
-        on_cancel: Optionaler Callback für Abbrechen-Button
-        confirm_text: Text für Bestätigen-Button (Standard: "Bestätigen")
-        cancel_text: Text für Abbrechen-Button (Standard: "Abbrechen")
-    """
-    def handle_confirm(e):
-        page.close(dialog)
-        on_confirm()
-    
-    def handle_cancel(e):
-        page.close(dialog)
-        if on_cancel:
-            on_cancel()
-    
-    dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text(title),
-        content=ft.Text(message),
-        actions=[
-            ft.TextButton(cancel_text, on_click=handle_cancel),
-            ft.ElevatedButton(confirm_text, on_click=handle_confirm),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
-    
-    page.open(dialog)
-
-
-# ══════════════════════════════════════════════════════════════════════
 # BADGES
 # ══════════════════════════════════════════════════════════════════════
 
@@ -159,38 +73,6 @@ def image_placeholder(height: int = 160, icon_size: int = 48, expand: bool = Fal
         bgcolor=bg_color,
         border_radius=12,
         expand=expand,
-    )
-
-
-# ══════════════════════════════════════════════════════════════════════
-# BANNER
-# ══════════════════════════════════════════════════════════════════════
-
-def login_banner(on_login_click: Callable) -> ft.Container:
-    """Erstellt ein Login-Banner für nicht eingeloggte Benutzer."""
-    return ft.Container(
-        content=ft.Row(
-            [
-                ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700, size=20),
-                ft.Text(
-                    "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
-                    color=ft.Colors.BLUE_900,
-                    size=14,
-                    expand=True,
-                ),
-                ft.TextButton(
-                    "Anmelden",
-                    icon=ft.Icons.LOGIN,
-                    on_click=on_login_click,
-                ),
-            ],
-            spacing=12,
-            alignment=ft.MainAxisAlignment.START,
-        ),
-        padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        bgcolor=ft.Colors.BLUE_50,
-        border_radius=10,
-        border=ft.border.all(1, ft.Colors.BLUE_200),
     )
 
 

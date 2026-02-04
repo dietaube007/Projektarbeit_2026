@@ -31,7 +31,6 @@ from .reference_handler import (
 )
 from .saved_search_handler import show_save_search_dialog
 from .search_handler import (
-    handle_load_posts,
     handle_render_items,
     handle_view_load_posts,
     handle_view_render_items,
@@ -66,7 +65,6 @@ __all__ = [
     # Saved search handlers
     "show_save_search_dialog",
     # Search handlers
-    "handle_load_posts",
     "handle_render_items",
     "handle_view_load_posts",
     "handle_view_render_items",

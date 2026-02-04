@@ -80,11 +80,37 @@ class ProfileService:
             current_metadata["display_name"] = sanitized_name
 
             self.sb.auth.update_user({"data": current_metadata})
+            self._sync_user_display_to_table(display_name=sanitized_name)
             logger.info(f"Display-Name aktualisiert für User {user.id}")
             return True, ""
         except Exception as e:  # noqa: BLE001
             logger.error(f"Fehler beim Aktualisieren des Anzeigenamens: {e}", exc_info=True)
             return False, str(e)
+
+    def _sync_user_display_to_table(
+        self,
+        display_name: Optional[str] = None,
+        profile_image: Optional[str] = None,
+    ) -> None:
+        """Synchronisiert display_name/profile_image in public.user."""
+        user = self.get_current_user()
+        if not user:
+            return
+        payload: Dict[str, Any] = {}
+        if display_name is not None:
+            payload["display_name"] = display_name
+        else:
+            payload["display_name"] = (user.user_metadata or {}).get("display_name") or "Benutzer"
+        if profile_image is not None:
+            payload["profile_image"] = profile_image
+        else:
+            payload["profile_image"] = (user.user_metadata or {}).get("profile_image_url")
+        if not payload:
+            return
+        try:
+            self.sb.table("user").update(payload).eq("id", str(user.id)).execute()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Sync public.user übersprungen: {e}")
 
     def _prepare_user_ids(self, user_ids: Iterable[str]) -> List[str]:
         """Bereitet User-IDs für Queries vor (dedupliziert, validiert).
@@ -131,9 +157,8 @@ class ProfileService:
             return {}
         
         try:
-            # Nutze direkt user_profiles View (hat nur display_name)
             result = (
-                self.sb.table("user_profiles")
+                self.sb.table("user")
                 .select("id, display_name")
                 .in_("id", user_ids_list)
                 .execute()

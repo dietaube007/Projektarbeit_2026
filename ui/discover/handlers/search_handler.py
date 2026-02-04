@@ -4,6 +4,7 @@ Search-Handler: UI-Handler für Post-Suche und Rendering.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Callable, Optional, List, Dict, Any
 import flet as ft
 
@@ -13,8 +14,10 @@ from ui.shared_components import create_loading_indicator, create_no_results_car
 
 logger = get_logger(__name__)
 
+LOADING_MELDUNGEN_TEXT = "Meldungen werden geladen…"
 
-def handle_load_posts(
+
+def _fetch_posts_sync(
     search_service: SearchService,
     favorites_service: FavoritesService,
     filters: Dict[str, Any],
@@ -22,57 +25,16 @@ def handle_load_posts(
     selected_colors: List[int],
     sort_option: str,
     current_user_id: Optional[str],
-    list_view: ft.Column,
-    grid_view: ft.ResponsiveRow,
-    empty_state_card: ft.Container,
-    page: ft.Page,
-    on_render: Callable[[List[Dict[str, Any]]], None],
-) -> None:
-    """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen + Favoritenstatus.
-    
-    Args:
-        search_service: SearchService-Instanz
-        favorites_service: FavoritesService-Instanz
-        filters: Dictionary mit Filterwerten (typ, art, geschlecht, rasse)
-        search_query: Optionaler Suchbegriff
-        selected_colors: Liste der ausgewählten Farb-IDs
-        sort_option: Sortier-Option
-        current_user_id: Aktuelle User-ID (None wenn nicht eingeloggt)
-        list_view: Column für Listen-Ansicht
-        grid_view: ResponsiveRow für Grid-Ansicht
-        empty_state_card: Container für Empty-State
-        page: Flet Page-Instanz
-        on_render: Callback zum Rendern der Items
-    """
-    loading_indicator = create_loading_indicator()
-    list_view.controls = [loading_indicator]
-    grid_view.controls = []
-    list_view.visible = True
-    grid_view.visible = False
-    page.update()
-
-    try:
-        # Favoriten-IDs laden (für Markierung)
-        favorite_ids = favorites_service.get_favorite_ids(current_user_id) if current_user_id else set()
-
-        # Posts über SearchService laden
-        items = search_service.search_posts(
-            filters=filters,
-            search_query=search_query,
-            selected_colors=set(selected_colors) if selected_colors else None,
-            sort_option=sort_option,
-            favorite_ids=favorite_ids,
-        )
-
-        on_render(items)
-
-    except Exception as ex:
-        logger.error(f"Fehler beim Laden der Daten: {ex}", exc_info=True)
-        list_view.controls = [empty_state_card]
-        grid_view.controls = []
-        list_view.visible = True
-        grid_view.visible = False
-        page.update()
+) -> List[Dict[str, Any]]:
+    """Lädt Meldungen synchron (für asyncio.to_thread). Gibt Items zurück."""
+    favorite_ids = favorites_service.get_favorite_ids(current_user_id) if current_user_id else set()
+    return search_service.search_posts(
+        filters=filters,
+        search_query=search_query,
+        selected_colors=set(selected_colors) if selected_colors else None,
+        sort_option=sort_option,
+        favorite_ids=favorite_ids,
+    )
 
 
 def handle_render_items(
@@ -182,8 +144,6 @@ async def handle_view_load_posts(
 ) -> None:
     """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen (View-Wrapper).
     
-    Sammelt alle aktiven Filterwerte und ruft handle_load_posts auf.
-    
     Args:
         search_service: SearchService-Instanz
         favorites_service: FavoritesService-Instanz
@@ -202,7 +162,6 @@ async def handle_view_load_posts(
         on_render: Callback zum Rendern der Items
         get_filter_value: Funktion zum Abrufen von Dropdown-Werten
     """
-    # Sicherstellen, dass UI-Elemente initialisiert sind
     if filter_typ is None:
         return
 
@@ -212,23 +171,36 @@ async def handle_view_load_posts(
         "geschlecht": get_filter_value(filter_geschlecht),
         "rasse": get_filter_value(filter_rasse),
     }
-
     sort_option = get_filter_value(sort_dropdown, "created_at_desc")
+    search_query = search_field.value.strip() if search_field.value else None
 
-    handle_load_posts(
-        search_service=search_service,
-        favorites_service=favorites_service,
-        filters=filters,
-        search_query=search_field.value.strip() if search_field.value else None,
-        selected_colors=selected_colors,
-        sort_option=sort_option,
-        current_user_id=current_user_id,
-        list_view=list_view,
-        grid_view=grid_view,
-        empty_state_card=empty_state_card,
-        page=page,
-        on_render=on_render,
-    )
+    loading_indicator = create_loading_indicator(text=LOADING_MELDUNGEN_TEXT)
+    list_view.controls = [loading_indicator]
+    grid_view.controls = []
+    list_view.visible = True
+    grid_view.visible = False
+    page.update()
+    await asyncio.sleep(0)
+
+    try:
+        items = await asyncio.to_thread(
+            _fetch_posts_sync,
+            search_service=search_service,
+            favorites_service=favorites_service,
+            filters=filters,
+            search_query=search_query,
+            selected_colors=selected_colors,
+            sort_option=sort_option,
+            current_user_id=current_user_id,
+        )
+        on_render(items)
+    except Exception as ex:
+        logger.error(f"Fehler beim Laden der Meldungen: {ex}", exc_info=True)
+        list_view.controls = [empty_state_card]
+        grid_view.controls = []
+        list_view.visible = True
+        grid_view.visible = False
+        page.update()
 
 
 def handle_view_render_items(

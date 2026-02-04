@@ -47,14 +47,19 @@
 
 ### user
 
-Benutzer-Profildaten (ergänzt Supabase Auth).
+Benutzer und Account (ergänzt Supabase Auth). Anzeigename und Profilbild-URL für Kommentare/Posts.
 
 | Spalte | Typ | Beschreibung |
 |--------|-----|--------------|
 | id | UUID | Primary Key (= auth.users.id) |
-| email | TEXT | E-Mail-Adresse |
-| display_name | TEXT | Anzeigename |
-| created_at | TIMESTAMP | Erstellungszeitpunkt |
+| role_id | INT | FK → role |
+| account_status_id | INT | FK → account_status |
+| notification | BOOLEAN | Benachrichtigungen ein/aus (Default true) |
+| display_name | TEXT | Anzeigename (für Kommentare, Posts) |
+| profile_image | TEXT | URL zum Profilbild (optional) |
+| created_at | TIMESTAMPTZ | Erstellungszeitpunkt |
+| updated_at | TIMESTAMPTZ | Letzte Aktualisierung |
+| last_login_at | TIMESTAMPTZ | Letzter Login (optional) |
 
 ### post_status
 
@@ -144,18 +149,6 @@ Farben zu Meldungen (m:n).
 | id | INT | Primary Key |
 | post_id | UUID | FK → post |
 | color_id | INT | FK → color |
-
-### profile
-
-Erweiterte Benutzerprofile.
-
-| Spalte | Typ | Beschreibung |
-|--------|-----|--------------|
-| id | UUID | Primary Key (= auth.users.id) |
-| display_name | TEXT | Anzeigename |
-| profile_image | TEXT | URL zum Profilbild |
-| created_at | TIMESTAMP | Erstellungszeitpunkt |
-| updated_at | TIMESTAMP | Letzte Aktualisierung |
 
 ### favorite
 

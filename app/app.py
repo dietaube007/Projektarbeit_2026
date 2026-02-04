@@ -72,6 +72,7 @@ class PetBuddyApp:
         self.discover_view: Optional[DiscoverView] = None
         self.profile_view: Optional[ProfileView] = None
         self.auth_view: Optional[AuthView] = None
+        self._redirect_loading_overlay: Optional[ft.Container] = None
     
     # ════════════════════════════════════════════════════════════════════
     # INITIALISIERUNG
@@ -155,19 +156,7 @@ class PetBuddyApp:
             # 404 - Route nicht gefunden
             logger.warning(f"Unbekannte Route: {route_path}")
             self.page.go("/discover")  # Fallback zu Discover
-    
-    def _show_home(self) -> None:
-        """Zeigt die Startseite (Home) mit Discover-View."""
-        if not self.discover_view:
-            if not self.build_ui():
-                return
-        
-        self.current_tab = TAB_START
-        if self.nav:
-            self.nav.selected_index = TAB_START
-        
-        self._show_main_app()
-    
+
     def _show_discover(self) -> None:
         """Zeigt die Discover-Seite."""
         try:
@@ -498,6 +487,13 @@ class PetBuddyApp:
             if self.start_section is None:
                 logger.error("_show_main_app: start_section ist None")
                 return
+
+            if self._redirect_loading_overlay and self._redirect_loading_overlay in self.page.overlay:
+                self.page.overlay.remove(self._redirect_loading_overlay)
+            if self.auth_view and getattr(self.auth_view, "_login_loading_overlay", None):
+                lo = self.auth_view._login_loading_overlay
+                if lo and lo in self.page.overlay:
+                    self.page.overlay.remove(lo)
             
             self.nav = create_navigation_bar(self.current_tab, self._on_nav_change)
             
@@ -541,18 +537,69 @@ class PetBuddyApp:
             self.page.update()
         except Exception as e:
             logger.error(f"Fehler in _show_main_app: {e}", exc_info=True)
+
+    async def _navigate_after_login(self) -> None:
+        """Kurze Verzögerung, dann Navigation zur Startseite (nach Login)."""
+        import asyncio
+        await asyncio.sleep(1.2)
+        self.page.go("/")
     
     def _show_login(self) -> None:
         """Zeigt die Login-Maske."""
+        from ui.theme import get_theme_color
+
         # Setze Route direkt, um Endlosschleife zu vermeiden
         self.page.route = "/login"
+
+        # Lade-Overlay für „nach Login“ (einmalig erstellen)
+        if self._redirect_loading_overlay is None:
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            self._redirect_loading_overlay = ft.Container(
+                content=ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.ProgressRing(
+                                width=48, height=48, stroke_width=3, color=PRIMARY_COLOR
+                            ),
+                            ft.Container(height=16),
+                            ft.Text(
+                                "Einen Moment, Sie werden weitergeleitet…",
+                                size=16,
+                                weight=ft.FontWeight.W_500,
+                                color=get_theme_color("text_primary", is_dark),
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            ft.Container(height=12),
+                            ft.ProgressBar(
+                                width=200,
+                                color=PRIMARY_COLOR,
+                                bgcolor=ft.Colors.with_opacity(0.2, PRIMARY_COLOR),
+                            ),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
+                    bgcolor=get_theme_color("card", is_dark),
+                    padding=32,
+                    border_radius=16,
+                    shadow=ft.BoxShadow(
+                        blur_radius=24,
+                        spread_radius=0,
+                        color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK),
+                    ),
+                ),
+                alignment=ft.alignment.center,
+                expand=True,
+                bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
+            )
         
         def on_login_success() -> None:
             self.is_logged_in = True
             self.pending_tab_after_login = None
-            
-            # Zur Startseite navigieren
-            self.page.go("/")
+            if self._redirect_loading_overlay not in self.page.overlay:
+                self.page.overlay.append(self._redirect_loading_overlay)
+            self.page.update()
+            self.page.run_task(self._navigate_after_login)
         
         def on_continue_without_account() -> None:
             self.is_logged_in = False

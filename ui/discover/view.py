@@ -13,7 +13,12 @@ from services.posts import SavedSearchService, FavoritesService, SearchService
 from services.account import ProfileService
 from utils.logging_config import get_logger
 from ui.theme import soft_card, get_theme_color
-from ui.shared_components import show_error_dialog, show_login_required_snackbar, create_empty_state_card
+from ui.shared_components import (
+    show_error_dialog,
+    show_login_required_snackbar,
+    create_empty_state_card,
+    create_loading_indicator,
+)
 
 from .components import (
     create_search_field,
@@ -266,8 +271,10 @@ class DiscoverView:
             message="Noch keine Meldungen",
             subtitle="",
         )
-        
-        self._list_view.controls = [self._empty_state_card]
+        # Beim Start Ladekreis anzeigen
+        self._list_view.controls = [
+            create_loading_indicator(text="Meldungen werden geladen…"),
+        ]
         self._list_view.visible = True
 
         if all([

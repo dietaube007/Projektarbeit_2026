@@ -84,6 +84,7 @@ class ProfileImageService:
                 current_metadata.pop("profile_image_url", None)
 
             self.sb.auth.update_user({"data": current_metadata})
+            self._profile_service._sync_user_display_to_table(profile_image=image_url)
             return True
         except Exception as e:  # noqa: BLE001
             logger.error(f"Fehler beim Aktualisieren der Profilbild-URL: {e}", exc_info=True)
