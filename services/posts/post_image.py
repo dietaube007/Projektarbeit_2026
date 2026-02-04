@@ -110,6 +110,42 @@ class PostStorageService:
         """
         return {"path": None, "base64": None, "url": None, "name": None}
 
+    def get_local_image_base64(self, file_path: str) -> Optional[str]:
+        """Liest und komprimiert ein lokales Bild, gibt Base64 für Vorschau zurück (ohne Upload).
+        
+        Args:
+            file_path: Pfad zur lokalen Bilddatei
+        
+        Returns:
+            Base64-kodierte Bilddaten oder None bei Fehler
+        """
+        if not file_path or not os.path.exists(file_path):
+            return None
+        try:
+            compressed_bytes, _ = self._compress_image(file_path)
+            return base64.b64encode(compressed_bytes).decode()
+        except (OSError, ValueError, IOError) as e:
+            logger.warning(f"Fehler beim Lesen des lokalen Bildes: {e}")
+            return None
+
+    def read_local_image_bytes(self, file_path: str) -> Optional[bytes]:
+        """Liest und komprimiert ein lokales Bild, gibt Bytes zurück (z. B. für KI-Erkennung).
+        
+        Args:
+            file_path: Pfad zur lokalen Bilddatei
+        
+        Returns:
+            Komprimierte Bilddaten als Bytes oder None bei Fehler
+        """
+        if not file_path or not os.path.exists(file_path):
+            return None
+        try:
+            compressed_bytes, _ = self._compress_image(file_path)
+            return compressed_bytes
+        except (OSError, ValueError, IOError) as e:
+            logger.warning(f"Fehler beim Lesen des lokalen Bildes: {e}")
+            return None
+
     def upload_post_image(
         self,
         file_path: str,

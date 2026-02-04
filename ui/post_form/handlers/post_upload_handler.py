@@ -8,8 +8,9 @@ from typing import Callable, Optional, Dict, Any, List
 
 import flet as ft
 
-from services.posts import PostService, PostRelationsService
+from services.posts import PostService, PostRelationsService, PostStorageService
 from services.account import ProfileService
+from .photo_upload_handler import cleanup_local_file
 from utils.validators import sanitize_string
 from utils.logging_config import get_logger
 from ui.constants import (
@@ -29,6 +30,7 @@ async def handle_save_post(
     sb,
     post_service: PostService,
     post_relations_service: PostRelationsService,
+    post_storage_service: PostStorageService,
     meldungsart: ft.SegmentedButton,
     name_tf: ft.TextField,
     species_dd: ft.Dropdown,
@@ -114,9 +116,19 @@ async def handle_save_post(
         for color_id in selected_farben:
             post_relations_service.add_color(post_id, color_id)
         
-        # Bild verknüpfen
-        if selected_photo.get("url"):
-            post_relations_service.add_photo(post_id, selected_photo["url"])
+        # Bild: wenn nur lokal vorhanden, jetzt in Storage hochladen und verknüpfen
+        photo_url = selected_photo.get("url")
+        local_path = selected_photo.get("local_path")
+        if local_path:
+            upload_result = post_storage_service.upload_post_image(
+                file_path=local_path,
+                original_filename=selected_photo.get("name") or "image.jpg",
+            )
+            if upload_result.get("url"):
+                post_relations_service.add_photo(post_id, upload_result["url"])
+            cleanup_local_file(local_path)
+        elif photo_url:
+            post_relations_service.add_photo(post_id, photo_url)
         
         show_status_callback("", is_error=False, is_loading=False)
         show_success_dialog(page, "Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
@@ -195,7 +207,7 @@ def reset_form_fields(
     for cb in farben_checkboxes.values():
         cb.value = False
     
-    selected_photo.update({"path": None, "name": None, "url": None, "base64": None})
+    selected_photo.update({"path": None, "name": None, "url": None, "base64": None, "local_path": None})
     photo_preview.visible = False
     title_label.value = "Name﹡"
     status_text.value = ""
@@ -215,6 +227,7 @@ async def handle_view_save_post(
     sb,
     post_service: PostService,
     post_relations_service: PostRelationsService,
+    post_storage_service: PostStorageService,
     meldungsart: ft.SegmentedButton,
     name_tf: ft.TextField,
     species_dd: ft.Dropdown,
@@ -277,7 +290,7 @@ async def handle_view_save_post(
         description_value=info_tf.value,
         location_value=location_tf.value,
         date_value=date_tf.value,
-        photo_url=selected_photo.get("url"),
+        photo_url=selected_photo.get("url") or ("local" if selected_photo.get("local_path") else None),
     )
     
     if not is_valid:
@@ -293,6 +306,7 @@ async def handle_view_save_post(
         sb=sb,
         post_service=post_service,
         post_relations_service=post_relations_service,
+        post_storage_service=post_storage_service,
         meldungsart=meldungsart,
         name_tf=name_tf,
         species_dd=species_dd,

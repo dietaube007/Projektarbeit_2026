@@ -43,8 +43,8 @@ async def handle_start_ai_recognition(
         meldungsart: SegmentedButton für Meldungsart
         show_consent_dialog_callback: Callback zum Anzeigen des Einverständnisdialogs
     """
-    # Prüfe ob Foto vorhanden
-    if not selected_photo.get("path"):
+    # Prüfe ob Foto vorhanden (lokal oder bereits in Storage)
+    if not selected_photo.get("path") and not selected_photo.get("local_path"):
         show_error_dialog(
             page,
             "Kein Foto",
@@ -123,15 +123,19 @@ async def perform_ai_recognition(
             page.close(progress_dlg)
             return
         
-        # Hole Bilddaten vom Storage
-        if not selected_photo.get("path"):
+        # Bilddaten: lokal oder aus Storage
+        local_path = selected_photo.get("local_path")
+        storage_path = selected_photo.get("path")
+        if not local_path and not storage_path:
             show_status_callback("Kein Bild vorhanden", is_error=True, is_loading=False)
             page.close(progress_dlg)
             return
         
-        # Lade Bild von Supabase über Service
         try:
-            image_data = post_storage_service.download_post_image(selected_photo["path"])
+            if local_path:
+                image_data = post_storage_service.read_local_image_bytes(local_path)
+            else:
+                image_data = post_storage_service.download_post_image(storage_path)
             if not image_data:
                 show_status_callback("Fehler beim Laden des Bildes", is_error=True, is_loading=False)
                 page.close(progress_dlg)

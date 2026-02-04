@@ -57,7 +57,7 @@ async def handle_pick_photo(
     photo_preview: ft.Image,
     show_status_callback: Callable[[str, bool, bool], None],
 ) -> None:
-    """Öffnet Dateiauswahl und lädt Bild zu Supabase Storage hoch.
+    """Öffnet Dateiauswahl und speichert das Bild nur lokal. Upload zu Supabase erfolgt beim Speichern der Meldung.
     
     Args:
         page: Flet Page-Instanz
@@ -79,35 +79,31 @@ async def handle_pick_photo(
     def on_upload(ev: ft.FilePickerUploadEvent):
         if ev.progress == 1.0:
             try:
-                # Versuche beide mögliche Pfade (mit und ohne Session-ID)
                 upload_path_with_session = get_upload_path(ev.file_name, page.session_id)
                 upload_path_direct = get_upload_path(ev.file_name, None)
                 
-                # Wähle den Pfad der existiert
                 if os.path.exists(upload_path_with_session):
-                    upload_path = upload_path_with_session
+                    local_path = upload_path_with_session
                 elif os.path.exists(upload_path_direct):
-                    upload_path = upload_path_direct
+                    local_path = upload_path_direct
                 else:
                     show_status_callback(f"Datei nicht gefunden: {ev.file_name}", is_error=True, is_loading=False)
                     return
                 
-                # Bild hochladen und komprimieren über Service
-                result = post_storage_service.upload_post_image(upload_path, ev.file_name)
-                
-                if result["url"]:
-                    selected_photo["path"] = result["path"]
-                    selected_photo["base64"] = result["base64"]
-                    selected_photo["url"] = result["url"]
+                # Nur lokal halten: Base64 für Vorschau, Pfad für späteren Upload beim Speichern
+                base64_data = post_storage_service.get_local_image_base64(local_path)
+                if base64_data:
+                    selected_photo["local_path"] = local_path
+                    selected_photo["base64"] = base64_data
+                    selected_photo["path"] = None
+                    selected_photo["url"] = None
                     
-                    photo_preview.src_base64 = result["base64"]
+                    photo_preview.src_base64 = base64_data
                     photo_preview.visible = True
-                    show_status_callback(f"Bild hochgeladen: {ev.file_name}", is_error=False, is_loading=False)
+                    show_status_callback(f"Bild ausgewählt: {ev.file_name}", is_error=False, is_loading=False)
                 else:
-                    show_status_callback("Fehler beim Hochladen", is_error=True, is_loading=False)
-                
-                # Lokale Datei aufräumen
-                cleanup_local_file(upload_path)
+                    show_status_callback("Fehler beim Verarbeiten des Bildes", is_error=True, is_loading=False)
+                    cleanup_local_file(local_path)
                 
             except Exception as ex:
                 show_status_callback(f"Fehler: {ex}", is_error=True, is_loading=False)
@@ -125,7 +121,7 @@ def handle_remove_photo(
     status_text: ft.Text,
     page: ft.Page,
 ) -> None:
-    """Entfernt das Foto aus der Vorschau und aus Supabase Storage.
+    """Entfernt das Foto aus der Vorschau. Wenn schon in Storage, dort löschen; sonst nur lokale Datei.
     
     Args:
         post_storage_service: PostStorageService-Instanz
@@ -134,9 +130,16 @@ def handle_remove_photo(
         status_text: Text-Widget für Status-Nachrichten
         page: Flet Page-Instanz
     """
-    post_storage_service.remove_post_image(selected_photo.get("path"))
+    storage_path = selected_photo.get("path")
+    local_path = selected_photo.get("local_path")
+    if storage_path:
+        post_storage_service.remove_post_image(storage_path)
+    if local_path:
+        cleanup_local_file(local_path)
     
-    selected_photo.update({"path": None, "name": None, "url": None, "base64": None})
+    selected_photo.update({
+        "path": None, "name": None, "url": None, "base64": None, "local_path": None
+    })
     photo_preview.visible = False
     status_text.value = ""
     page.update()

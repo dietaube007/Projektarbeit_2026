@@ -92,7 +92,7 @@ class PostForm:
         # Ausgewählte Werte
         self.selected_farben: List[int] = []
         self.farben_checkboxes: Dict[int, ft.Checkbox] = {}
-        self.selected_photo: Dict[str, Any] = {"path": None, "name": None, "url": None, "base64": None}
+        self.selected_photo: Dict[str, Any] = {"path": None, "name": None, "url": None, "base64": None, "local_path": None}
         self.farben_panel_visible = {"visible": True}
         
         # UI-Elemente initialisieren
@@ -299,6 +299,7 @@ class PostForm:
             sb=self.sb,
             post_service=self.post_service,
             post_relations_service=self.post_relations_service,
+            post_storage_service=self.post_storage_service,
             meldungsart=self.meldungsart,
             name_tf=self.name_tf,
             species_dd=self.species_dd,
