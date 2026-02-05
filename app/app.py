@@ -523,6 +523,7 @@ class PetBuddyApp:
                     self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
                     page=self.page,
                     on_title_click=self._go_to_start,
+                    on_login=lambda _: self._show_login(),
                 )
                 self.page.update()
             
@@ -532,6 +533,7 @@ class PetBuddyApp:
                 self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
                 page=self.page,
                 on_title_click=self._go_to_start,
+                on_login=lambda _: self._show_login(),
             )
             self.page.navigation_bar = self.nav
             self.page.add(self.body)

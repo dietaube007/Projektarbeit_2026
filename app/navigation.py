@@ -52,6 +52,7 @@ def create_app_bar(
     theme_toggle_button: ft.Control,
     page: Optional[ft.Page] = None,  # Page-Instanz hinzufügen
     on_title_click: Optional[Callable[[ft.ControlEvent], None]] = None,
+    on_login: Optional[Callable[[ft.ControlEvent], None]] = None,
 ) -> ft.AppBar:
     """Erstellt die App-Bar."""
     from ui.theme import get_theme_color
@@ -63,6 +64,12 @@ def create_app_bar(
             ft.Icons.LOGOUT,
             tooltip="Abmelden",
             on_click=on_logout
+        ))
+    elif on_login is not None:
+        actions.insert(0, ft.IconButton(
+            ft.Icons.LOGIN,
+            tooltip="Anmelden",
+            on_click=on_login,
         ))
     
     bgcolor = None
