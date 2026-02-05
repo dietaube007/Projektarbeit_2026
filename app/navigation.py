@@ -50,11 +50,11 @@ def create_app_bar(
     is_logged_in: bool,
     on_logout: Callable[[ft.ControlEvent], None],
     theme_toggle_button: ft.Control,
-    page: Optional[ft.Page] = None  # Page-Instanz hinzufügen
+    page: Optional[ft.Page] = None,  # Page-Instanz hinzufügen
+    on_title_click: Optional[Callable[[ft.ControlEvent], None]] = None,
 ) -> ft.AppBar:
     """Erstellt die App-Bar."""
     from ui.theme import get_theme_color
-    from typing import Optional
     
     actions = [theme_toggle_button]
     
@@ -71,8 +71,16 @@ def create_app_bar(
     else:
         bgcolor = get_theme_color("background", is_dark=False)
     
+    title_content = ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600)
+    if on_title_click is not None:
+        title_content = ft.GestureDetector(
+            content=title_content,
+            on_tap=on_title_click,
+            mouse_cursor=ft.MouseCursor.CLICK,
+        )
+    
     return ft.AppBar(
-        title=ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600),
+        title=title_content,
         center_title=True,
         actions=actions,
         bgcolor=bgcolor,  

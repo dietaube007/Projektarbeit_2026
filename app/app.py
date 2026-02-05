@@ -361,6 +361,14 @@ class PetBuddyApp:
         self.current_tab = new_tab
         self.render_tab()
     
+    def _go_to_start(self, _e: ft.ControlEvent) -> None:
+        """Navigiert zur Startseite (z. B. beim Klick auf die PetBuddy-Überschrift)."""
+        self.current_tab = TAB_START
+        if self.nav is not None:
+            self.nav.selected_index = TAB_START
+        self.page.go("/")
+        self.render_tab()
+    
     def _logout(self) -> None:
         """Meldet den Benutzer ab."""
         try:
@@ -513,7 +521,8 @@ class PetBuddyApp:
                     self.is_logged_in,
                     lambda _: self._logout(),
                     self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
-                    page=self.page
+                    page=self.page,
+                    on_title_click=self._go_to_start,
                 )
                 self.page.update()
             
@@ -521,7 +530,8 @@ class PetBuddyApp:
                 self.is_logged_in,
                 lambda _: self._logout(),
                 self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
-                page=self.page 
+                page=self.page,
+                on_title_click=self._go_to_start,
             )
             self.page.navigation_bar = self.nav
             self.page.add(self.body)
