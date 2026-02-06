@@ -160,6 +160,10 @@ class ProfileView:
             self.display_name.value = "Fehler beim Laden"
             self.page.update()
 
+    async def refresh_user_data(self) -> None:
+        """Öffentliches Refresh für Benutzer-Daten (z. B. nach Login)."""
+        await self._load_user_data()
+
     # ─────────────────────────────────────────────────────────────
     # NAVIGATION
     # ─────────────────────────────────────────────────────────────

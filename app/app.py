@@ -188,6 +188,8 @@ class PetBuddyApp:
         if not self.profile_view:
             if not self.build_ui():
                 return
+        else:
+            self.page.run_task(self.profile_view.refresh_user_data)
         
         self.current_tab = TAB_PROFIL
         if self.nav:
@@ -388,31 +390,34 @@ class PetBuddyApp:
         """Baut die UI-Bereiche auf."""
         try:
             # DiscoverView erstellen
-            self.discover_view = DiscoverView(
-                page=self.page,
-                sb=self.sb,
-                on_contact_click=None,
-                on_melden_click=self.go_to_melden_tab,
-                on_login_required=self._show_favorite_login_dialog,
-                on_save_search_login_required=self._show_saved_search_login_dialog,
-                on_comment_login_required=self._show_comment_login_dialog,
-            )
+            if self.discover_view is None:
+                self.discover_view = DiscoverView(
+                    page=self.page,
+                    sb=self.sb,
+                    on_contact_click=None,
+                    on_melden_click=self.go_to_melden_tab,
+                    on_login_required=self._show_favorite_login_dialog,
+                    on_save_search_login_required=self._show_saved_search_login_dialog,
+                    on_comment_login_required=self._show_comment_login_dialog,
+                )
             
             # PostForm erstellen
-            self.post_form = PostForm(
-                page=self.page,
-                sb=self.sb,
-                on_saved_callback=self.on_post_saved
-            )
+            if self.post_form is None:
+                self.post_form = PostForm(
+                    page=self.page,
+                    sb=self.sb,
+                    on_saved_callback=self.on_post_saved
+                )
             
             # ProfileView erstellen
-            self.profile_view = ProfileView(
-                page=self.page,
-                sb=self.sb,
-                on_logout=self._logout,
-                on_favorites_changed=self._on_favorites_changed,
-                on_posts_changed=self._on_posts_changed,
-            )
+            if self.profile_view is None:
+                self.profile_view = ProfileView(
+                    page=self.page,
+                    sb=self.sb,
+                    on_logout=self._logout,
+                    on_favorites_changed=self._on_favorites_changed,
+                    on_posts_changed=self._on_posts_changed,
+                )
             
             return True
             
@@ -581,7 +586,7 @@ class PetBuddyApp:
             self.render_tab()
             
             if self.discover_view:
-                self.page.run_task(self.discover_view.load_posts)
+                self.page.run_task(self.discover_view.ensure_loaded)
             else:
                 logger.error("_show_main_app: discover_view ist None")
             

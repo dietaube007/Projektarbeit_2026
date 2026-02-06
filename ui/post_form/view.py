@@ -7,10 +7,12 @@ Enthält UI-Komposition und koordiniert Post Form-Features.
 from __future__ import annotations
 
 from typing import Callable, Optional, Dict, Any, List
+import asyncio
 
 import flet as ft
 
 from services.posts.references import ReferenceService
+from services.geocoding import geocode_suggestions
 from services.posts import PostService, PostRelationsService, PostStorageService
 from services.ai.pet_recognition import get_recognition_service
 from utils.logging_config import get_logger
@@ -94,6 +96,8 @@ class PostForm:
         self.farben_checkboxes: Dict[int, ft.Checkbox] = {}
         self.selected_photo: Dict[str, Any] = {"path": None, "name": None, "url": None, "base64": None, "local_path": None}
         self.farben_panel_visible = {"visible": True}
+        self.location_selected: Dict[str, Any] = {"text": None, "lat": None, "lon": None}
+        self._location_query_version = 0
         
         # UI-Elemente initialisieren
         self._init_ui_elements()
@@ -163,7 +167,18 @@ class PostForm:
         self.info_tf = create_description_field()
         self.info_tf.on_change = on_update_description_counter
         self.location_tf = create_location_field()
+        self.location_tf.on_change = lambda _: self._on_location_change()
         self.date_tf = create_date_field()
+
+        self.location_suggestions_list = ft.Column(spacing=2)
+        self.location_suggestions_box = ft.Container(
+            content=self.location_suggestions_list,
+            visible=False,
+            padding=8,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.with_opacity(0.02, ft.Colors.BLACK),
+        )
         
         # Status-Nachricht
         self.status_text = create_status_text()
@@ -248,6 +263,55 @@ class PostForm:
         else:
             if color_id in self.selected_farben:
                 self.selected_farben.remove(color_id)
+
+    def _on_location_change(self) -> None:
+        """Lädt Vorschlaege fuer den Standort basierend auf dem Freitext."""
+        self.location_selected = {"text": None, "lat": None, "lon": None}
+        self._location_query_version += 1
+        query = self.location_tf.value or ""
+        self.page.run_task(
+            self._update_location_suggestions,
+            query,
+            self._location_query_version,
+        )
+
+    async def _update_location_suggestions(self, query: str, version: int) -> None:
+        await asyncio.sleep(0.3)
+        if version != self._location_query_version:
+            return
+        if not query or len(query.strip()) < 3:
+            self._clear_location_suggestions()
+            return
+        suggestions = geocode_suggestions(query)
+        if not suggestions:
+            self._clear_location_suggestions()
+            return
+
+        def build_item(item: Dict[str, Any]) -> ft.Control:
+            return ft.TextButton(
+                item.get("text", ""),
+                on_click=lambda e, it=item: self._select_location_suggestion(it),
+                style=ft.ButtonStyle(alignment=ft.alignment.center_left),
+            )
+
+        self.location_suggestions_list.controls = [build_item(s) for s in suggestions]
+        self.location_suggestions_box.visible = True
+        self.page.update()
+
+    def _select_location_suggestion(self, item: Dict[str, Any]) -> None:
+        self.location_selected = {
+            "text": item.get("text"),
+            "lat": item.get("lat"),
+            "lon": item.get("lon"),
+        }
+        self.location_tf.value = item.get("text", "")
+        self._clear_location_suggestions()
+        self.page.update()
+
+    def _clear_location_suggestions(self) -> None:
+        self.location_suggestions_list.controls = []
+        self.location_suggestions_box.visible = False
+        self.page.update()
     
     async def _start_ai_recognition_flow(self):
         """Startet den kompletten KI-Rassenerkennungs-Flow."""
@@ -307,6 +371,7 @@ class PostForm:
             sex_dd=self.sex_dd,
             info_tf=self.info_tf,
             location_tf=self.location_tf,
+            location_selected=self.location_selected,
             date_tf=self.date_tf,
             selected_farben=self.selected_farben,
             selected_photo=self.selected_photo,
@@ -323,6 +388,8 @@ class PostForm:
             parse_event_date=parse_date,
             on_saved_callback=self.on_saved_callback,
         )
+        self.location_selected = {"text": None, "lat": None, "lon": None}
+        self._clear_location_suggestions()
     
     async def _load_refs(self, _=None):
         """Lädt alle Referenzdaten aus der Datenbank."""
@@ -390,6 +457,7 @@ class PostForm:
             ai_button=self.ai_button,
             ai_result_container=self.ai_result_container,
             location_tf=self.location_tf,
+            location_suggestions=self.location_suggestions_box,
             date_tf=self.date_tf,
             save_button=self.save_button,
             status_text=self.status_text,

@@ -5,6 +5,7 @@ flet==0.28.3
 pillow>=10.0.0
 python-dotenv>=1.0.0
 supabase>=2.0.0
+certifi>=2024.2.2
 
 # KI-Rassenerkennung
 transformers>=4.30.0

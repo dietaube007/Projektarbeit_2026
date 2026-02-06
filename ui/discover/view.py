@@ -79,6 +79,7 @@ class DiscoverView:
         self.selected_farben: list[int] = []
         self.farben_panel_visible = {"visible": False}
         self.current_items = {"items": []}
+        self._has_loaded_posts = False
 
         # User
         self.current_user_id: Optional[str] = None
@@ -357,6 +358,13 @@ class DiscoverView:
             on_render=self._render_items,
             get_filter_value=handle_view_get_filter_value,
         )
+        self._has_loaded_posts = True
+
+    async def ensure_loaded(self) -> None:
+        """Lädt Meldungen nur beim ersten Anzeigen der Discover-View."""
+        if self._has_loaded_posts:
+            return
+        await self.load_posts()
     
     def _render_items(self, items: list[dict]) -> None:
         """Rendert die geladenen Items in der Listen-Ansicht."""

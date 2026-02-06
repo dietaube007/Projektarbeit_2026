@@ -50,7 +50,6 @@ def create_name_field() -> ft.TextField:
         TextField für Name/Überschrift-Eingabe
     """
     return ft.TextField(
-        width=FIELD_WIDTH_MEDIUM,
         max_length=MAX_HEADLINE_LENGTH,
         counter_text=f"0 / {MAX_HEADLINE_LENGTH}",
         helper_text=f"Max. {MAX_HEADLINE_LENGTH} Zeichen",
@@ -428,6 +427,7 @@ def create_form_colors_section(
 def create_form_details_section(
     info_tf: ft.TextField,
     location_tf: ft.TextField,
+    location_suggestions: ft.Control,
     date_tf: ft.TextField,
     page: ft.Page,
 ) -> List[ft.Control]:
@@ -436,6 +436,7 @@ def create_form_details_section(
     Args:
         info_tf: TextField für Beschreibung
         location_tf: TextField für Standort
+        location_suggestions: Vorschlagsliste für Standort
         date_tf: TextField für Datum
         page: Flet Page-Instanz für Theme-Erkennung
     
@@ -448,6 +449,7 @@ def create_form_details_section(
         ft.Divider(height=20),
         ft.Text("Standort & Datum﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         location_tf,
+        location_suggestions,
         date_tf,
         ft.Divider(height=20),
     ]
@@ -484,6 +486,7 @@ def create_form_layout(
     ai_button: ft.Control,
     ai_result_container: ft.Container,
     location_tf: ft.TextField,
+    location_suggestions: ft.Control,
     date_tf: ft.TextField,
     save_button: ft.FilledButton,
     status_text: ft.Text,
@@ -505,6 +508,7 @@ def create_form_layout(
         ai_button: Button für KI-Erkennung
         ai_result_container: Container für AI-Ergebnisse
         location_tf: TextField für Standort
+        location_suggestions: Vorschlagsliste für Standort
         date_tf: TextField für Datum
         save_button: Button zum Speichern
         status_text: Text-Widget für Status-Nachrichten
@@ -539,7 +543,7 @@ def create_form_layout(
     controls.extend(create_form_colors_section(farben_header, farben_panel))
     
     # Details-Sektion
-    controls.extend(create_form_details_section(info_tf, location_tf, date_tf, page))
+    controls.extend(create_form_details_section(info_tf, location_tf, location_suggestions, date_tf, page))
     
     # Action-Sektion
     controls.extend(create_form_action_section(save_button, status_text))

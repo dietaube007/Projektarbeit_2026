@@ -4,6 +4,7 @@ Post Upload-Feature: UI und Logik für Post-Erstellung und Speicherung.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Callable, Optional, Dict, Any, List
 
 import flet as ft
@@ -38,12 +39,13 @@ async def handle_save_post(
     sex_dd: ft.Dropdown,
     info_tf: ft.TextField,
     location_tf: ft.TextField,
+    location_selected: Dict[str, Any],
     date_tf: ft.TextField,
     selected_farben: List[int],
     selected_photo: Dict[str, Any],
     show_status_callback: Callable[[str, bool, bool], None],
     show_validation_dialog_callback: Callable[[str, str, List[str]], None],
-    parse_event_date: Callable[[str], Optional],
+    parse_event_date: Callable[[str], Optional[date]],
     on_saved_callback: Optional[Callable[[int], None]] = None,
 ) -> None:
     """Speichert die Meldung in der Datenbank.
@@ -60,6 +62,7 @@ async def handle_save_post(
         sex_dd: Dropdown für Geschlecht
         info_tf: TextField für Beschreibung
         location_tf: TextField für Ort
+        location_selected: Ausgewaehlter Standort (text/lat/lon)
         date_tf: TextField für Datum
         selected_farben: Liste der ausgewählten Farb-IDs
         selected_photo: Dictionary mit Foto-Informationen
@@ -97,6 +100,14 @@ async def handle_save_post(
         description = sanitize_string(info_tf.value, max_length=MAX_DESCRIPTION_LENGTH)
         location = sanitize_string(location_tf.value, max_length=MAX_LOCATION_LENGTH)
         
+        if location_selected.get("lat") is None or location_selected.get("lon") is None:
+            show_validation_dialog_callback(
+                "Standort unklar",
+                "Bitte waehlen Sie einen Standort aus der Vorschlagsliste.",
+                ["• Geben Sie einen konkreten Ort oder eine Adresse ein."],
+            )
+            return
+
         post_data = {
             "user_id": user_id,
             "post_status_id": int(list(meldungsart.selected)[0]),
@@ -106,7 +117,9 @@ async def handle_save_post(
             "breed_id": int(breed_dd.value) if breed_dd.value and breed_dd.value != NO_SELECTION_VALUE else None,
             "sex_id": int(sex_dd.value) if sex_dd.value and sex_dd.value != NO_SELECTION_VALUE else None,
             "event_date": event_date.isoformat(),
-            "location_text": location,
+            "location_text": location_selected.get("text") or location,
+            "location_lat": location_selected.get("lat"),
+            "location_lon": location_selected.get("lon"),
         }
         
         new_post = post_service.create(post_data)
@@ -235,6 +248,7 @@ async def handle_view_save_post(
     sex_dd: ft.Dropdown,
     info_tf: ft.TextField,
     location_tf: ft.TextField,
+    location_selected: Dict[str, Any],
     date_tf: ft.TextField,
     selected_farben: List[int],
     selected_photo: Dict[str, Any],
@@ -248,7 +262,7 @@ async def handle_view_save_post(
     ai_hint_badge: Optional[ft.Control],
     show_status_callback: Callable[[str, bool, bool], None],
     show_validation_dialog_callback: Callable[[str, str, List[str]], None],
-    parse_event_date: Callable[[str], Optional],
+    parse_event_date: Callable[[str], Optional[date]],
     on_saved_callback: Optional[Callable[[int], None]] = None,
 ) -> None:
     """Speichert die Meldung in der Datenbank (View-Wrapper).
@@ -314,6 +328,7 @@ async def handle_view_save_post(
         sex_dd=sex_dd,
         info_tf=info_tf,
         location_tf=location_tf,
+        location_selected=location_selected,
         date_tf=date_tf,
         selected_farben=selected_farben,
         selected_photo=selected_photo,
