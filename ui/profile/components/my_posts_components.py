@@ -177,6 +177,7 @@ def build_my_post_card(
     page: ft.Page,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
+    on_mark_reunited: Optional[Callable[[dict], None]] = None,
 ) -> ft.Control:
     """Erstellt eine kompakte Karte für eine eigene Meldung.
     
@@ -185,6 +186,7 @@ def build_my_post_card(
         page: Flet Page-Instanz
         on_edit: Optionaler Callback zum Bearbeiten
         on_delete: Optionaler Callback zum Löschen
+        on_mark_reunited: Optionaler Callback zum Als-wiedervereint-markieren
     
     Returns:
         Container mit Post-Karte
@@ -279,24 +281,36 @@ def build_my_post_card(
         expand=True,
     )
     
-    # Aktionen
+    # Aktionen (Wiedervereint nur anzeigen wenn Status noch nicht Wiedervereint)
+    action_controls = []
+    if typ_lower != "wiedervereint":
+        action_controls.append(
+            ft.IconButton(
+                icon=ft.Icons.CHECK_CIRCLE_OUTLINE,
+                icon_size=20,
+                icon_color=ft.Colors.GREEN_600,
+                tooltip="Als wiedervereint markieren",
+                on_click=lambda e, p=post: on_mark_reunited(p) if on_mark_reunited else None,
+            )
+        )
+    action_controls.extend([
+        ft.IconButton(
+            icon=ft.Icons.EDIT_OUTLINED,
+            icon_size=20,
+            icon_color=PRIMARY_COLOR,
+            tooltip="Bearbeiten",
+            on_click=lambda e, p=post: on_edit(p) if on_edit else None,
+        ),
+        ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE,
+            icon_size=20,
+            icon_color=ft.Colors.RED_600,
+            tooltip="Löschen",
+            on_click=lambda e, pid=post_id: on_delete(pid) if on_delete else None,
+        ),
+    ])
     actions = ft.Column(
-        [
-            ft.IconButton(
-                icon=ft.Icons.EDIT_OUTLINED,
-                icon_size=20,
-                icon_color=PRIMARY_COLOR,
-                tooltip="Bearbeiten",
-                on_click=lambda e, p=post: on_edit(p) if on_edit else None,
-            ),
-            ft.IconButton(
-                icon=ft.Icons.DELETE_OUTLINE,
-                icon_size=20,
-                icon_color=ft.Colors.RED_600,
-                tooltip="Löschen",
-                on_click=lambda e, pid=post_id: on_delete(pid) if on_delete else None,
-            ),
-        ],
+        action_controls,
         spacing=0,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )

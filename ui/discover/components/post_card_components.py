@@ -255,6 +255,7 @@ def build_big_card(
                 icon=ft.Icons.COMMENT,
                 on_click=toggle_comments,
                 disabled=(not supabase or not post_id),
+                width=190,
             ),
         ],
         spacing=10,
@@ -310,13 +311,20 @@ def show_detail_dialog(
         )
 
     # Titel mit Favoriten-Button
-    title_row = ft.Row(
-        [
-            ft.Text(data["title"], expand=True),
-            favorite_btn,
-        ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-    ) if favorite_btn else ft.Text(data["title"])
+    title_row = (
+        ft.Container(
+            content=ft.Row(
+                [
+                    ft.Text(data["title"], expand=True),
+                    favorite_btn,
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
+            padding=ft.padding.symmetric(horizontal=16),
+        )
+        if favorite_btn
+        else ft.Text(data["title"])
+    )
 
     # Links: Infos (Bild, Beschreibung, Metadaten) | Rechts: Kommentare
     post_id = str(item.get("id") or "")
@@ -324,7 +332,12 @@ def show_detail_dialog(
         [
             ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
             ft.Container(height=8),
-            ft.Text(item.get("description") or "Keine Beschreibung.", color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(
+                item.get("description") or "Keine Beschreibung.",
+                color=ft.Colors.ON_SURFACE_VARIANT,
+                width=480,
+                text_align=ft.TextAlign.JUSTIFY,
+            ),
             ft.Container(height=8),
             meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
             meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
@@ -334,7 +347,7 @@ def show_detail_dialog(
         tight=True,
         spacing=8,
         scroll=ft.ScrollMode.AUTO,
-        expand=True,
+        width=480,
     )
 
     if supabase and post_id and profile_service is not None:
@@ -346,13 +359,13 @@ def show_detail_dialog(
         # CommentSection transparent - Dialog-Hintergrund scheint durch
         right_column = ft.Container(
             content=comment_section,
-            width=550,
+            width=480,
             height=500,
-            padding=ft.padding.only(left=16),
+            padding=ft.padding.only(left=8),
         )
         dialog_content = ft.Row(
             [details_column, right_column],
-            spacing=0,
+            spacing=8,
             vertical_alignment=ft.CrossAxisAlignment.START,
         )
     else:
@@ -362,7 +375,8 @@ def show_detail_dialog(
         title=title_row,
         content=ft.Container(
             content=dialog_content,
-            width=1400,
+            width=1080,
+            padding=ft.padding.symmetric(horizontal=16, vertical=8),
         ),
         actions=[
             ft.TextButton("Schließen", on_click=lambda _: page.close(dlg)),
@@ -372,6 +386,8 @@ def show_detail_dialog(
                 on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
             ),
         ],
+        actions_alignment=ft.MainAxisAlignment.END,
+        actions_padding=ft.padding.symmetric(horizontal=16, vertical=8),
     )
     page.open(dlg)
     # Kommentare nach Öffnen laden (Dialog muss bereits in der Page sein)

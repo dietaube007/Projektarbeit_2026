@@ -37,6 +37,7 @@ from .handlers.my_posts_handler import (
     edit_post as edit_post_feature,
     confirm_delete_post,
     handle_delete_post,
+    handle_mark_reunited,
 )
 from .handlers.edit_profile_handler import (
     handle_change_password,
@@ -281,6 +282,7 @@ class ProfileView:
             on_posts_changed=self.on_posts_changed,
             on_edit=self._edit_post,
             on_delete=self._confirm_delete_post,
+            on_mark_reunited=self._mark_reunited,
         )
 
     def _edit_post(self, post: dict):
@@ -318,7 +320,19 @@ class ProfileView:
             on_posts_changed=self.on_posts_changed,
             on_edit=self._edit_post,
             on_delete=self._confirm_delete_post,
+            on_mark_reunited=self._mark_reunited,
         )
+
+    def _mark_reunited(self, post: dict):
+        """Setzt eine Meldung auf 'Wiedervereint'."""
+        handle_mark_reunited(
+            post=post,
+            page=self.page,
+            sb=self.sb,
+            on_posts_changed=self.on_posts_changed,
+        )
+        # Liste neu laden, damit Status-Badge aktualisiert wird
+        self.page.run_task(self._load_my_posts)
 
     def _confirm_delete_account(self):
         """Zeigt Bestätigungsdialog zum Löschen des Kontos."""

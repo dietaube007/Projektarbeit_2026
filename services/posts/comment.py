@@ -76,6 +76,15 @@ class CommentService:
                         "profile_image": profile.get("profile_image"),
                     }
                     comment["replies"] = []  # Initialisiere replies-Liste
+
+                # Emoji-Reaktionen laden
+                current_user_id = self._profile_service.get_user_id()
+                comment_ids = [c.get("id") for c in comments if c.get("id") is not None]
+                reactions_map = self.get_comment_reactions(comment_ids, current_user_id)
+                for comment in comments:
+                    r = reactions_map.get(comment.get("id"), {"counts": {}, "user_emojis": set()})
+                    comment["reactions"] = r.get("counts", {})
+                    comment["user_reactions"] = list(r.get("user_emojis", set()))
             
             # Hierarchische Struktur aufbauen
             top_level = []
@@ -111,6 +120,74 @@ class CommentService:
         except Exception as e:
             logger.error(f"Fehler beim Laden der Kommentare für Post {post_id}: {e}", exc_info=True)
             return []
+
+    def get_comment_reactions(
+        self,
+        comment_ids: List[int],
+        user_id: Optional[str] = None,
+    ) -> Dict[int, Dict[str, Any]]:
+        """Lädt Emoji-Reaktionen für mehrere Kommentare.
+
+        Returns:
+            Dict[comment_id] = {"counts": {emoji: count}, "user_emojis": set()}
+        """
+        if not comment_ids:
+            return {}
+        try:
+            response = (
+                self.sb.table("comment_reaction")
+                .select("comment_id, emoji, user_id")
+                .in_("comment_id", comment_ids)
+                .execute()
+            )
+            rows = response.data if response and hasattr(response, "data") else []
+            result: Dict[int, Dict[str, Any]] = {}
+            for row in rows:
+                cid = row.get("comment_id")
+                if cid is None:
+                    continue
+                if cid not in result:
+                    result[cid] = {"counts": {}, "user_emojis": set()}
+                emoji = row.get("emoji")
+                if emoji:
+                    result[cid]["counts"][emoji] = result[cid]["counts"].get(emoji, 0) + 1
+                    if user_id and row.get("user_id") == str(user_id):
+                        result[cid]["user_emojis"].add(emoji)
+            return result
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Reaktionen: {e}", exc_info=True)
+            return {}
+
+    def toggle_reaction(self, comment_id: Union[int, str], user_id: str, emoji: str) -> bool:
+        """Toggle einer Emoji-Reaktion für einen Kommentar.
+
+        Returns:
+            True wenn hinzugefügt, False wenn entfernt oder Fehler.
+        """
+        try:
+            comment_id_int = int(comment_id) if isinstance(comment_id, str) else comment_id
+            existing = (
+                self.sb.table("comment_reaction")
+                .select("id")
+                .eq("comment_id", comment_id_int)
+                .eq("user_id", str(user_id))
+                .eq("emoji", emoji)
+                .execute()
+            )
+            if existing and getattr(existing, "data", None):
+                reaction_id = existing.data[0].get("id")
+                self.sb.table("comment_reaction").delete().eq("id", reaction_id).execute()
+                return False
+
+            self.sb.table("comment_reaction").insert({
+                "comment_id": comment_id_int,
+                "user_id": str(user_id),
+                "emoji": emoji,
+            }).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Fehler beim Toggle der Reaktion: {e}", exc_info=True)
+            return False
 
     def create_comment(
         self,

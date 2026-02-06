@@ -10,6 +10,7 @@ import flet as ft
 
 from ui.shared_components import loading_indicator, show_success_dialog, show_error_dialog
 from services.posts import PostService
+from services.posts.references import ReferenceService
 from utils.logging_config import get_logger
 from ..components.my_posts_components import create_post_details_dialog, build_my_post_card
 from ..components.edit_post_components import EditPostDialog
@@ -52,12 +53,41 @@ def delete_post(sb, post_id: int) -> bool:
         return False
 
 
+def handle_mark_reunited(
+    post: dict,
+    page: ft.Page,
+    sb,
+    on_posts_changed: Optional[Callable] = None,
+) -> None:
+    """Setzt eine Meldung auf 'Wiedervereint'."""
+    try:
+        ref_service = ReferenceService(sb)
+        statuses = ref_service.get_post_statuses() or []
+        reunited = next(
+            (s for s in statuses if str(s.get("name", "")).lower() == "wiedervereint"),
+            None,
+        )
+        if not reunited:
+            show_error_dialog(page, "Fehler", "Status 'Wiedervereint' nicht gefunden.")
+            return
+
+        post_service = PostService(sb)
+        post_service.update(str(post.get("id")), {"post_status_id": reunited["id"]})
+        show_success_dialog(page, "Aktualisiert", "Meldung wurde auf 'Wiedervereint' gesetzt.")
+        if on_posts_changed:
+            on_posts_changed()
+    except Exception as e:
+        logger.error(f"Fehler beim Setzen auf Wiedervereint: {e}", exc_info=True)
+        show_error_dialog(page, "Fehler", "Die Meldung konnte nicht aktualisiert werden.")
+
+
 def render_my_posts_list(
     posts_list: ft.Column,
     posts_items: List[dict],
     page: ft.Page,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
+    on_mark_reunited: Optional[Callable[[dict], None]] = None,
     not_logged_in: bool = False,
 ):
     """Rendert die Liste der eigenen Meldungen.
@@ -68,6 +98,7 @@ def render_my_posts_list(
         page: Flet Page-Instanz
         on_edit: Optionaler Callback zum Bearbeiten
         on_delete: Optionaler Callback zum Löschen
+        on_mark_reunited: Optionaler Callback zum Als-wiedervereint-markieren
         not_logged_in: Ob der Benutzer nicht eingeloggt ist
     """
     posts_list.controls.clear()
@@ -95,7 +126,13 @@ def render_my_posts_list(
     else:
         for post in posts_items:
             posts_list.controls.append(
-                build_my_post_card(post, page=page, on_edit=on_edit, on_delete=on_delete)
+                build_my_post_card(
+                    post,
+                    page=page,
+                    on_edit=on_edit,
+                    on_delete=on_delete,
+                    on_mark_reunited=on_mark_reunited,
+                )
             )
 
 
@@ -107,6 +144,7 @@ async def load_my_posts(
     on_posts_changed: Optional[Callable] = None,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
+    on_mark_reunited: Optional[Callable[[dict], None]] = None,
 ) -> List[dict]:
     """Lädt alle eigenen Meldungen des aktuellen Benutzers.
     
@@ -138,6 +176,7 @@ async def load_my_posts(
                 page=page,
                 on_edit=on_edit,
                 on_delete=on_delete,
+                on_mark_reunited=on_mark_reunited,
                 not_logged_in=True,
             )
             page.update()
@@ -153,6 +192,7 @@ async def load_my_posts(
             page=page,
             on_edit=on_edit,
             on_delete=on_delete,
+            on_mark_reunited=on_mark_reunited,
         )
         page.update()
         return my_posts_items
@@ -166,6 +206,7 @@ async def load_my_posts(
             page=page,
             on_edit=on_edit,
             on_delete=on_delete,
+            on_mark_reunited=on_mark_reunited,
         )
         page.update()
         return my_posts_items
@@ -242,6 +283,7 @@ def handle_delete_post(
     on_posts_changed: Optional[Callable] = None,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
+    on_mark_reunited: Optional[Callable[[dict], None]] = None,
 ) -> None:
     """Löscht einen Post und aktualisiert die UI.
     
@@ -267,6 +309,7 @@ def handle_delete_post(
                 page=page,
                 on_edit=on_edit,
                 on_delete=on_delete,
+                on_mark_reunited=on_mark_reunited,
             )
             show_success_dialog(page, "Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
             page.update()

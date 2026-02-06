@@ -56,6 +56,8 @@ class CommentSection(ft.Container):
         self.is_dark = page.theme_mode == ft.ThemeMode.DARK
         self._current_comments = []
         self._delete_confirming_id = None
+        self.is_logged_in = bool(profile_service and profile_service.get_user_id())
+        self.reaction_emojis = ["👍", "❤️", "😂", "😮", "😢"]
 
         # Kommentar-Liste (scrollbar)
         self.comments_list = ft.Column(
@@ -113,6 +115,11 @@ class CommentSection(ft.Container):
             icon_color=PRIMARY_COLOR,
             disabled=False
         )
+
+        if not self.is_logged_in:
+            self.comment_input.disabled = True
+            self.comment_input.hint_text = "Zum Kommentieren anmelden"
+            self.send_button.disabled = True
         
         super().__init__(
             bgcolor=None,  # Transparent 
@@ -346,6 +353,8 @@ class CommentSection(ft.Container):
         self, comment, is_reply: bool, is_author: bool, is_dark: bool, reply_button: ft.IconButton
     ) -> ft.Row:
         """Baut die Aktionen-Zeile: Antworten + Löschen-Icon oder Inline-Bestätigung."""
+        if not self.is_logged_in:
+            return ft.Row([], spacing=0)
         cid = comment.get("id")
         is_confirming = is_author and (self._delete_confirming_id == cid)
         if is_confirming:
@@ -384,6 +393,52 @@ class CommentSection(ft.Container):
             )
         return ft.Row([reply_button], spacing=0)
 
+    def _build_reactions_row(self, comment: dict) -> ft.Row:
+        counts = comment.get("reactions", {}) or {}
+        user_reactions = set(comment.get("user_reactions", []) or [])
+
+        def reaction_chip(emoji: str, count: int) -> ft.Control:
+            is_active = emoji in user_reactions
+            label = f"{emoji} {count}"
+            return ft.OutlinedButton(
+                label,
+                on_click=(lambda e, em=emoji, c=comment: self._toggle_reaction(c, em)) if self.is_logged_in else None,
+                disabled=not self.is_logged_in,
+                height=28,
+                style=ft.ButtonStyle(
+                    bgcolor=(ft.Colors.BLUE_50 if (is_active and not self.is_dark) else (ft.Colors.BLUE_GREY_800 if (is_active and self.is_dark) else None)),
+                    color=(ft.Colors.BLUE_700 if (is_active and not self.is_dark) else None),
+                ),
+            )
+
+        chips = [reaction_chip(e, c) for e, c in counts.items() if c]
+
+        emoji_menu = ft.PopupMenuButton(
+            icon=ft.Icons.ADD_REACTION,
+            tooltip="Reagieren",
+            disabled=not self.is_logged_in,
+            items=[
+                ft.PopupMenuItem(
+                    text=e,
+                    on_click=(lambda _, em=e, c=comment: self._toggle_reaction(c, em))
+                    if self.is_logged_in
+                    else None,
+                )
+                for e in self.reaction_emojis
+            ],
+        )
+
+        return ft.Row(chips + [emoji_menu], spacing=6, wrap=True)
+
+    def _toggle_reaction(self, comment: dict, emoji: str) -> None:
+        if not self.is_logged_in:
+            return
+        current_user_id = self.profile_service.get_user_id() if self.profile_service else None
+        if not current_user_id:
+            return
+        self.comment_service.toggle_reaction(comment.get("id"), current_user_id, emoji)
+        self.load_comments()
+
     def create_comment_card(self, comment: dict, is_reply: bool = False) -> ft.Container:
         """Erstellt eine Kommentar-Karte.
         
@@ -413,7 +468,8 @@ class CommentSection(ft.Container):
             icon_size=16,
             icon_color=PRIMARY_COLOR,
             tooltip="Antworten",
-            on_click=lambda e, c=comment: self.start_reply(c)
+            on_click=lambda e, c=comment: self.start_reply(c),
+            disabled=not self.is_logged_in,
         )
         
         card_content = ft.Row([
@@ -427,20 +483,30 @@ class CommentSection(ft.Container):
             
             # Kommentar-Inhalt
             ft.Column([
-                # Kopfzeile: Name + Zeit
-                ft.Row([
-                    ft.Text(
-                        username,
-                        weight=ft.FontWeight.BOLD,
-                        size=13 if not is_reply else 12,
-                        color=get_theme_color("text_primary", is_dark)
-                    ),
-                    ft.Text(
-                        format_time(comment.get('created_at')),
-                        size=11 if not is_reply else 10,
-                        color=get_theme_color("text_secondary", is_dark)
-                    )
-                ], spacing=8),
+                # Kopfzeile: Name + Zeit + Reaktionen
+                ft.Row(
+                    [
+                        ft.Row(
+                            [
+                                ft.Text(
+                                    username,
+                                    weight=ft.FontWeight.BOLD,
+                                    size=13 if not is_reply else 12,
+                                    color=get_theme_color("text_primary", is_dark),
+                                ),
+                                ft.Text(
+                                    format_time(comment.get('created_at')),
+                                    size=11 if not is_reply else 10,
+                                    color=get_theme_color("text_secondary", is_dark),
+                                ),
+                            ],
+                            spacing=8,
+                        ),
+                        ft.Container(expand=True),
+                        self._build_reactions_row(comment),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
                 
                 # Kommentar-Text
                 ft.Text(
@@ -449,7 +515,7 @@ class CommentSection(ft.Container):
                     selectable=True,
                     color=get_theme_color("text_primary", is_dark)
                 ),
-                
+
                 # Aktionen (Antworten, Löschen oder Inline-Bestätigung)
                 self._build_comment_actions_row(
                     comment=comment,
