@@ -325,10 +325,7 @@ def create_delete_account_dialog(
                 [
                     ft.Text(
                         "Diese Aktion kann nicht rückgängig gemacht werden!\n\n"
-                        "Folgende Daten werden gelöscht:\n"
-                        "• Ihr Profilbild\n"
-                        "• Ihre Favoriten\n"
-                        "• Ihre Meldungen",
+                        "Alle mit Ihrem Konto verbundenen Daten werden gelöscht.",
                         size=14,
                     ),
                     ft.Container(height=16),

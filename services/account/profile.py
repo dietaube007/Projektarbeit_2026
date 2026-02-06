@@ -145,6 +145,8 @@ class ProfileService:
     def get_user_profiles(self, user_ids: Iterable[str]) -> Dict[str, Dict[str, Any]]:
         """Lädt Profil-Daten (display_name + profile_image) für mehrere User-IDs.
         
+        Enthält Retry-Logik für transiente Netzwerkfehler (z.B. HTTP/2 Connection-Pool).
+        
         Args:
             user_ids: Iterable mit User-IDs (wird automatisch dedupliziert)
         
@@ -152,40 +154,52 @@ class ProfileService:
             Dictionary: user_id -> {"display_name": str, "profile_image": str | None}
             Leeres Dictionary bei Fehler oder wenn keine user_ids vorhanden.
         """
+        import time
+
         user_ids_list = self._prepare_user_ids(user_ids)
         if not user_ids_list:
             return {}
         
-        try:
-            result = (
-                self.sb.table("user")
-                .select("id, display_name")
-                .in_("id", user_ids_list)
-                .execute()
-            )
-            
-            profiles = {}
-            PROFILE_IMAGE_BUCKET = "profile-images"
-            
-            for row in (result.data or []):
-                user_id = row.get("id")
-                if user_id:
-                    # Profilbild-URL aus Storage generieren
-                    # Format: {user_id}/avatar.jpg (wie in ProfileImageService)
-                    storage_path = f"{user_id}/avatar.jpg"
-                    try:
-                        profile_image_url = self.sb.storage.from_(PROFILE_IMAGE_BUCKET).get_public_url(storage_path)
-                    except Exception as e:  # noqa: BLE001
-                        logger.debug(f"Konnte Profilbild-URL nicht generieren für User {user_id}: {e}")
-                        profile_image_url = None
-                    
-                    profiles[user_id] = {
-                        "display_name": row.get("display_name") or "Unbekannt",
-                        "profile_image": profile_image_url,
-                    }
-            
-            return profiles
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Laden der Benutzerprofile: {e}", exc_info=True)
-            return {}
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = (
+                    self.sb.table("user")
+                    .select("id, display_name")
+                    .in_("id", user_ids_list)
+                    .execute()
+                )
+                
+                profiles = {}
+                PROFILE_IMAGE_BUCKET = "profile-images"
+                
+                for row in (result.data or []):
+                    user_id = row.get("id")
+                    if user_id:
+                        # Profilbild-URL aus Storage generieren
+                        # Format: {user_id}/avatar.jpg (wie in ProfileImageService)
+                        storage_path = f"{user_id}/avatar.jpg"
+                        try:
+                            profile_image_url = self.sb.storage.from_(PROFILE_IMAGE_BUCKET).get_public_url(storage_path)
+                        except Exception as e:  # noqa: BLE001
+                            logger.debug(f"Konnte Profilbild-URL nicht generieren für User {user_id}: {e}")
+                            profile_image_url = None
+                        
+                        profiles[user_id] = {
+                            "display_name": row.get("display_name") or "Unbekannt",
+                            "profile_image": profile_image_url,
+                        }
+                
+                return profiles
+            except Exception as e:  # noqa: BLE001
+                if attempt < max_retries - 1:
+                    wait = 0.5 * (attempt + 1)
+                    logger.warning(
+                        f"Benutzerprofile laden fehlgeschlagen (Versuch {attempt + 1}/{max_retries}), "
+                        f"Retry in {wait}s: {e}"
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Fehler beim Laden der Benutzerprofile nach {max_retries} Versuchen: {e}", exc_info=True)
+                    return {}
     

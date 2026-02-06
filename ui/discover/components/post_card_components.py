@@ -79,7 +79,22 @@ def build_small_card(
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     )
 
-    card_inner = ft.Column([visual, badges, header], spacing=8)
+    # Ersteller mit Profilbild
+    profile_img_sm = data.get("user_profile_image")
+    user_row = ft.Row(
+        [
+            ft.CircleAvatar(
+                foreground_image_src=profile_img_sm if profile_img_sm else None,
+                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=8) if not profile_img_sm else None,
+                bgcolor=ft.Colors.BLUE_GREY_400,
+                radius=8,
+            ),
+            ft.Text(data["username"], size=11, color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+        ],
+        spacing=4,
+    )
+
+    card_inner = ft.Column([visual, badges, header, user_row], spacing=8)
     card = soft_card(card_inner, pad=12, elev=2)
 
     wrapper = ft.Container(
@@ -165,11 +180,26 @@ def build_big_card(
 
     line1 = ft.Text(f"{data['rasse']} • {data['farbe']}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
 
+    # Ersteller mit Profilbild
+    profile_img = data.get("user_profile_image")
+    user_chip = ft.Row(
+        [
+            ft.CircleAvatar(
+                foreground_image_src=profile_img if profile_img else None,
+                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=10) if not profile_img else None,
+                bgcolor=ft.Colors.BLUE_GREY_400,
+                radius=10,
+            ),
+            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+        ],
+        spacing=6,
+    )
+
     metas = ft.Row(
         [
             meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
             meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-            meta_row(ft.Icons.PERSON, data["username"]),
+            user_chip,
             meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
         ],
         spacing=16,
@@ -341,7 +371,19 @@ def show_detail_dialog(
             ft.Container(height=8),
             meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
             meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-            meta_row(ft.Icons.PERSON, data["username"]),
+            # Ersteller mit Profilbild
+            ft.Row(
+                [
+                    ft.CircleAvatar(
+                        foreground_image_src=data.get("user_profile_image") or None,
+                        content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=12) if not data.get("user_profile_image") else None,
+                        bgcolor=ft.Colors.BLUE_GREY_400,
+                        radius=12,
+                    ),
+                    ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+                ],
+                spacing=6,
+            ),
             meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
         ],
         tight=True,

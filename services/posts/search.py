@@ -160,6 +160,8 @@ class SearchService:
     ) -> List[Dict[str, Any]]:
         """Sucht Posts mit Filtern, Suche, Farben und Sortierung.
 
+        Enthält Retry-Logik für transiente Netzwerkfehler (HTTP/2 Connection-Pool).
+
         Args:
             filters: Dictionary mit Filterwerten (typ, art, geschlecht, rasse)
             search_query: Optionaler Suchbegriff (max. MAX_SEARCH_QUERY_LENGTH Zeichen)
@@ -172,53 +174,65 @@ class SearchService:
             Liste von Post-Dictionaries mit is_favorite Flag und user_display_name.
             Leere Liste bei Fehler.
         """
+        import time
+
         # Input-Validierung und Sanitization
         if search_query:
             search_query = sanitize_string(search_query, max_length=MAX_SEARCH_QUERY_LENGTH)
             if not search_query:
                 search_query = None
 
-        try:
-            # Query bauen und ausführen
-            query = self._build_query(filters, sort_option)
-            result = query.limit(limit).execute()
-            items = result.data or []
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Query bauen und ausführen
+                query = self._build_query(filters, sort_option)
+                result = query.limit(limit).execute()
+                items = result.data or []
 
-            # Suche (Python-Filter)
-            if search_query:
-                items = filter_by_search(items, search_query)
+                # Suche (Python-Filter)
+                if search_query:
+                    items = filter_by_search(items, search_query)
 
-            # Farben (Python-Filter)
-            if selected_colors:
-                items = filter_by_colors(items, selected_colors)
+                # Farben (Python-Filter)
+                if selected_colors:
+                    items = filter_by_colors(items, selected_colors)
 
-            # Event-Datum Sortierung in Python (falls gewählt)
-            if sort_option == SORT_EVENT_DESC:
-                items = sort_by_event_date(items, desc=True)
-            elif sort_option == SORT_EVENT_ASC:
-                items = sort_by_event_date(items, desc=False)
+                # Event-Datum Sortierung in Python (falls gewählt)
+                if sort_option == SORT_EVENT_DESC:
+                    items = sort_by_event_date(items, desc=True)
+                elif sort_option == SORT_EVENT_ASC:
+                    items = sort_by_event_date(items, desc=False)
 
-            # Favoritenstatus markieren
-            if favorite_ids is not None:
-                items = mark_favorites(items, favorite_ids)
+                # Favoritenstatus markieren
+                if favorite_ids is not None:
+                    items = mark_favorites(items, favorite_ids)
 
-            # Benutzernamen anreichern
-            items = self._enrich_with_usernames(items)
+                # Benutzernamen anreichern
+                items = self._enrich_with_usernames(items)
 
-            return items
+                return items
 
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Suchen von Posts: {e}", exc_info=True)
-            return []
+            except Exception as e:  # noqa: BLE001
+                if attempt < max_retries - 1:
+                    wait = 0.5 * (attempt + 1)
+                    logger.warning(
+                        f"Posts laden fehlgeschlagen (Versuch {attempt + 1}/{max_retries}), "
+                        f"Retry in {wait}s: {e}"
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Fehler beim Suchen von Posts nach {max_retries} Versuchen: {e}", exc_info=True)
+                    return []
 
     def _enrich_with_usernames(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Reichert Posts mit Benutzernamen an.
+        """Reichert Posts mit Benutzernamen und Profilbildern an.
 
         Args:
             items: Liste von Post-Dictionaries
 
         Returns:
-            Liste von Posts mit user_display_name Feld (leerer String wenn nicht gefunden)
+            Liste von Posts mit user_display_name und user_profile_image Feldern
         """
         if not items:
             return items
@@ -229,9 +243,11 @@ class SearchService:
             if item.get("user_id")
         }
 
-        display_names = self._profile_service.get_user_display_names(user_ids) if user_ids else {}
+        profiles = self._profile_service.get_user_profiles(user_ids) if user_ids else {}
 
         for item in items:
-            item["user_display_name"] = display_names.get(item.get("user_id"), "")
+            profile = profiles.get(item.get("user_id"), {})
+            item["user_display_name"] = profile.get("display_name", "")
+            item["user_profile_image"] = profile.get("profile_image")
 
         return items

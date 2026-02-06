@@ -8,6 +8,7 @@ from typing import Callable, Optional
 
 import flet as ft
 
+from app.dialogs import create_reaction_login_dialog
 from services.posts import CommentService
 from ui.constants import PRIMARY_COLOR
 from ui.helpers import format_time
@@ -115,11 +116,6 @@ class CommentSection(ft.Container):
             icon_color=PRIMARY_COLOR,
             disabled=False
         )
-
-        if not self.is_logged_in:
-            self.comment_input.disabled = True
-            self.comment_input.hint_text = "Zum Kommentieren anmelden"
-            self.send_button.disabled = True
         
         super().__init__(
             bgcolor=None,  # Transparent 
@@ -353,8 +349,6 @@ class CommentSection(ft.Container):
         self, comment, is_reply: bool, is_author: bool, is_dark: bool, reply_button: ft.IconButton
     ) -> ft.Row:
         """Baut die Aktionen-Zeile: Antworten + Löschen-Icon oder Inline-Bestätigung."""
-        if not self.is_logged_in:
-            return ft.Row([], spacing=0)
         cid = comment.get("id")
         is_confirming = is_author and (self._delete_confirming_id == cid)
         if is_confirming:
@@ -402,8 +396,7 @@ class CommentSection(ft.Container):
             label = f"{emoji} {count}"
             return ft.OutlinedButton(
                 label,
-                on_click=(lambda e, em=emoji, c=comment: self._toggle_reaction(c, em)) if self.is_logged_in else None,
-                disabled=not self.is_logged_in,
+                on_click=lambda e, em=emoji, c=comment: self._toggle_reaction(c, em),
                 height=28,
                 style=ft.ButtonStyle(
                     bgcolor=(ft.Colors.BLUE_50 if (is_active and not self.is_dark) else (ft.Colors.BLUE_GREY_800 if (is_active and self.is_dark) else None)),
@@ -416,13 +409,10 @@ class CommentSection(ft.Container):
         emoji_menu = ft.PopupMenuButton(
             icon=ft.Icons.ADD_REACTION,
             tooltip="Reagieren",
-            disabled=not self.is_logged_in,
             items=[
                 ft.PopupMenuItem(
                     text=e,
-                    on_click=(lambda _, em=e, c=comment: self._toggle_reaction(c, em))
-                    if self.is_logged_in
-                    else None,
+                    on_click=lambda _, em=e, c=comment: self._toggle_reaction(c, em),
                 )
                 for e in self.reaction_emojis
             ],
@@ -432,12 +422,28 @@ class CommentSection(ft.Container):
 
     def _toggle_reaction(self, comment: dict, emoji: str) -> None:
         if not self.is_logged_in:
+            self._show_reaction_login_dialog()
             return
         current_user_id = self.profile_service.get_user_id() if self.profile_service else None
         if not current_user_id:
             return
         self.comment_service.toggle_reaction(comment.get("id"), current_user_id, emoji)
         self.load_comments()
+
+    def _show_reaction_login_dialog(self) -> None:
+        """Zeigt einen Login-Dialog wenn ein Gast auf eine Reaktion klickt."""
+        def on_login_click(e: ft.ControlEvent) -> None:
+            self._page.close(dialog)
+            self._page.route = "/login"
+            self._page.update()
+
+        def on_cancel_click(e: ft.ControlEvent) -> None:
+            self._page.close(dialog)
+
+        dialog = create_reaction_login_dialog(
+            self._page, on_login_click, on_cancel_click
+        )
+        self._page.open(dialog)
 
     def create_comment_card(self, comment: dict, is_reply: bool = False) -> ft.Container:
         """Erstellt eine Kommentar-Karte.
@@ -469,7 +475,6 @@ class CommentSection(ft.Container):
             icon_color=PRIMARY_COLOR,
             tooltip="Antworten",
             on_click=lambda e, c=comment: self.start_reply(c),
-            disabled=not self.is_logged_in,
         )
         
         card_content = ft.Row([
@@ -547,6 +552,10 @@ class CommentSection(ft.Container):
     
     def start_reply(self, comment: dict) -> None:
         """Startet den Antwort-Modus für einen Kommentar."""
+        if not self.is_logged_in:
+            if self.on_login_required:
+                self.on_login_required()
+            return
         self.replying_to = comment['id']
         
         # Username extrahieren (Schema: user-Tabelle hat display_name)

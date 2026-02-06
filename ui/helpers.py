@@ -70,6 +70,9 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
     if not username:
         username = "Nutzer"
 
+    # Profilbild des Erstellers
+    user_profile_image = item.get("user_profile_image") or None
+
     # Erstellungsdatum (wann gepostet)
     created_at_raw = (item.get("created_at") or "")[:10]
     created_at = format_date(created_at_raw)
@@ -85,6 +88,7 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
         "when": when,
         "status": status,
         "username": username,
+        "user_profile_image": user_profile_image,
         "created_at": created_at,
     }
 

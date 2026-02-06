@@ -169,6 +169,12 @@ class DiscoverView:
                 color_checkboxes_container=self._farben_filter_container,
                 page=self.page,
                 on_reset=on_filter_change,
+                update_breeds_callback=lambda: handle_view_update_rassen_dropdown(
+                    filter_art=self._filter_art,
+                    filter_rasse=self._filter_rasse,
+                    all_breeds=self._all_breeds,
+                    page=self.page,
+                ),
             )
         
         def on_toggle_farben_panel(_: Optional[ft.ControlEvent] = None) -> None:

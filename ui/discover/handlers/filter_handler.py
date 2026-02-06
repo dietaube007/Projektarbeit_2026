@@ -24,6 +24,7 @@ def reset_filters(
     color_checkboxes_container: ft.ResponsiveRow,
     page: ft.Page,
     on_reset: Optional[Callable[[], None]] = None,
+    update_breeds_callback: Optional[Callable[[], None]] = None,
 ) -> None:
     """Setzt alle Filter zurück.
 
@@ -38,6 +39,7 @@ def reset_filters(
         color_checkboxes_container: Container mit Farb-Checkboxen
         page: Flet Page-Instanz
         on_reset: Optional Callback nach Reset
+        update_breeds_callback: Optional Callback zum Aktualisieren des Rassen-Dropdowns (Tierart „Alle“)
     """
     search_field.value = ""
     filter_typ.value = "alle"
@@ -51,6 +53,10 @@ def reset_filters(
     for container in color_checkboxes_container.controls:
         if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
             container.content.value = False
+
+    # Rassen-Dropdown an Tierart „Alle“ anpassen (alle Rassen anzeigen)
+    if update_breeds_callback:
+        update_breeds_callback()
 
     page.update()
     if on_reset:
@@ -225,6 +231,7 @@ def handle_view_reset_filters(
     color_checkboxes_container: ft.ResponsiveRow,
     page: ft.Page,
     on_reset: Optional[Callable[[], None]] = None,
+    update_breeds_callback: Optional[Callable[[], None]] = None,
 ) -> None:
     """Setzt alle Filter zurück (View-Wrapper für reset_filters).
     
@@ -239,6 +246,7 @@ def handle_view_reset_filters(
         color_checkboxes_container: Container mit Farb-Checkboxen
         page: Flet Page-Instanz
         on_reset: Optional Callback nach Reset
+        update_breeds_callback: Optional Callback zum Aktualisieren des Rassen-Dropdowns
     """
     reset_filters(
         search_field=search_field,
@@ -251,6 +259,7 @@ def handle_view_reset_filters(
         color_checkboxes_container=color_checkboxes_container,
         page=page,
         on_reset=on_reset,
+        update_breeds_callback=update_breeds_callback,
     )
 
 

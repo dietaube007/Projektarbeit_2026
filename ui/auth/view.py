@@ -74,7 +74,6 @@ class AuthView:
         self._theme_icon: Optional[ft.IconButton] = None
         self._welcome_text: Optional[ft.Text] = None
         self._title_text: Optional[ft.Text] = None
-        self._subtitle_text: Optional[ft.Text] = None
         # Button-Referenzen für Deaktivierung beim Modal-Öffnen
         self._login_btn: Optional[ft.ElevatedButton] = None
         self._register_btn: Optional[ft.TextButton] = None
@@ -277,8 +276,6 @@ class AuthView:
             self._welcome_text.color = get_theme_color("text_secondary", is_dark)
         if self._title_text:
             self._title_text.color = get_theme_color("text_primary", is_dark)
-        if self._subtitle_text:
-            self._subtitle_text.color = get_theme_color("text_secondary", is_dark)
     
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
@@ -488,13 +485,6 @@ class AuthView:
             weight=ft.FontWeight.BOLD,
             color=get_theme_color("text_primary", is_dark),
         )
-        self._subtitle_text = ft.Text(
-            "Melden Sie sich an, um Ihre Haustierhilfe zu\nstarten.",
-            size=14,
-            color=get_theme_color("text_secondary", is_dark),
-            text_align=ft.TextAlign.CENTER,
-        )
-        
         # Haupt-Layout
         self._background = ft.Container(
             content=ft.Stack([
@@ -505,8 +495,6 @@ class AuthView:
                         ft.Container(height=24),
                         self._welcome_text,
                         self._title_text,
-                        ft.Container(height=8),
-                        self._subtitle_text,
                         ft.Container(height=32),
                         self._form_card,
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),

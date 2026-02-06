@@ -105,6 +105,26 @@ def create_comment_login_dialog(
     )
 
 
+def create_reaction_login_dialog(
+    page: ft.Page,
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
+) -> ft.AlertDialog:
+    """Erstellt einen Dialog wenn Gast auf eine Reaktion klickt."""
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Anmeldung erforderlich"),
+        content=ft.Text(
+            "Bitte melden Sie sich an, um auf Kommentare zu reagieren."
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel_click),
+            ft.ElevatedButton("Anmelden", on_click=on_login_click),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
 def create_login_banner(on_login_click: Callable) -> ft.Container:
     """Erstellt ein Banner für nicht eingeloggte Benutzer."""
     return ft.Container(
