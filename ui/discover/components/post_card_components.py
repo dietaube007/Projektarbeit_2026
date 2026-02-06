@@ -19,7 +19,6 @@ from ui.shared_components import (
     badge_for_species,
     meta_row,
     image_placeholder,
-    create_loading_indicator,
 )
 
 
@@ -125,14 +124,16 @@ def build_big_card(
 ) -> ft.Control:
     """Erstellt eine große Listen-Karte für die Listen-Ansicht.
     
+    Kommentare werden nur im Detail-Dialog angezeigt.
+    
     Args:
         item: Post-Dictionary mit allen Daten
         page: Flet Page-Instanz
         on_favorite_click: Callback (item, control) für Favoriten-Toggle
         on_card_click: Callback (item) für Karten-Klick
         on_contact_click: Optionaler Callback (item) für Kontakt-Button
-        supabase: Optional Supabase-Client für Kommentare
-        profile_service: Optional ProfileService für Kommentare
+        supabase: Optional Supabase-Client (für Detail-Dialog)
+        profile_service: Optional ProfileService (für Detail-Dialog)
         on_comment_login_required: Optional Callback wenn Login zum Kommentieren erforderlich
     
     Returns:
@@ -141,18 +142,24 @@ def build_big_card(
     data = extract_item_data(item)
     is_dark = page.theme_mode == ft.ThemeMode.DARK
 
+    # --- Linke Spalte: Bild ---
     visual_content = (
         ft.Image(src=data["img_src"], height=LIST_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
         else image_placeholder(LIST_IMAGE_HEIGHT, icon_size=64, expand=True, page=page)
     )
 
-    visual = ft.Container(
+    image_col = ft.Container(
         content=visual_content,
+        width=280,
+        height=LIST_IMAGE_HEIGHT,
         border_radius=16,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         bgcolor=get_theme_color("card", is_dark),
     )
+
+    # --- Rechte Spalte: Infos ---
+    title_text = ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
 
     badges = ft.Row(
         [badge_for_typ(data["typ"]), badge_for_species(data["art"])],
@@ -160,25 +167,7 @@ def build_big_card(
         wrap=True,
     )
 
-    is_fav = item.get("is_favorite", False)
-    favorite_btn = ft.IconButton(
-        icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
-        icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
-        tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
-        on_click=lambda e, it=item: on_favorite_click(it, e.control),
-    )
-
-    header = ft.Row(
-        [
-            ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600),
-            ft.Container(expand=True),
-            badges,
-            favorite_btn,
-        ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-    )
-
-    line1 = ft.Text(f"{data['rasse']} • {data['farbe']}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT)
+    line1 = ft.Text(f"{data['rasse']} • {data['farbe']}".strip(" • "), color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
 
     # Ersteller mit Profilbild
     profile_img = data.get("user_profile_image")
@@ -190,89 +179,29 @@ def build_big_card(
                 bgcolor=ft.Colors.BLUE_GREY_400,
                 radius=10,
             ),
-            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
         ],
         spacing=6,
     )
 
-    metas = ft.Row(
+    metas = ft.Column(
         [
             meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
-            meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
             user_chip,
-            meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
+            meta_row(ft.Icons.SCHEDULE, f"Erstellt am: {data['created_at']}"),
         ],
-        spacing=16,
-        wrap=True,
+        spacing=4,
     )
 
-    # -----------------------------
-    # Kommentare - erst bei Bedarf laden
-    # -----------------------------
-    post_id = str(item.get("id") or "")
-    comment_section = None  # Wird erst beim Öffnen erstellt
-    
-    # Kommentar-Anzahl ermitteln
-    comment_count = 0
-    if supabase and post_id:
-        try:
-            response = supabase.table('comment') \
-                .select('id', count='exact') \
-                .eq('post_id', post_id) \
-                .eq('is_deleted', False) \
-                .execute()
-            comment_count = response.count or 0
-        except Exception as e:
-            from utils.logging_config import get_logger
-            logger = get_logger(__name__)
-            logger.debug(f"Fehler beim Laden der Kommentar-Anzahl für Post {post_id}: {e}")
-
-    # Button-Text mit Anzahl
-    comment_button_text = f"Kommentare ({comment_count})" if comment_count > 0 else "Kommentare"
-    
-    # Container für Kommentare (anfangs leer - kein Ladebalken!)
-    comments_container = ft.Container(
-        content=ft.Container(),  # Leerer Container statt ProgressRing
-        height=400,
-        visible=False,
-        padding=ft.padding.only(top=8),
+    # Herz rechts neben Kontakt
+    is_fav = item.get("is_favorite", False)
+    favorite_btn = ft.IconButton(
+        icon=ft.Icons.FAVORITE if is_fav else ft.Icons.FAVORITE_BORDER,
+        icon_color=ft.Colors.RED if is_fav else ft.Colors.GREY_600,
+        tooltip="Aus Favoriten entfernen" if is_fav else "Zu Favoriten hinzufügen",
+        on_click=lambda e, it=item: on_favorite_click(it, e.control),
     )
 
-    def toggle_comments(e):
-        """Öffnet/Schließt die Kommentar-Sektion"""
-        nonlocal comment_section
-        
-        comments_container.visible = not comments_container.visible
-        
-        # CommentSection erst beim ersten Öffnen erstellen
-        if comments_container.visible:
-            if comment_section is None and supabase and post_id:
-                # Zeige kurz Ladeindikator
-                comments_container.content = create_loading_indicator(
-                    text="Lade Kommentare...",
-                    size=32,
-                    text_size=12,
-                    padding=20,
-                )
-                page.update()
-                
-                # CommentSection erstellen - transparent, Card-Hintergrund scheint durch
-                comment_section = CommentSection(
-                    page, post_id, supabase,
-                    profile_service=profile_service,
-                    on_login_required=on_comment_login_required,
-                )
-                comments_container.content = comment_section
-                comment_section.load_comments()
-            elif comment_section:
-                # Bereits existierende Section neu laden
-                comment_section.load_comments()
-        
-        page.update()
-
-    # -----------------------------
-    # Aktionen (Kontakt + Kommentar-Button)
-    # -----------------------------
     actions = ft.Row(
         [
             ft.FilledButton(
@@ -280,18 +209,23 @@ def build_big_card(
                 icon=ft.Icons.EMAIL,
                 on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
             ),
-            ft.OutlinedButton(
-                comment_button_text,
-                icon=ft.Icons.COMMENT,
-                on_click=toggle_comments,
-                disabled=(not supabase or not post_id),
-                width=190,
-            ),
+            favorite_btn,
         ],
-        spacing=10,
+        spacing=4,
     )
 
-    card_inner = ft.Column([visual, header, line1, metas, actions, comments_container], spacing=10)
+    info_col = ft.Column(
+        [title_text, badges, line1, metas, actions],
+        spacing=8,
+        expand=True,
+    )
+
+    # Zwei-Spalten-Layout: Bild links, Infos rechts
+    card_inner = ft.Row(
+        [image_col, info_col],
+        spacing=16,
+        vertical_alignment=ft.CrossAxisAlignment.START,
+    )
     card = soft_card(card_inner, pad=12, elev=3)
 
     wrapper = ft.Container(
@@ -299,6 +233,7 @@ def build_big_card(
         animate_scale=300,
         scale=ft.Scale(1.0),
         on_click=lambda e, it=item: on_card_click(it) if on_card_click else None,
+        col={"xs": 12, "md": 6},  # 2 Karten pro Zeile ab mittlerer Breite
     )
 
     def on_hover(e: ft.HoverEvent):

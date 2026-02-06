@@ -7,12 +7,10 @@ from .search_filter_components import (
     create_dropdown,
     create_farben_header,
     create_reset_button,
-    create_view_toggle,
     create_sort_dropdown,
     populate_dropdown,
 )
 from .post_card_components import (
-    build_small_card,
     build_big_card,
     show_detail_dialog,
 )
@@ -24,11 +22,9 @@ __all__ = [
     "create_dropdown",
     "create_farben_header",
     "create_reset_button",
-    "create_view_toggle",
     "create_sort_dropdown",
     "populate_dropdown",
     # Post Cards
-    "build_small_card",
     "build_big_card",
     "show_detail_dialog",
     # Comments

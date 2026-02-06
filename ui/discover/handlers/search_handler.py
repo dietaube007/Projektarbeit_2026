@@ -39,9 +39,7 @@ def _fetch_posts_sync(
 
 def handle_render_items(
     items: List[Dict[str, Any]],
-    view_mode: str,
     list_view: ft.Column,
-    grid_view: ft.ResponsiveRow,
     empty_state_card: ft.Container,
     page: ft.Page,
     on_favorite_click: Callable[[Dict[str, Any], ft.IconButton], None],
@@ -51,13 +49,11 @@ def handle_render_items(
     profile_service=None,
     on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Rendert Post-Items in List- oder Grid-Ansicht.
+    """Rendert Post-Items in der Listen-Ansicht.
     
     Args:
         items: Liste von Post-Dictionaries
-        view_mode: "list" oder "grid"
         list_view: Column für Listen-Ansicht
-        grid_view: ResponsiveRow für Grid-Ansicht
         empty_state_card: Container für Empty-State
         page: Flet Page-Instanz
         on_favorite_click: Callback für Favoriten-Klick
@@ -73,45 +69,27 @@ def handle_render_items(
         if not items:
             no_results = create_no_results_card()
             list_view.controls = [no_results]
-            grid_view.controls = []
             list_view.visible = True
-            grid_view.visible = False
             page.update()
             return
 
         # Lazy import um Circular Import zu vermeiden
-        from ..components.post_card_components import build_small_card, build_big_card
+        from ..components.post_card_components import build_big_card
         
-        if view_mode == "grid":
-            grid_view.controls = [
-                build_small_card(
-                    item=it,
-                    page=page,
-                    on_favorite_click=on_favorite_click,
-                    on_card_click=on_card_click,
-                )
-                for it in items
-            ]
-            list_view.controls = []
-            list_view.visible = False
-            grid_view.visible = True
-        else:
-            list_view.controls = [
-                build_big_card(
-                    item=it,
-                    page=page,
-                    on_favorite_click=on_favorite_click,
-                    on_card_click=on_card_click,
-                    on_contact_click=on_contact_click,
-                    supabase=supabase,
-                    profile_service=profile_service,
-                    on_comment_login_required=on_comment_login_required,
-                )
-                for it in items
-            ]
-            grid_view.controls = []
-            list_view.visible = True
-            grid_view.visible = False
+        list_view.controls = [
+            build_big_card(
+                item=it,
+                page=page,
+                on_favorite_click=on_favorite_click,
+                on_card_click=on_card_click,
+                on_contact_click=on_contact_click,
+                supabase=supabase,
+                profile_service=profile_service,
+                on_comment_login_required=on_comment_login_required,
+            )
+            for it in items
+        ]
+        list_view.visible = True
 
         page.update()
     except Exception as e:
@@ -136,7 +114,6 @@ async def handle_view_load_posts(
     selected_colors: list[int],
     current_user_id: Optional[str],
     list_view: ft.Column,
-    grid_view: ft.ResponsiveRow,
     empty_state_card: ft.Container,
     page: ft.Page,
     on_render: Callable[[list[dict]], None],
@@ -156,7 +133,6 @@ async def handle_view_load_posts(
         selected_colors: Liste der ausgewählten Farb-IDs
         current_user_id: Aktuelle User-ID (None wenn nicht eingeloggt)
         list_view: Column für Listen-Ansicht
-        grid_view: ResponsiveRow für Grid-Ansicht
         empty_state_card: Container für Empty-State
         page: Flet Page-Instanz
         on_render: Callback zum Rendern der Items
@@ -176,9 +152,7 @@ async def handle_view_load_posts(
 
     loading_indicator = create_loading_indicator(text=LOADING_MELDUNGEN_TEXT)
     list_view.controls = [loading_indicator]
-    grid_view.controls = []
     list_view.visible = True
-    grid_view.visible = False
     page.update()
     await asyncio.sleep(0)
 
@@ -197,18 +171,14 @@ async def handle_view_load_posts(
     except Exception as ex:
         logger.error(f"Fehler beim Laden der Meldungen: {ex}", exc_info=True)
         list_view.controls = [empty_state_card]
-        grid_view.controls = []
         list_view.visible = True
-        grid_view.visible = False
         page.update()
 
 
 def handle_view_render_items(
     items: list[dict],
-    view_mode: str,
     current_items: dict,  
     list_view: ft.Column,
-    grid_view: ft.ResponsiveRow,
     empty_state_card: ft.Container,
     page: ft.Page,
     on_favorite_click: Callable[[Dict[str, Any], ft.IconButton], None],
@@ -218,14 +188,12 @@ def handle_view_render_items(
     profile_service=None,
     on_comment_login_required: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Rendert die geladenen Items in der aktuellen View-Mode (View-Wrapper).
+    """Rendert die geladenen Items in der Listen-Ansicht (View-Wrapper).
     
     Args:
         items: Liste von Post-Dictionaries die gerendert werden sollen
-        view_mode: "list" oder "grid"
         current_items: Dictionary mit "items" key (wird aktualisiert)
         list_view: Column für Listen-Ansicht
-        grid_view: ResponsiveRow für Grid-Ansicht
         empty_state_card: Container für Empty-State
         page: Flet Page-Instanz
         on_favorite_click: Callback für Favoriten-Klick
@@ -238,9 +206,7 @@ def handle_view_render_items(
     current_items["items"] = items
     handle_render_items(
         items=items,
-        view_mode=view_mode,
         list_view=list_view,
-        grid_view=grid_view,
         empty_state_card=empty_state_card,
         page=page,
         on_favorite_click=on_favorite_click,
@@ -274,56 +240,3 @@ def handle_view_show_detail_dialog(
     )
 
 
-def handle_view_view_change(
-    e: ft.ControlEvent,
-    view_mode: dict,  # dict mit "mode" key für Mutability
-    current_items: dict,  # dict mit "items" key
-    list_view: ft.Column,
-    grid_view: ft.ResponsiveRow,
-    empty_state_card: ft.Container,
-    page: ft.Page,
-    on_favorite_click: Callable[[Dict[str, Any], ft.IconButton], None],
-    on_card_click: Callable[[Dict[str, Any]], None],
-    on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
-    supabase=None,
-    profile_service=None,
-    on_comment_login_required: Optional[Callable[[], None]] = None,
-) -> None:
-    """Wird aufgerufen wenn die View-Ansicht geändert wird (View-Wrapper).
-    
-    Wechselt zwischen Listen- und Grid-Ansicht und rendert die aktuellen
-    Items in der neuen Ansicht.
-    
-    Args:
-        e: ControlEvent vom View-Toggle
-        view_mode: Dictionary mit "mode" key (wird aktualisiert)
-        current_items: Dictionary mit "items" key
-        list_view: Column für Listen-Ansicht
-        grid_view: ResponsiveRow für Grid-Ansicht
-        empty_state_card: Container für Empty-State
-        page: Flet Page-Instanz
-        on_favorite_click: Callback für Favoriten-Klick
-        on_card_click: Callback für Card-Klick
-        on_contact_click: Optional Callback für Kontakt-Klick
-        supabase: Optional Supabase-Client für Kommentare
-        profile_service: Optional ProfileService für Kommentare
-    """
-    val = next(iter(e.control.selected), "list")
-    view_mode["mode"] = val
-    
-    items = current_items.get("items", [])
-    handle_view_render_items(
-        items=items,
-        view_mode=val,
-        current_items=current_items,
-        list_view=list_view,
-        grid_view=grid_view,
-        empty_state_card=empty_state_card,
-        page=page,
-        on_favorite_click=on_favorite_click,
-        on_card_click=on_card_click,
-        on_contact_click=on_contact_click,
-        supabase=supabase,
-        profile_service=profile_service,
-        on_comment_login_required=on_comment_login_required,
-    )

@@ -25,7 +25,6 @@ from .components import (
     create_dropdown,
     create_farben_header,
     create_reset_button,
-    create_view_toggle,
     create_sort_dropdown,
 )
 from .handlers import (
@@ -42,7 +41,6 @@ from .handlers import (
     handle_view_load_references,
     handle_view_tierart_change,
     handle_view_update_rassen_dropdown,
-    handle_view_view_change,
 )
 
 logger = get_logger(__name__)
@@ -80,7 +78,6 @@ class DiscoverView:
         # Filter-Status (als dict für Mutability in Handlern)
         self.selected_farben: list[int] = []
         self.farben_panel_visible = {"visible": False}
-        self.view_mode = {"mode": "list"}
         self.current_items = {"items": []}
 
         # User
@@ -100,9 +97,7 @@ class DiscoverView:
         self._sort_dropdown: Optional[ft.Dropdown] = None
         self._reset_btn: Optional[ft.TextButton] = None
         self._save_search_btn: Optional[ft.TextButton] = None
-        self._view_toggle: Optional[ft.SegmentedButton] = None
         self._list_view: Optional[ft.Column] = None
-        self._grid_view: Optional[ft.ResponsiveRow] = None
         self._empty_state_card: Optional[ft.Container] = None
         self.search_row = ft.ResponsiveRow(controls=[], spacing=10, run_spacing=10) 
 
@@ -185,23 +180,6 @@ class DiscoverView:
                 page=self.page,
             )
         
-        def on_view_change(e: ft.ControlEvent) -> None:
-            handle_view_view_change(
-                e=e,
-                view_mode=self.view_mode,
-                current_items=self.current_items,
-                list_view=self._list_view,
-                grid_view=self._grid_view,
-                empty_state_card=self._empty_state_card,
-                page=self.page,
-                on_favorite_click=self._toggle_favorite,
-                on_card_click=self._show_detail_dialog,
-                on_contact_click=self.on_contact_click,
-                supabase=self.sb,
-                profile_service=self.profile_service,
-                on_comment_login_required=self.on_comment_login_required,
-            )
-        
         def on_show_save_search_dialog(e: Optional[ft.ControlEvent] = None) -> None:
             handle_view_show_save_search_dialog(
                 page=self.page,
@@ -268,10 +246,7 @@ class DiscoverView:
             on_click=on_show_save_search_dialog,
         )
 
-        self._view_toggle = create_view_toggle(on_change=on_view_change)
-
-        self._list_view = ft.Column(spacing=14, expand=True)
-        self._grid_view = ft.ResponsiveRow(spacing=12, run_spacing=12, visible=False)
+        self._list_view = ft.ResponsiveRow(spacing=14, run_spacing=14, expand=True)
         
         self._empty_state_card = create_empty_state_card(
             message="Noch keine Meldungen",
@@ -377,7 +352,6 @@ class DiscoverView:
             selected_colors=self.selected_farben,
             current_user_id=self.current_user_id,
             list_view=self._list_view,
-            grid_view=self._grid_view,
             empty_state_card=self._empty_state_card,
             page=self.page,
             on_render=self._render_items,
@@ -385,13 +359,11 @@ class DiscoverView:
         )
     
     def _render_items(self, items: list[dict]) -> None:
-        """Rendert die geladenen Items in der aktuellen View-Mode."""
+        """Rendert die geladenen Items in der Listen-Ansicht."""
         handle_view_render_items(
             items=items,
-            view_mode=self.view_mode["mode"],
             current_items=self.current_items,
             list_view=self._list_view,
-            grid_view=self._grid_view,
             empty_state_card=self._empty_state_card,
             page=self.page,
             on_favorite_click=self._toggle_favorite,
@@ -457,17 +429,10 @@ class DiscoverView:
     def build(self) -> ft.Column:
         """Erstellt und gibt die komplette Discover-UI zurück."""
 
-        view_toggle_row = ft.Container(
-            content=ft.Row([self._view_toggle], alignment=ft.MainAxisAlignment.START),
-            padding=ft.padding.only(left=4, top=12, bottom=8),
-        )
-
         content_container = ft.Container(
-            padding=4,
+            padding=ft.padding.only(left=4, right=4, top=12),
             content=ft.Column([
-                view_toggle_row,
                 self._list_view,
-                self._grid_view,
             ], spacing=8),
         )
 

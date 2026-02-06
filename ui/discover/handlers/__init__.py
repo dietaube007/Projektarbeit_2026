@@ -35,7 +35,6 @@ from .search_handler import (
     handle_view_load_posts,
     handle_view_render_items,
     handle_view_show_detail_dialog,
-    handle_view_view_change,
 )
 
 __all__ = [
@@ -69,5 +68,4 @@ __all__ = [
     "handle_view_load_posts",
     "handle_view_render_items",
     "handle_view_show_detail_dialog",
-    "handle_view_view_change",
 ]

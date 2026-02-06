@@ -318,7 +318,14 @@ def meta_row(icon: str, text: str) -> ft.Control:
     return ft.Row(
         [
             ft.Icon(icon, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text(text, color=ft.Colors.ON_SURFACE_VARIANT)
+            ft.Text(
+                text,
+                color=ft.Colors.ON_SURFACE_VARIANT,
+                max_lines=1,
+                overflow=ft.TextOverflow.ELLIPSIS,
+                no_wrap=True,
+                expand=True,
+            ),
         ],
         spacing=6,
     )
