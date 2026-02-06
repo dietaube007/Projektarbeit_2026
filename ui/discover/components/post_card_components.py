@@ -277,56 +277,92 @@ def show_detail_dialog(
             on_click=lambda e, it=item: on_favorite_click(it, e.control),
         )
 
-    # Titel mit Favoriten-Button
-    title_row = (
-        ft.Container(
-            content=ft.Row(
-                [
-                    ft.Text(data["title"], expand=True),
-                    favorite_btn,
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            ),
-            padding=ft.padding.symmetric(horizontal=16),
+    title_row = ft.Container(height=0)
+
+    # Eventdatum-Label je nach Meldungstyp
+    typ_lower = (data["typ"] or "").lower().strip()
+    if "fundtier" in typ_lower or "gefunden" in typ_lower or "zugelaufen" in typ_lower:
+        event_label = "Gefunden am"
+    elif "vermisst" in typ_lower or "entlaufen" in typ_lower:
+        event_label = "Vermisst seit"
+    elif "wiedervereint" in typ_lower:
+        event_label = "Wiedervereint am"
+    else:
+        event_label = "Ereignis am"
+
+    # Aktions-Zeile: Kontakt links, Herz daneben
+    action_controls = []
+    action_controls.append(
+        ft.FilledButton(
+            "Kontakt",
+            icon=ft.Icons.EMAIL,
+            on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
         )
-        if favorite_btn
-        else ft.Text(data["title"])
     )
+    if favorite_btn:
+        action_controls.append(favorite_btn)
+
+    actions_row = ft.Row(action_controls, spacing=4)
 
     # Links: Infos (Bild, Beschreibung, Metadaten) | Rechts: Kommentare
     post_id = str(item.get("id") or "")
     details_column = ft.Column(
         [
-            ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-            ft.Container(height=8),
-            ft.Text(
-                item.get("description") or "Keine Beschreibung.",
-                color=ft.Colors.ON_SURFACE_VARIANT,
-                width=480,
-                text_align=ft.TextAlign.JUSTIFY,
-            ),
-            ft.Container(height=8),
-            meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
-            meta_row(ft.Icons.SCHEDULE, data["when"] or DEFAULT_PLACEHOLDER),
-            # Ersteller mit Profilbild
-            ft.Row(
+            ft.Column(
                 [
-                    ft.CircleAvatar(
-                        foreground_image_src=data.get("user_profile_image") or None,
-                        content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=12) if not data.get("user_profile_image") else None,
-                        bgcolor=ft.Colors.BLUE_GREY_400,
-                        radius=12,
+                    ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+                    ft.Container(height=2),
+                    ft.Row(
+                        [
+                            ft.CircleAvatar(
+                                foreground_image_src=data.get("user_profile_image") or None,
+                                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
+                                if not data.get("user_profile_image")
+                                else None,
+                                bgcolor=ft.Colors.BLUE_GREY_400,
+                                radius=18,
+                            ),
+                            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+                        ],
+                        spacing=10,
                     ),
-                    ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Container(height=10),
+                    ft.Text(
+                        data["title"],
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.ON_SURFACE,
+                    ),
+                    ft.Text(
+                        item.get("description") or "Keine Beschreibung.",
+                        color=ft.Colors.ON_SURFACE_VARIANT,
+                        width=480,
+                        text_align=ft.TextAlign.JUSTIFY,
+                    ),
                 ],
-                spacing=6,
+                tight=True,
+                spacing=2,
+                scroll=ft.ScrollMode.AUTO,
+                expand=True,
             ),
-            meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
+            ft.Divider(height=16, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK)),
+            ft.Column(
+                [
+                    meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
+                    meta_row(
+                        ft.Icons.SCHEDULE,
+                        f"{event_label}: {data['when']}" if data["when"] and data["when"] != "—" else DEFAULT_PLACEHOLDER,
+                    ),
+                    meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
+                ],
+                tight=True,
+                spacing=8,
+            ),
         ],
         tight=True,
         spacing=8,
-        scroll=ft.ScrollMode.AUTO,
         width=480,
+        expand=True,
     )
 
     if supabase and post_id and profile_service is not None:
@@ -339,7 +375,7 @@ def show_detail_dialog(
         right_column = ft.Container(
             content=comment_section,
             width=480,
-            height=500,
+            expand=True,
             padding=ft.padding.only(left=8),
         )
         dialog_content = ft.Row(
@@ -350,23 +386,26 @@ def show_detail_dialog(
     else:
         dialog_content = details_column
 
+    actions_bar = ft.Row(
+        [
+            *action_controls,
+            ft.Container(expand=True),
+            ft.TextButton("Schließen", on_click=lambda _: page.close(dlg)),
+        ],
+        spacing=4,
+    )
+
     dlg = ft.AlertDialog(
         title=title_row,
+        title_padding=ft.padding.only(left=30, right=30, top=30, bottom=8),
         content=ft.Container(
             content=dialog_content,
             width=1080,
-            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            height=600,
         ),
-        actions=[
-            ft.TextButton("Schließen", on_click=lambda _: page.close(dlg)),
-            ft.FilledButton(
-                "Kontakt",
-                icon=ft.Icons.EMAIL,
-                on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
-            ),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-        actions_padding=ft.padding.symmetric(horizontal=16, vertical=8),
+        content_padding=ft.padding.symmetric(horizontal=30),
+        actions=[actions_bar],
+        actions_padding=ft.padding.only(left=30, right=30, top=8, bottom=30),
     )
     page.open(dlg)
     # Kommentare nach Öffnen laden (Dialog muss bereits in der Page sein)

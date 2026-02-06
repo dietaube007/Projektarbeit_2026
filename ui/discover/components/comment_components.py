@@ -271,7 +271,7 @@ class CommentSection(ft.Container):
                     if isinstance(action_control, ft.IconButton) and action_control.icon == ft.Icons.DELETE_OUTLINE:
                         action_control.icon_color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
     
-    def load_comments(self) -> None:
+    def load_comments(self, show_loading: bool = True) -> None:
         """Lädt alle nicht gelöschten Kommentare für diesen Post.
         
         Zeigt einen Loading-Indikator während des Ladens und rendert die
@@ -289,6 +289,7 @@ class CommentSection(ft.Container):
             create_comment_card=self.create_comment_card,
             create_error_state=self._create_error_state,
             on_comments_loaded=lambda cs: setattr(self, "_current_comments", cs or []),
+            show_loading=show_loading,
         )
 
     def _refresh_comments_ui(self) -> None:
@@ -346,7 +347,12 @@ class CommentSection(ft.Container):
         )
     
     def _build_comment_actions_row(
-        self, comment, is_reply: bool, is_author: bool, is_dark: bool, reply_button: ft.IconButton
+        self,
+        comment,
+        is_reply: bool,
+        is_author: bool,
+        is_dark: bool,
+        reply_button: Optional[ft.IconButton],
     ) -> ft.Row:
         """Baut die Aktionen-Zeile: Antworten + Löschen-Icon oder Inline-Bestätigung."""
         cid = comment.get("id")
@@ -385,7 +391,7 @@ class CommentSection(ft.Container):
                 ],
                 spacing=0,
             )
-        return ft.Row([reply_button], spacing=0)
+        return ft.Row([reply_button] if reply_button else [], spacing=0)
 
     def _build_reactions_row(self, comment: dict) -> ft.Row:
         counts = comment.get("reactions", {}) or {}
@@ -428,7 +434,7 @@ class CommentSection(ft.Container):
         if not current_user_id:
             return
         self.comment_service.toggle_reaction(comment.get("id"), current_user_id, emoji)
-        self.load_comments()
+        self.load_comments(show_loading=False)
 
     def _show_reaction_login_dialog(self) -> None:
         """Zeigt einen Login-Dialog wenn ein Gast auf eine Reaktion klickt."""
@@ -468,14 +474,16 @@ class CommentSection(ft.Container):
         username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         profile_image = user_data.get('profile_image') if isinstance(user_data, dict) else None
         
-        # Antwort-Button 
-        reply_button = ft.IconButton(
-            icon=ft.Icons.REPLY,
-            icon_size=16,
-            icon_color=PRIMARY_COLOR,
-            tooltip="Antworten",
-            on_click=lambda e, c=comment: self.start_reply(c),
-        )
+        # Antwort-Button (nur für Top-Level-Kommentare)
+        reply_button = None
+        if not is_reply:
+            reply_button = ft.IconButton(
+                icon=ft.Icons.REPLY,
+                icon_size=16,
+                icon_color=PRIMARY_COLOR,
+                tooltip="Antworten",
+                on_click=lambda e, c=comment: self.start_reply(c),
+            )
         
         card_content = ft.Row([
             # Profilbild
@@ -543,6 +551,7 @@ class CommentSection(ft.Container):
         
         return ft.Container(
             content=card_content,
+            key=f"comment_{comment.get('id')}",
             padding=8,
             margin=ft.margin.only(left=40 if is_reply else 0),
             bgcolor=card_bg,
@@ -594,13 +603,26 @@ class CommentSection(ft.Container):
             self.on_login_required()
             return
         content = self.comment_input.value or ""
+        was_reply = bool(self.replying_to)
+        scroll_to_parent = self.replying_to
 
         def on_success_callback():
             """Callback nach erfolgreichem Speichern."""
-            self.load_comments()
+            self.load_comments(show_loading=False)
             # Antwort-Modus beenden (Handler setzt nur Banner, wir müssen auch replying_to zurücksetzen)
-            if self.replying_to:
+            if was_reply:
                 self.replying_to = None
+                # Bei Antworten: zum Eltern-Kommentar scrollen (Position beibehalten)
+                try:
+                    self.comments_list.scroll_to(key=f"comment_{scroll_to_parent}", duration=300)
+                except Exception:
+                    pass
+            else:
+                # Bei neuem Top-Level-Kommentar: nach oben scrollen
+                try:
+                    self.comments_list.scroll_to(offset=0, duration=300)
+                except Exception:
+                    pass
         
         handle_post_comment(
             comment_service=self.comment_service,

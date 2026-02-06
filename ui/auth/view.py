@@ -489,16 +489,17 @@ class AuthView:
         self._background = ft.Container(
             content=ft.Stack([
                 ft.Column([
-                    ft.Container(expand=True),
+                    ft.Container(height=40),
                     ft.Column([
                         paw_icon,
-                        ft.Container(height=24),
+                        ft.Container(height=16),
                         self._welcome_text,
                         self._title_text,
-                        ft.Container(height=32),
+                        ft.Container(height=24),
                         self._form_card,
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True,
+                   scroll=ft.ScrollMode.AUTO),
                 ft.Container(
                     content=ft.Row([self._theme_icon], spacing=8),
                     top=0,

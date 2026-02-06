@@ -246,7 +246,7 @@ class DiscoverView:
             on_click=on_show_save_search_dialog,
         )
 
-        self._list_view = ft.ResponsiveRow(spacing=14, run_spacing=14, expand=True)
+        self._list_view = ft.ResponsiveRow(spacing=14, run_spacing=14)
         
         self._empty_state_card = create_empty_state_card(
             message="Noch keine Meldungen",
@@ -429,11 +429,16 @@ class DiscoverView:
     def build(self) -> ft.Column:
         """Erstellt und gibt die komplette Discover-UI zurück."""
 
-        content_container = ft.Container(
-            padding=ft.padding.only(left=4, right=4, top=12),
-            content=ft.Column([
-                self._list_view,
-            ], spacing=8),
+        # Scroll innerhalb des Tab-Contents
+        content_container = ft.Column(
+            [
+                ft.Container(
+                    padding=ft.padding.only(left=4, right=4, top=12),
+                    content=self._list_view,
+                ),
+            ],
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
         )
 
         map_placeholder = ft.Column(
@@ -445,20 +450,32 @@ class DiscoverView:
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             alignment=ft.MainAxisAlignment.CENTER,
+            expand=True,
         )
-
-        map_container = ft.Container(padding=4, content=map_placeholder, expand=True)
 
         tabs = ft.Tabs(
             selected_index=0,
             tabs=[
-                ft.Tab(text="Meldungen", icon=ft.Icons.PETS, content=content_container),
-                ft.Tab(text="Karte", icon=ft.Icons.MAP, content=map_container),
+                ft.Tab(
+                    tab_content=ft.Row(
+                        [ft.Icon(ft.Icons.PETS, size=24), ft.Text("Meldungen", size=14)],
+                        spacing=6,
+                    ),
+                    content=content_container,
+                ),
+                ft.Tab(
+                    tab_content=ft.Row(
+                        [ft.Icon(ft.Icons.MAP, size=24), ft.Text("Karte", size=14)],
+                        spacing=6,
+                    ),
+                    content=map_placeholder,
+                ),
             ],
             expand=True,
             animation_duration=250,
+            label_padding=ft.padding.symmetric(horizontal=12, vertical=6),
         )
 
         self.page.run_task(self.load_posts)
 
-        return ft.Column([tabs], spacing=14, expand=True)
+        return ft.Column([tabs], spacing=0, expand=True)

@@ -83,7 +83,7 @@ class PetBuddyApp:
         try:
             self.page.title = "PetBuddy"
             self.page.padding = 0
-            self.page.scroll = ft.ScrollMode.AUTO
+            self.page.scroll = None
             self.page.window_min_width = WINDOW_MIN_WIDTH
             self.page.window_width = WINDOW_DEFAULT_WIDTH
             self.page.window_height = WINDOW_DEFAULT_HEIGHT
@@ -458,18 +458,57 @@ class PetBuddyApp:
                     padding=20
                 )
             
+            # Suchleiste auf-/zuklappbar
+            search_filters = ft.Container(
+                content=self.discover_view.search_row,
+                visible=True,
+                padding=ft.padding.only(top=8),
+            )
+
+            def toggle_search(_):
+                search_filters.visible = not search_filters.visible
+                toggle_btn.icon = (
+                    ft.Icons.SEARCH_OFF if search_filters.visible
+                    else ft.Icons.SEARCH
+                )
+                toggle_btn.tooltip = (
+                    "Filter ausblenden" if search_filters.visible
+                    else "Filter einblenden"
+                )
+                self.page.update()
+
+            toggle_btn = ft.IconButton(
+                icon=ft.Icons.SEARCH_OFF,
+                icon_size=22,
+                tooltip="Filter ausblenden",
+                on_click=toggle_search,
+                style=ft.ButtonStyle(padding=4),
+            )
+
+            search_toggle_card = soft_card(
+                ft.Column([
+                    ft.Row(
+                        [
+                            toggle_btn,
+                            ft.Text("Filter & Suche", weight=ft.FontWeight.W_700, size=14),
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        spacing=4,
+                    ),
+                    search_filters,
+                ], spacing=0),
+                pad=10,
+                elev=2,
+            )
+
             controls.extend([
-                soft_card(
-                    ft.Column([self.discover_view.search_row], spacing=8),
-                    pad=12,
-                    elev=2
-                ),
+                search_toggle_card,
                 self.discover_view.build(),
             ])
-            
+
             return ft.Column(
                 controls,
-                spacing=14,
+                spacing=8,
                 expand=True,
             )
         except Exception as e:

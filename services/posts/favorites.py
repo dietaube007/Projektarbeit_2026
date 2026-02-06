@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, TYPE_CHECKING, Optional
 
 from supabase import Client
@@ -181,17 +182,27 @@ class FavoritesService:
         if not user_id:
             return set()
         
-        try:
-            # Optimierte Query: Nur post_id selektieren, keine unnötigen Daten
-            fav_res = (
-                self.sb.table("favorite")
-                .select("post_id")
-                .eq("user_id", user_id)
-                .execute()
-            )
-            # Set-Comprehension für schnellen Lookup
-            return {str(row["post_id"]) for row in (fav_res.data or []) if "post_id" in row}
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Laden der Favoriten für User {user_id}: {e}", exc_info=True)
-            return set()
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Optimierte Query: Nur post_id selektieren, keine unnötigen Daten
+                fav_res = (
+                    self.sb.table("favorite")
+                    .select("post_id")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                # Set-Comprehension für schnellen Lookup
+                return {str(row["post_id"]) for row in (fav_res.data or []) if "post_id" in row}
+            except Exception as e:  # noqa: BLE001
+                if attempt < max_retries - 1:
+                    wait = 0.5 * (attempt + 1)
+                    logger.warning(
+                        f"Favoriten laden fehlgeschlagen (Versuch {attempt + 1}/{max_retries}), "
+                        f"Retry in {wait}s: {e}"
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Fehler beim Laden der Favoriten für User {user_id} nach {max_retries} Versuchen: {e}", exc_info=True)
+                    return set()
 

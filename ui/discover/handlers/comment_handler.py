@@ -24,6 +24,7 @@ def handle_load_comments(
     create_comment_card: Callable[[Dict[str, Any], bool], ft.Control],
     create_error_state: Callable[[str], ft.Control],
     on_comments_loaded: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
+    show_loading: bool = True,
 ) -> None:
     """Lädt alle nicht gelöschten Kommentare für einen Post.
     
@@ -38,13 +39,15 @@ def handle_load_comments(
         create_error_state: Funktion zum Erstellen des Error-State-UI
         on_comments_loaded: Optionaler Callback mit der geladenen Kommentar-Liste (für Inline-Refresh)
     """
-    loading_indicator.visible = True
+    if show_loading:
+        loading_indicator.visible = True
     comments_list.controls.clear()
     
-    try:
-        page.update()
-    except Exception:
-        pass
+    if show_loading:
+        try:
+            page.update()
+        except Exception:
+            pass
     
     try:
         # Kommentare über Service laden
@@ -74,7 +77,8 @@ def handle_load_comments(
         comments_list.controls.append(create_error_state(str(e)))
     finally:
         # Stelle sicher, dass der Loading-Indikator IMMER ausgeblendet wird
-        loading_indicator.visible = False
+        if show_loading:
+            loading_indicator.visible = False
         try:
             page.update()
         except Exception:

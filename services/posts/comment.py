@@ -56,7 +56,7 @@ class CommentService:
                 .select(COMMENT_SELECT_FULL)
                 .eq("post_id", post_id)
                 .eq("is_deleted", False)
-                .order("created_at", desc=False)
+                .order("created_at", desc=True)
                 .execute()
             )
             
