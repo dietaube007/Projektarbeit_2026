@@ -142,7 +142,7 @@ def build_big_card(
     data = extract_item_data(item)
     is_dark = page.theme_mode == ft.ThemeMode.DARK
 
-    # --- Linke Spalte: Bild ---
+    # --- Bild ---
     visual_content = (
         ft.Image(src=data["img_src"], height=LIST_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
         if data["img_src"]
@@ -151,14 +151,14 @@ def build_big_card(
 
     image_col = ft.Container(
         content=visual_content,
-        width=280,
         height=LIST_IMAGE_HEIGHT,
         border_radius=16,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         bgcolor=get_theme_color("card", is_dark),
+        col={"xs": 12, "md": 5},  # Volle Breite mobil, ~40% Desktop
     )
 
-    # --- Rechte Spalte: Infos ---
+    # --- Infos ---
     title_text = ft.Text(data["title"], size=18, weight=ft.FontWeight.W_600, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
 
     badges = ft.Row(
@@ -214,17 +214,19 @@ def build_big_card(
         spacing=4,
     )
 
-    info_col = ft.Column(
-        [title_text, badges, line1, metas, actions],
-        spacing=8,
-        expand=True,
+    info_col = ft.Container(
+        content=ft.Column(
+            [title_text, badges, line1, metas, actions],
+            spacing=8,
+        ),
+        col={"xs": 12, "md": 7},  # Volle Breite mobil, ~60% Desktop
     )
 
-    # Zwei-Spalten-Layout: Bild links, Infos rechts
-    card_inner = ft.Row(
+    # Responsives Layout: Mobil vertikal, Desktop horizontal
+    card_inner = ft.ResponsiveRow(
         [image_col, info_col],
-        spacing=16,
-        vertical_alignment=ft.CrossAxisAlignment.START,
+        spacing=12,
+        run_spacing=10,
     )
     card = soft_card(card_inner, pad=12, elev=3)
 
