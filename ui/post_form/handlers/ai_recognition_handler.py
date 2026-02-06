@@ -69,8 +69,8 @@ async def handle_start_ai_recognition(
         )
         return
     
-    # Einverständnisdialog anzeigen
-    await show_consent_dialog_callback()
+    # Einverständnisdialog anzeigen 
+    show_consent_dialog_callback()
 
 
 async def show_consent_dialog(

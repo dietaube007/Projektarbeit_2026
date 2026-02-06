@@ -281,7 +281,7 @@ async def handle_view_save_post(
         parse_event_date: Funktion zum Parsen des Datums
         on_saved_callback: Optionaler Callback nach erfolgreichem Speichern
     """
-    from .form_validation import validate_form_fields
+    from .form_validation_handler import validate_form_fields
     
     is_valid, errors = validate_form_fields(
         name_value=name_tf.value,

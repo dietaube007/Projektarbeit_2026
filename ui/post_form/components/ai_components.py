@@ -224,29 +224,35 @@ def create_ai_suggestion_dialog(
     """
     confidence_percent = int(confidence * 100)
     
+    content_controls = [
+        ft.Text(error_message, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+        ft.Divider(),
+        ft.Text(f"Vorgeschlagene Rasse: {suggested_breed}", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+    ]
+    if suggested_species:
+        content_controls.append(
+            ft.Text(f"Vorgeschlagene Tierart: {suggested_species}", size=13, color=ft.Colors.ON_SURFACE)
+        )
+    content_controls.extend([
+        ft.Text(f"Konfidenz: {confidence_percent}%", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+        ft.Container(
+            content=ft.Text(
+                "Hinweis: Die Konfidenz ist niedrig. Bitte prüfen Sie den Vorschlag sorgfältig.",
+                size=11,
+                color=ft.Colors.ON_SURFACE_VARIANT,
+                italic=True,
+            ),
+            padding=8,
+            bgcolor=getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.ORANGE_50,
+            border_radius=4,
+        ),
+    ])
     suggestion_dlg = ft.AlertDialog(
         modal=True,
         title=ft.Text("KI-Vorschlag (niedrige Konfidenz)", color=ft.Colors.ON_SURFACE),
         content=ft.Container(
             content=ft.Column(
-                [
-                    ft.Text(error_message, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Divider(),
-                    ft.Text(f"Vorgeschlagene Rasse: {suggested_breed}", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                    suggested_species and ft.Text(f"Vorgeschlagene Tierart: {suggested_species}", size=13, color=ft.Colors.ON_SURFACE),
-                    ft.Text(f"Konfidenz: {confidence_percent}%", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Container(
-                        content=ft.Text(
-                            "Hinweis: Die Konfidenz ist niedrig. Bitte prüfen Sie den Vorschlag sorgfältig.",
-                            size=11,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                            italic=True,
-                        ),
-                        padding=8,
-                        bgcolor=getattr(ft.Colors, "SURFACE_CONTAINER_LOW", None) or ft.Colors.ORANGE_50,
-                        border_radius=4,
-                    ),
-                ],
+                content_controls,
                 spacing=8,
                 tight=True,
             ),
