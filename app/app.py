@@ -641,6 +641,9 @@ class PetBuddyApp:
                 for control in getattr(self.page, "_theme_listeners", []):
                     if hasattr(control, "_apply_theme"):
                         control._apply_theme()
+                # Profil-View neu bauen (Dark-Mode-Farben aktualisieren)
+                if self.profile_view:
+                    self.profile_view._rebuild()
                 # AppBar mit neuer Hintergrundfarbe neu erstellen
                 if self._main_column:
                     self._app_bar_control = create_app_bar(

@@ -520,6 +520,7 @@ class AuthView:
             ]),
             bgcolor=get_theme_color("background", is_dark),
             expand=True,
+            border_radius=0,
         )
     
     def build(self) -> ft.Control:

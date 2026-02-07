@@ -30,6 +30,7 @@ from .handlers.my_favorites_handler import (
 )
 from .handlers.my_posts_handler import (
     load_my_posts,
+    render_my_posts_list,
     edit_post as edit_post_feature,
     confirm_delete_post,
     handle_delete_post,
@@ -206,6 +207,17 @@ class ProfileView:
 
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
+        # Post-Karten mit aktuellen Theme-Farben neu rendern
+        if self.current_view == self.VIEW_MY_POSTS and self.my_posts_items:
+            render_my_posts_list(
+                posts_list=self.my_posts_list,
+                posts_items=self.my_posts_items,
+                page=self.page,
+                on_edit=self._edit_post,
+                on_delete=self._confirm_delete_post,
+                on_mark_reunited=self._mark_reunited,
+            )
+
         self.main_container.controls.clear()
 
         view_builders = {
@@ -410,6 +422,8 @@ class ProfileView:
         return create_settings_view(
             on_notification_change=on_notification_change,
             on_email_notification_change=on_email_notification_change,
+            on_change_password=lambda _: self._show_change_password_dialog(),
+            on_delete_account=lambda _: self._confirm_delete_account(),
         )
 
     def _build_favorites(self) -> list:
@@ -423,6 +437,7 @@ class ProfileView:
         return create_my_posts_view(
             my_posts_list=self.my_posts_list,
             my_posts_items=self.my_posts_items,
+            page=self.page,
         )
 
     def _build_saved_searches(self) -> list:

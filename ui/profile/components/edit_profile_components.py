@@ -405,7 +405,7 @@ def create_edit_profile_view(
     on_delete_account: Callable,
 ) -> list[ft.Control]:
     """Erstellt die Profil-Bearbeiten-Ansicht.
-    
+
     Args:
         avatar: CircleAvatar-Widget
         profile_image_picker: FilePicker-Instanz
@@ -415,8 +415,8 @@ def create_edit_profile_view(
         on_delete_image: Callback für Bild-Löschung
         on_save_display_name: Callback zum Speichern (erhält TextField)
         page: Flet Page-Instanz
-        on_change_password: Callback zum Ändern des Passworts
-        on_delete_account: Callback zum Löschen des Kontos
+        on_change_password: (nicht mehr verwendet, siehe Settings)
+        on_delete_account: (nicht mehr verwendet, siehe Settings)
     Returns:
         Liste von Controls für Edit Profile-View
     """
@@ -434,17 +434,7 @@ def create_edit_profile_view(
         page=page,
     )
 
-    password_section = create_password_section(
-        on_change_password=on_change_password,
-    )
-
-    delete_account_section = create_delete_account_section(
-        on_delete_account=on_delete_account,
-    )
-
     return [
         change_image_section,
         change_name_section,
-        password_section,
-        delete_account_section,
     ]

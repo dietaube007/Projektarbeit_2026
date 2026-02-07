@@ -43,7 +43,7 @@ TEXT_SECONDARY = LIGHT_TEXT_SECONDARY
 STATUS_COLORS: dict[str, str] = {
     "vermisst": ft.Colors.RED_200,
     "fundtier": ft.Colors.INDIGO_300,
-    "wiedervereint": ft.Colors.LIGHT_GREEN_200,
+    "wiedervereint": ft.Colors.LIGHT_GREEN_300,
 }
 
 SPECIES_COLORS: dict[str, str] = {
