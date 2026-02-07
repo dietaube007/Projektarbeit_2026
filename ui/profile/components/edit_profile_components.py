@@ -43,16 +43,13 @@ def create_profile_image_section(
     """
     image_buttons: list[ft.Control] = [
         ft.FilledButton("Bild ändern", icon=ft.Icons.CAMERA_ALT, on_click=on_file_pick),
+        ft.OutlinedButton(
+            "Bild löschen",
+            icon=ft.Icons.DELETE_OUTLINE,
+            on_click=on_delete_image,
+            style=ft.ButtonStyle(color=ft.Colors.RED, side=ft.BorderSide(1, ft.Colors.RED)),
+        ),
     ]
-    if has_profile_image:
-        image_buttons.append(
-            ft.OutlinedButton(
-                "Bild löschen",
-                icon=ft.Icons.DELETE_OUTLINE,
-                on_click=on_delete_image,
-                style=ft.ButtonStyle(color=ft.Colors.RED, side=ft.BorderSide(1, ft.Colors.RED)),
-            )
-        )
 
     return soft_card(
         ft.Column(

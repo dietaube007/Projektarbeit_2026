@@ -506,6 +506,10 @@ class CommentSection(ft.Container):
         user_data = comment.get('user', {})
         username = user_data.get('display_name', 'Unbekannt') if isinstance(user_data, dict) else 'Unbekannt'
         profile_image = user_data.get('profile_image') if isinstance(user_data, dict) else None
+        if isinstance(profile_image, str):
+            profile_image = profile_image.strip()
+            if profile_image.lower() in {"", "null", "none", "undefined"}:
+                profile_image = None
         
         # Antwort-Button (nur für Top-Level-Kommentare)
         reply_button = None
@@ -522,9 +526,11 @@ class CommentSection(ft.Container):
             # Profilbild
             ft.CircleAvatar(
                 foreground_image_src=profile_image if profile_image else None,
-                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=14) if not profile_image else None,
+                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=14)
+                if not profile_image
+                else None,
                 bgcolor=PRIMARY_COLOR,
-                radius=16 if not is_reply else 14
+                radius=16 if not is_reply else 14,
             ),
             
             # Kommentar-Inhalt

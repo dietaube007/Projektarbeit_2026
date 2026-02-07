@@ -55,9 +55,26 @@ class ProfileService:
     def get_profile_image_url(self) -> Optional[str]:
         """Gibt die Profilbild-URL des aktuellen Benutzers zurück."""
         user = self.get_current_user()
-        if user and user.user_metadata:
-            return user.user_metadata.get("profile_image_url")
-        return None
+        if not user:
+            return None
+
+        try:
+            result = (
+                self.sb.table("user")
+                .select("profile_image")
+                .eq("id", str(user.id))
+                .execute()
+            )
+            row = (result.data or [None])[0]
+            profile_image_url = row.get("profile_image") if isinstance(row, dict) else None
+            if isinstance(profile_image_url, str):
+                profile_image_url = profile_image_url.strip()
+                if profile_image_url.lower() in {"", "none", "null", "undefined"}:
+                    profile_image_url = None
+            return profile_image_url or None
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Konnte Profilbild aus user-Tabelle nicht laden: {e}")
+            return None
 
     def update_display_name(self, new_name: str) -> Tuple[bool, str]:
         """Aktualisiert den Anzeigenamen des aktuellen Benutzers."""
@@ -91,6 +108,7 @@ class ProfileService:
         self,
         display_name: Optional[str] = None,
         profile_image: Optional[str] = None,
+        force_profile_image: bool = False,
     ) -> None:
         """Synchronisiert display_name/profile_image in public.user."""
         user = self.get_current_user()
@@ -103,8 +121,8 @@ class ProfileService:
             payload["display_name"] = (user.user_metadata or {}).get("display_name") or "Benutzer"
         if profile_image is not None:
             payload["profile_image"] = profile_image
-        else:
-            payload["profile_image"] = (user.user_metadata or {}).get("profile_image_url")
+        elif force_profile_image:
+            payload["profile_image"] = None
         if not payload:
             return
         try:
@@ -165,25 +183,21 @@ class ProfileService:
             try:
                 result = (
                     self.sb.table("user")
-                    .select("id, display_name")
+                    .select("id, display_name, profile_image")
                     .in_("id", user_ids_list)
                     .execute()
                 )
                 
                 profiles = {}
-                PROFILE_IMAGE_BUCKET = "profile-images"
                 
                 for row in (result.data or []):
                     user_id = row.get("id")
                     if user_id:
-                        # Profilbild-URL aus Storage generieren
-                        # Format: {user_id}/avatar.jpg (wie in ProfileImageService)
-                        storage_path = f"{user_id}/avatar.jpg"
-                        try:
-                            profile_image_url = self.sb.storage.from_(PROFILE_IMAGE_BUCKET).get_public_url(storage_path)
-                        except Exception as e:  # noqa: BLE001
-                            logger.debug(f"Konnte Profilbild-URL nicht generieren für User {user_id}: {e}")
-                            profile_image_url = None
+                        profile_image_url = row.get("profile_image")
+                        if isinstance(profile_image_url, str):
+                            profile_image_url = profile_image_url.strip()
+                            if profile_image_url.lower() in {"", "null", "none", "undefined"}:
+                                profile_image_url = None
                         
                         profiles[user_id] = {
                             "display_name": row.get("display_name") or "Unbekannt",

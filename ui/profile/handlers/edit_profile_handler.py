@@ -270,6 +270,11 @@ def update_avatar_image(view: Any, image_url: Optional[str]) -> None:
         view: ProfileView-Instanz
         image_url: Optional URL des Profilbilds
     """
+    if isinstance(image_url, str):
+        image_url = image_url.strip()
+        if image_url.lower() in {"none", "null", "undefined"}:
+            image_url = ""
+
     if image_url:
         # Cache-Busting: Timestamp anhängen um Browser-Caching zu vermeiden
         from time import time as _time

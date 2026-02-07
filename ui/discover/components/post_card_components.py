@@ -80,12 +80,18 @@ def build_small_card(
 
     # Ersteller mit Profilbild
     profile_img_sm = data.get("user_profile_image")
+    if isinstance(profile_img_sm, str):
+        profile_img_sm = profile_img_sm.strip()
+        if profile_img_sm.lower() in {"", "null", "none", "undefined"}:
+            profile_img_sm = None
     user_row = ft.Row(
         [
             ft.CircleAvatar(
                 foreground_image_src=profile_img_sm if profile_img_sm else None,
-                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=8) if not profile_img_sm else None,
-                bgcolor=ft.Colors.with_opacity(0.6, PRIMARY_COLOR),
+                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=8)
+                if not profile_img_sm
+                else None,
+                bgcolor=PRIMARY_COLOR,
                 radius=8,
             ),
             ft.Text(data["username"], size=11, color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
@@ -317,11 +323,11 @@ def show_detail_dialog(
                     ft.Row(
                         [
                             ft.CircleAvatar(
-                                foreground_image_src=data.get("user_profile_image") or None,
+                                foreground_image_src=(data.get("user_profile_image") or "").strip() or None,
                                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
-                                if not data.get("user_profile_image")
+                                if (data.get("user_profile_image") or "").strip().lower() in {"", "null", "none", "undefined"}
                                 else None,
-                                bgcolor=ft.Colors.with_opacity(0.6, PRIMARY_COLOR),
+                                bgcolor=PRIMARY_COLOR,
                                 radius=18,
                             ),
                             ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),

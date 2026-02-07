@@ -148,6 +148,10 @@ class ProfileView:
                 self.display_name.value = self.profile_service.get_display_name()
 
                 profile_image_url = self.profile_service.get_profile_image_url()
+                if isinstance(profile_image_url, str):
+                    profile_image_url = profile_image_url.strip()
+                    if profile_image_url.lower() in {"", "null", "none", "undefined"}:
+                        profile_image_url = None
                 update_avatar_image(self, profile_image_url)
 
                 self.page.update()
@@ -258,6 +262,9 @@ class ProfileView:
 
     def _confirm_delete_profile_image(self):
         """Zeigt Bestätigungsdialog zum Löschen des Profilbilds."""
+        if self.profile_service.get_profile_image_url() is None:
+            show_error_dialog(self.page, "Kein Profilbild", "Es ist kein Profilbild vorhanden.")
+            return
         handle_delete_profile_image_confirmation(self)
 
     async def _delete_profile_image(self):

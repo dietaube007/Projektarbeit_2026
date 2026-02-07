@@ -76,22 +76,17 @@ class ProfileImageService:
                 if not user:
                     return False
 
-            current_metadata = dict(user.user_metadata) if user.user_metadata else {}
-
-            if image_url:
-                current_metadata["profile_image_url"] = image_url
-            else:
-                current_metadata.pop("profile_image_url", None)
-
-            self.sb.auth.update_user({"data": current_metadata})
-            self._profile_service._sync_user_display_to_table(profile_image=image_url)
+            self._profile_service._sync_user_display_to_table(
+                profile_image=image_url,
+                force_profile_image=True,
+            )
             return True
         except Exception as e:  # noqa: BLE001
             logger.error(f"Fehler beim Aktualisieren der Profilbild-URL: {e}", exc_info=True)
             return False
 
     def upload_profile_image(self, file_path: str) -> Tuple[bool, Optional[str], str]:
-        """Lädt ein Profilbild zu Supabase Storage hoch und aktualisiert user_metadata."""
+        """Lädt ein Profilbild zu Supabase Storage hoch und aktualisiert public.user."""
         if not os.path.exists(file_path):
             return False, None, "Datei nicht gefunden."
 
