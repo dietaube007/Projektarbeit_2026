@@ -436,11 +436,6 @@ class DiscoverView:
     ) -> ft.Control:
         """Erstellt den Start-Tab mit Login-Banner, Filter-Toggle und Liste."""
         try:
-            controls: list[ft.Control] = []
-
-            if not is_logged_in:
-                controls.append(create_login_banner(on_login_click))
-
             if not hasattr(self, "search_row"):
                 return ft.Container(
                     content=ft.Text("Fehler: search_row nicht initialisiert"),
@@ -449,7 +444,7 @@ class DiscoverView:
 
             search_filters = ft.Container(
                 content=self.search_row,
-                visible=True,
+                visible=False,
                 padding=ft.padding.only(top=0),
             )
 
@@ -466,9 +461,9 @@ class DiscoverView:
                 self.page.update()
 
             toggle_btn = ft.IconButton(
-                icon=ft.Icons.SEARCH_OFF,
+                icon=ft.Icons.SEARCH,
                 icon_size=22,
-                tooltip="Filter ausblenden",
+                tooltip="Filter einblenden",
                 on_click=toggle_search,
                 style=ft.ButtonStyle(padding=4),
             )
@@ -492,19 +487,19 @@ class DiscoverView:
                 elev=2,
             )
 
-            content_area = ft.Container(
-                content=self.build(),
-                expand=True,
-            )
+            # Alle Inhalte in einer gemeinsamen scrollbaren Column
+            scroll_children: list[ft.Control] = []
 
-            controls.extend([
-                search_toggle_card,
-                content_area,
-            ])
+            if not is_logged_in:
+                scroll_children.append(create_login_banner(on_login_click))
+
+            scroll_children.append(search_toggle_card)
+            scroll_children.append(self.build())
 
             return ft.Column(
-                controls,
+                scroll_children,
                 spacing=0,
+                scroll=ft.ScrollMode.AUTO,
                 expand=True,
             )
         except Exception as e:
@@ -521,16 +516,10 @@ class DiscoverView:
     def build(self) -> ft.Column:
         """Erstellt und gibt die komplette Discover-UI zurück."""
 
-        # Scroll innerhalb des Tab-Contents
-        content_container = ft.ListView(
-            controls=[
-                ft.Container(
-                    padding=ft.padding.only(left=4, right=4, top=0),
-                    content=self._list_view,
-                ),
-            ],
-            spacing=0,
-            expand=True,
+        # Post-Liste (kein eigenes Scrollen)
+        content_container = ft.Container(
+            padding=ft.padding.only(left=4, right=4, top=0),
+            content=self._list_view,
         )
 
         map_placeholder = ft.Column(
@@ -542,32 +531,52 @@ class DiscoverView:
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             alignment=ft.MainAxisAlignment.CENTER,
-            expand=True,
         )
 
-        tabs = ft.Tabs(
-            selected_index=0,
-            tabs=[
-                ft.Tab(
-                    tab_content=ft.Row(
-                        [ft.Icon(ft.Icons.PETS, size=24), ft.Text("Meldungen", size=14)],
-                        spacing=6,
-                    ),
-                    content=content_container,
+        # Tab-Inhalte: Index 0 = Meldungen, Index 1 = Karte
+        tab_contents = [content_container, map_placeholder]
+        tab_body = ft.Container(content=tab_contents[0])
+
+        def switch_tab(index: int):
+            tab_body.content = tab_contents[index]
+            for i, btn in enumerate(tab_buttons):
+                btn.style = ft.ButtonStyle(
+                    color=ft.Colors.PRIMARY if i == index else ft.Colors.GREY_500,
+                )
+            self.page.update()
+
+        tab_buttons = [
+            ft.TextButton(
+                content=ft.Row(
+                    [ft.Icon(ft.Icons.PETS, size=24), ft.Text("Meldungen", size=14)],
+                    spacing=6,
+                    alignment=ft.MainAxisAlignment.CENTER,
                 ),
-                ft.Tab(
-                    tab_content=ft.Row(
-                        [ft.Icon(ft.Icons.MAP, size=24), ft.Text("Karte", size=14)],
-                        spacing=6,
-                    ),
-                    content=map_placeholder,
+                style=ft.ButtonStyle(
+                    color=ft.Colors.PRIMARY,
+                    padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 ),
-            ],
-            expand=True,
-            animation_duration=250,
-            label_padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                on_click=lambda _, i=0: switch_tab(i),
+            ),
+            ft.TextButton(
+                content=ft.Row(
+                    [ft.Icon(ft.Icons.MAP, size=24), ft.Text("Karte", size=14)],
+                    spacing=6,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                style=ft.ButtonStyle(
+                    color=ft.Colors.GREY_500,
+                    padding=ft.padding.symmetric(horizontal=24, vertical=12),
+                ),
+                on_click=lambda _, i=1: switch_tab(i),
+            ),
+        ]
+
+        tab_bar = ft.Container(
+            content=ft.Row(tab_buttons, spacing=0, alignment=ft.MainAxisAlignment.START),
+            padding=ft.padding.symmetric(horizontal=8, vertical=4),
         )
 
         self.page.run_task(self.load_posts)
 
-        return ft.Column([tabs], spacing=0, expand=True)
+        return ft.Column([tab_bar, ft.Divider(height=1), tab_body], spacing=0)
