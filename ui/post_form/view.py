@@ -6,6 +6,7 @@ Enthält UI-Komposition und koordiniert Post Form-Features.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Callable, Optional, Dict, Any, List
 import asyncio
 
@@ -169,6 +170,28 @@ class PostForm:
         self.location_tf = create_location_field()
         self.location_tf.on_change = lambda _: self._on_location_change()
         self.date_tf = create_date_field()
+        self.date_tf.read_only = True
+
+        # DatePicker wie im Edit-Dialog (nur Kalender)
+        self.date_picker = ft.DatePicker(
+            first_date=date(2000, 1, 1),
+            last_date=date.today(),
+            on_change=self._on_date_picked,
+            help_text="Datum auswählen",
+            error_invalid_text="Datum außerhalb des gültigen Bereichs",
+            error_format_text="Ungültiges Datum",
+            cancel_text="Abbrechen",
+            confirm_text="OK",
+            date_picker_entry_mode=ft.DatePickerEntryMode.CALENDAR_ONLY,
+        )
+        if self.date_picker not in self.page.overlay:
+            self.page.overlay.append(self.date_picker)
+
+        self.date_tf.suffix = ft.IconButton(
+            ft.Icons.CALENDAR_MONTH,
+            on_click=lambda _: self._open_date_picker(),
+        )
+        self.date_tf.on_tap = lambda _: self._open_date_picker()
 
         self.location_suggestions_list = ft.Column(spacing=2)
         self.location_suggestions_box = ft.Container(
@@ -312,6 +335,22 @@ class PostForm:
         self.location_suggestions_list.controls = []
         self.location_suggestions_box.visible = False
         self.page.update()
+
+    def _open_date_picker(self) -> None:
+        """Öffnet den DatePicker."""
+        try:
+            self.date_picker.open = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def _on_date_picked(self, e: ft.ControlEvent) -> None:
+        """Wird aufgerufen, wenn im DatePicker ein Datum gewählt wird."""
+        if getattr(e, "control", None) and getattr(e.control, "value", None):
+            selected_date = e.control.value
+            if isinstance(selected_date, date):
+                self.date_tf.value = selected_date.strftime(DATE_FORMAT)
+                self.page.update()
     
     async def _start_ai_recognition_flow(self):
         """Startet den kompletten KI-Rassenerkennungs-Flow."""
