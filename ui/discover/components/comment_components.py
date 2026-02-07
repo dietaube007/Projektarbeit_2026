@@ -263,9 +263,9 @@ class CommentSection(ft.Container):
             if len(row.controls) < 2 or not isinstance(row.controls[1], ft.Column):
                 continue
             
-            # Column mit [Row(Name+Zeit), Text(Kommentar), Row(Aktionen)]
+            # Column mit [Row(Name+Zeit), Text(Kommentar), Reaktionen, Row(Aktionen)]
             col = row.controls[1]
-            
+
             # Name + Zeit Row (Index 0)
             if len(col.controls) > 0 and isinstance(col.controls[0], ft.Row):
                 name_time_row = col.controls[0]
@@ -273,14 +273,14 @@ class CommentSection(ft.Container):
                     name_time_row.controls[0].color = c("text_primary")
                 if len(name_time_row.controls) > 1 and isinstance(name_time_row.controls[1], ft.Text):
                     name_time_row.controls[1].color = c("text_secondary")
-            
+
             # Kommentar-Text (Index 1)
             if len(col.controls) > 1 and isinstance(col.controls[1], ft.Text):
                 col.controls[1].color = c("text_primary")
-            
-            # Aktionen Row (Index 2) - Delete-Button Icon-Farbe
-            if len(col.controls) > 2 and isinstance(col.controls[2], ft.Row):
-                actions_row = col.controls[2]
+
+            # Aktionen Row (Index 3) - Delete-Button Icon-Farbe
+            if len(col.controls) > 3 and isinstance(col.controls[3], ft.Row):
+                actions_row = col.controls[3]
                 for action_control in actions_row.controls:
                     if isinstance(action_control, ft.IconButton) and action_control.icon == ft.Icons.DELETE_OUTLINE:
                         action_control.icon_color = ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300
@@ -560,38 +560,35 @@ class CommentSection(ft.Container):
             
             # Kommentar-Inhalt
             ft.Column([
-                # Kopfzeile: Name + Zeit + Reaktionen
+                # Kopfzeile: Name + Zeit
                 ft.Row(
                     [
-                        ft.Row(
-                            [
-                                ft.Text(
-                                    username,
-                                    weight=ft.FontWeight.BOLD,
-                                    size=13 if not is_reply else 12,
-                                    color=get_theme_color("text_primary", is_dark),
-                                ),
-                                ft.Text(
-                                    format_time(comment.get('created_at')),
-                                    size=11 if not is_reply else 10,
-                                    color=get_theme_color("text_secondary", is_dark),
-                                ),
-                            ],
-                            spacing=8,
+                        ft.Text(
+                            username,
+                            weight=ft.FontWeight.BOLD,
+                            size=13 if not is_reply else 12,
+                            color=get_theme_color("text_primary", is_dark),
                         ),
-                        ft.Container(expand=True),
-                        self._build_reactions_row(comment),
+                        ft.Text(
+                            format_time(comment.get('created_at')),
+                            size=11 if not is_reply else 10,
+                            color=get_theme_color("text_secondary", is_dark),
+                        ),
                     ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    spacing=8,
+                    wrap=True,
                 ),
-                
+
                 # Kommentar-Text
                 ft.Text(
                     comment.get('content', ''),
                     size=13 if not is_reply else 12,
                     selectable=True,
-                    color=get_theme_color("text_primary", is_dark)
+                    color=get_theme_color("text_primary", is_dark),
                 ),
+
+                # Reaktionen (eigene Zeile)
+                self._build_reactions_row(comment),
 
                 # Aktionen (Antworten, Löschen oder Inline-Bestätigung)
                 self._build_comment_actions_row(
@@ -600,9 +597,9 @@ class CommentSection(ft.Container):
                     is_author=is_author,
                     is_dark=is_dark,
                     reply_button=reply_button,
-                )
-                
-            ], spacing=2, expand=True),
+                ),
+
+            ], spacing=4, expand=True),
             
         ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.START)
         
