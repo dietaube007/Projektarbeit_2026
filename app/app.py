@@ -499,7 +499,7 @@ class PetBuddyApp:
             search_filters = ft.Container(
                 content=self.discover_view.search_row,
                 visible=True,
-                padding=ft.padding.only(top=8),
+                padding=ft.padding.only(top=0),
             )
 
             def toggle_search(_):
@@ -534,7 +534,7 @@ class PetBuddyApp:
                     ),
                     search_filters,
                 ], spacing=0),
-                pad=10,
+                pad=4,
                 elev=2,
             )
 
@@ -545,7 +545,7 @@ class PetBuddyApp:
 
             return ft.Column(
                 controls,
-                spacing=8,
+                spacing=0,
                 expand=True,
             )
         except Exception as e:

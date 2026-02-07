@@ -440,7 +440,7 @@ class DiscoverView:
         content_container = ft.Column(
             [
                 ft.Container(
-                    padding=ft.padding.only(left=4, right=4, top=12),
+                    padding=ft.padding.only(left=4, right=4, top=0),
                     content=self._list_view,
                 ),
             ],

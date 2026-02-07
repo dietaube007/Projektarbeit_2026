@@ -41,6 +41,8 @@ def build_small_card(
     """
     data = extract_item_data(item)
     is_dark = page.theme_mode == ft.ThemeMode.DARK
+    screen_width = page.width or getattr(page, "window_width", None) or 0
+    is_mobile = bool(screen_width and screen_width < 720)
 
     visual_content = (
         ft.Image(src=data["img_src"], height=CARD_IMAGE_HEIGHT, fit=ft.ImageFit.COVER, gapless_playback=True)
@@ -271,6 +273,8 @@ def show_detail_dialog(
         geschlecht = geschlecht.strip() or "Keine Angabe"
 
     is_dark = page.theme_mode == ft.ThemeMode.DARK
+    screen_width = page.width or getattr(page, "window_width", None) or 0
+    is_mobile = bool(screen_width and screen_width < 720)
     
     visual = (
         ft.Image(src=data["img_src"], height=DIALOG_IMAGE_HEIGHT, fit=ft.ImageFit.COVER)
@@ -321,42 +325,34 @@ def show_detail_dialog(
     post_id = str(item.get("id") or "")
     details_column = ft.Column(
         [
-            ft.Column(
+            ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+            ft.Container(height=2),
+            ft.Row(
                 [
-                    ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
-                    ft.Container(height=2),
-                    ft.Row(
-                        [
-                            ft.CircleAvatar(
-                                foreground_image_src=(data.get("user_profile_image") or "").strip() or None,
-                                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
-                                if (data.get("user_profile_image") or "").strip().lower() in {"", "null", "none", "undefined"}
-                                else None,
-                                bgcolor=PRIMARY_COLOR,
-                                radius=18,
-                            ),
-                            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
-                        ],
-                        spacing=10,
+                    ft.CircleAvatar(
+                        foreground_image_src=(data.get("user_profile_image") or "").strip() or None,
+                        content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
+                        if (data.get("user_profile_image") or "").strip().lower() in {"", "null", "none", "undefined"}
+                        else None,
+                        bgcolor=PRIMARY_COLOR,
+                        radius=18,
                     ),
-                    ft.Container(height=10),
-                    ft.Text(
-                        data["title"],
-                        size=20,
-                        weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.ON_SURFACE,
-                    ),
-                    ft.Text(
-                        item.get("description") or "Keine Beschreibung.",
-                        color=ft.Colors.ON_SURFACE_VARIANT,
-                        width=480,
-                        text_align=ft.TextAlign.JUSTIFY,
-                    ),
+                    ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
                 ],
-                tight=True,
-                spacing=2,
-                scroll=ft.ScrollMode.AUTO,
-                expand=True,
+                spacing=10,
+            ),
+            ft.Container(height=10),
+            ft.Text(
+                data["title"],
+                size=20,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.ON_SURFACE,
+            ),
+            ft.Text(
+                item.get("description") or "Keine Beschreibung.",
+                color=ft.Colors.ON_SURFACE_VARIANT,
+                width=None if is_mobile else 480,
+                text_align=ft.TextAlign.JUSTIFY,
             ),
             ft.Divider(height=16, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK)),
             ft.Column(
@@ -376,7 +372,12 @@ def show_detail_dialog(
                         ft.Icons.PALETTE,
                         f"Farbe: {data['farbe']}" if data["farbe"] else "Farbe: Keine Angabe",
                     ),
-                    meta_row(ft.Icons.LOCATION_ON, f"Ort: {data['ort'] or DEFAULT_PLACEHOLDER}"),
+                    meta_row(
+                        ft.Icons.LOCATION_ON,
+                        f"Ort: {data['ort'] or DEFAULT_PLACEHOLDER}",
+                        allow_wrap=is_mobile,
+                        max_lines=2,
+                    ),
                     meta_row(
                         ft.Icons.SCHEDULE,
                         f"{event_label}: {data['when']}" if data["when"] and data["when"] != "—" else DEFAULT_PLACEHOLDER,
@@ -389,8 +390,9 @@ def show_detail_dialog(
         ],
         tight=True,
         spacing=8,
-        width=480,
+        width=None if is_mobile else 480,
         expand=True,
+        scroll=ft.ScrollMode.AUTO if is_mobile else ft.ScrollMode.AUTO,
     )
 
     if supabase and post_id and profile_service is not None:
@@ -402,15 +404,21 @@ def show_detail_dialog(
         # CommentSection transparent - Dialog-Hintergrund scheint durch
         right_column = ft.Container(
             content=comment_section,
-            width=480,
+            width=None if is_mobile else 480,
             expand=True,
-            padding=ft.padding.only(left=8),
+            padding=ft.padding.only(left=8) if not is_mobile else ft.padding.only(top=8),
         )
-        dialog_content = ft.Row(
-            [details_column, right_column],
-            spacing=8,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        )
+        if is_mobile:
+            dialog_content = ft.Column(
+                [details_column, right_column],
+                spacing=12,
+            )
+        else:
+            dialog_content = ft.Row(
+                [details_column, right_column],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
     else:
         dialog_content = details_column
 
@@ -423,13 +431,20 @@ def show_detail_dialog(
         spacing=4,
     )
 
+    if is_mobile:
+        dialog_content = ft.Column(
+            [dialog_content],
+            spacing=0,
+            scroll=ft.ScrollMode.AUTO,
+        )
+
     dlg = ft.AlertDialog(
         title=title_row,
         title_padding=ft.padding.only(left=30, right=30, top=30, bottom=8),
         content=ft.Container(
             content=dialog_content,
-            width=1080,
-            height=600,
+            width=None if is_mobile else 1080,
+            height=None if is_mobile else 600,
         ),
         content_padding=ft.padding.symmetric(horizontal=30),
         actions=[actions_bar],

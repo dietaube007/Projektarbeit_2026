@@ -358,12 +358,14 @@ def create_loading_indicator(
 # META-KOMPONENTEN
 # ══════════════════════════════════════════════════════════════════════
 
-def meta_row(icon: str, text: str) -> ft.Control:
+def meta_row(icon: str, text: str, allow_wrap: bool = False, max_lines: int = 1) -> ft.Control:
     """Erstellt eine Zeile mit Icon und Text für Metadaten.
     
     Args:
         icon: Icon-Name (z.B. ft.Icons.LOCATION_ON)
         text: Anzuzeigender Text
+        allow_wrap: Ob der Text umbrechen darf
+        max_lines: Maximale Zeilenanzahl (nur relevant bei allow_wrap)
     
     Returns:
         Row-Widget mit Icon und Text
@@ -374,9 +376,9 @@ def meta_row(icon: str, text: str) -> ft.Control:
             ft.Text(
                 text,
                 color=ft.Colors.ON_SURFACE_VARIANT,
-                max_lines=1,
-                overflow=ft.TextOverflow.ELLIPSIS,
-                no_wrap=True,
+                max_lines=max_lines if allow_wrap else 1,
+                overflow=None if allow_wrap else ft.TextOverflow.ELLIPSIS,
+                no_wrap=not allow_wrap,
                 expand=True,
             ),
         ],
