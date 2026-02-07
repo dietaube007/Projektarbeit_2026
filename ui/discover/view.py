@@ -11,11 +11,15 @@ from supabase import Client
 from services.posts.references import ReferenceService
 from services.posts import SavedSearchService, FavoritesService, SearchService
 from services.account import ProfileService
-from ui.theme import get_theme_color
+from ui.theme import get_theme_color, soft_card
 from ui.shared_components import (
     create_empty_state_card,
     create_loading_indicator,
 )
+from app.dialogs import create_login_banner
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from .components import (
     create_search_field,
@@ -424,6 +428,91 @@ class DiscoverView:
             load_posts_callback=self.load_posts,
             page=self.page,
         )
+
+    def build_start_section(
+        self,
+        is_logged_in: bool,
+        on_login_click: Callable[[ft.ControlEvent], None],
+    ) -> ft.Control:
+        """Erstellt den Start-Tab mit Login-Banner, Filter-Toggle und Liste."""
+        try:
+            controls: list[ft.Control] = []
+
+            if not is_logged_in:
+                controls.append(create_login_banner(on_login_click))
+
+            if not hasattr(self, "search_row"):
+                return ft.Container(
+                    content=ft.Text("Fehler: search_row nicht initialisiert"),
+                    padding=20,
+                )
+
+            search_filters = ft.Container(
+                content=self.search_row,
+                visible=True,
+                padding=ft.padding.only(top=0),
+            )
+
+            def toggle_search(_):
+                search_filters.visible = not search_filters.visible
+                toggle_btn.icon = (
+                    ft.Icons.SEARCH_OFF if search_filters.visible
+                    else ft.Icons.SEARCH
+                )
+                toggle_btn.tooltip = (
+                    "Filter ausblenden" if search_filters.visible
+                    else "Filter einblenden"
+                )
+                self.page.update()
+
+            toggle_btn = ft.IconButton(
+                icon=ft.Icons.SEARCH_OFF,
+                icon_size=22,
+                tooltip="Filter ausblenden",
+                on_click=toggle_search,
+                style=ft.ButtonStyle(padding=4),
+            )
+
+            search_toggle_card = soft_card(
+                ft.Column(
+                    [
+                        ft.Row(
+                            [
+                                toggle_btn,
+                                ft.Text("Filter & Suche", weight=ft.FontWeight.W_700, size=14),
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing=4,
+                        ),
+                        search_filters,
+                    ],
+                    spacing=0,
+                ),
+                pad=4,
+                elev=2,
+            )
+
+            content_area = ft.Container(
+                content=self.build(),
+                expand=True,
+            )
+
+            controls.extend([
+                search_toggle_card,
+                content_area,
+            ])
+
+            return ft.Column(
+                controls,
+                spacing=0,
+                expand=True,
+            )
+        except Exception as e:
+            logger.error(f"Fehler in build_start_section: {e}")
+            return ft.Container(
+                content=ft.Text(f"Fehler beim Laden: {str(e)}"),
+                padding=20,
+            )
 
     # ─────────────────────────────────────────────────────────────
     # Build

@@ -18,26 +18,24 @@ from supabase import Client
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-from ui.theme import ThemeManager, soft_card
+from ui.theme import ThemeManager
 from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
-from ui.auth import AuthView
 from ui.shared_components import show_confirm_dialog
 from ui.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_DEFAULT_WIDTH,
     WINDOW_DEFAULT_HEIGHT,
-    PRIMARY_COLOR,
 )
 
 from app.dialogs import (
-    create_login_banner,
     show_comment_login_dialog,
     show_favorite_login_dialog,
     show_login_required_dialog,
     show_saved_search_login_dialog,
 )
+from app.auth_flow import AuthFlow
 from app.navigation import (
     TAB_START,
     TAB_MELDEN,
@@ -93,8 +91,7 @@ class PetBuddyApp:
         self.post_form: Optional[PostForm] = None
         self.discover_view: Optional[DiscoverView] = None
         self.profile_view: Optional[ProfileView] = None
-        self.auth_view: Optional[AuthView] = None
-        self._redirect_loading_overlay: Optional[ft.Container] = None
+        self._auth_flow: Optional[AuthFlow] = None
     
     # ════════════════════════════════════════════════════════════════════
     # INITIALISIERUNG
@@ -126,6 +123,13 @@ class PetBuddyApp:
             # Supabase-Client initialisieren
             self.sb = get_client()
 
+            # Auth-Flow initialisieren
+            self._auth_flow = AuthFlow(
+                page=self.page,
+                sb=self.sb,
+                set_logged_in=self._set_logged_in,
+                clear_pending_tab=self._clear_pending_tab,
+            )
 
             return True
             
@@ -177,7 +181,7 @@ class PetBuddyApp:
             self.page.go("/discover")
             return
         elif route_path == "/login":
-            self._show_login()
+            self._open_login()
         elif route_path == "/discover":
             self._show_discover()
         elif route_path == "/profile":
@@ -346,7 +350,7 @@ class PetBuddyApp:
         if new_tab in [TAB_MELDEN, TAB_PROFIL] and not self.is_logged_in:
             def on_login() -> None:
                 self.pending_tab_after_login = new_tab
-                self._show_login()
+                self._open_login()
 
             def on_cancel() -> None:
                 profile_key = get_profile_drawer_key(
@@ -396,7 +400,7 @@ class PetBuddyApp:
         if not self.is_logged_in:
             def on_login() -> None:
                 self.pending_tab_after_login = TAB_PROFIL
-                self._show_login()
+                self._open_login()
 
             def on_cancel() -> None:
                 profile_key = get_profile_drawer_key(
@@ -489,15 +493,15 @@ class PetBuddyApp:
                     on_melden_click=self.go_to_melden_tab,
                     on_login_required=lambda: show_favorite_login_dialog(
                         self.page,
-                        on_login=self._show_login,
+                        on_login=self._open_login,
                     ),
                     on_save_search_login_required=lambda: show_saved_search_login_dialog(
                         self.page,
-                        on_login=self._show_login,
+                        on_login=self._open_login,
                     ),
                     on_comment_login_required=lambda: show_comment_login_dialog(
                         self.page,
-                        on_login=self._show_login,
+                        on_login=self._open_login,
                     ),
                 )
 
@@ -535,98 +539,6 @@ class PetBuddyApp:
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
 
-    def _build_start_section(self) -> ft.Control:
-        """Erstellt den Start-Tab mit Suchleiste und Liste."""
-        try:
-            controls = []
-
-            # Login-Banner für nicht eingeloggte Benutzer
-            if not self.is_logged_in:
-                controls.append(
-                    create_login_banner(
-                        lambda _: self._show_login(),
-                    )
-                )
-
-            if not self.discover_view:
-                logger.error("discover_view ist None in _build_start_section")
-                return ft.Container(
-                    content=ft.Text("Fehler: Discover-View nicht initialisiert"),
-                    padding=20
-                )
-
-            if not hasattr(self.discover_view, 'search_row'):
-                logger.error("discover_view.search_row existiert nicht")
-                return ft.Container(
-                    content=ft.Text("Fehler: search_row nicht initialisiert"),
-                    padding=20
-                )
-
-            # Suchleiste auf-/zuklappbar
-            search_filters = ft.Container(
-                content=self.discover_view.search_row,
-                visible=True,
-                padding=ft.padding.only(top=0),
-            )
-
-            def toggle_search(_):
-                search_filters.visible = not search_filters.visible
-                toggle_btn.icon = (
-                    ft.Icons.SEARCH_OFF if search_filters.visible
-                    else ft.Icons.SEARCH
-                )
-                toggle_btn.tooltip = (
-                    "Filter ausblenden" if search_filters.visible
-                    else "Filter einblenden"
-                )
-                self.page.update()
-
-            toggle_btn = ft.IconButton(
-                icon=ft.Icons.SEARCH_OFF,
-                icon_size=22,
-                tooltip="Filter ausblenden",
-                on_click=toggle_search,
-                style=ft.ButtonStyle(padding=4),
-            )
-
-            search_toggle_card = soft_card(
-                ft.Column([
-                    ft.Row(
-                        [
-                            toggle_btn,
-                            ft.Text("Filter & Suche", weight=ft.FontWeight.W_700, size=14),
-                        ],
-                        alignment=ft.MainAxisAlignment.START,
-                        spacing=4,
-                    ),
-                    search_filters,
-                ], spacing=0),
-                pad=4,
-                elev=2,
-            )
-
-            content_area = ft.Container(
-                content=self.discover_view.build(),
-                expand=True,
-            )
-
-            controls.extend([
-                search_toggle_card,
-                content_area,
-            ])
-
-            return ft.Column(
-                controls,
-                spacing=0,
-                expand=True,
-            )
-        except Exception as e:
-            logger.error(f"Fehler in _build_start_section: {e}", exc_info=True)
-            return ft.Container(
-                content=ft.Text(f"Fehler beim Laden: {str(e)}"),
-                padding=20
-            )
-    
     # ════════════════════════════════════════════════════════════════════
     # APP STARTEN
     # ════════════════════════════════════════════════════════════════════
@@ -635,15 +547,28 @@ class PetBuddyApp:
         """Zeigt die Hauptanwendung."""
         try:
             # Komponenten erstellen
-            self.start_section = self._build_start_section()
+            if not self.discover_view:
+                if not self.build_ui():
+                    logger.error("_show_main_app: build_ui() fehlgeschlagen")
+                    return
+
+            self.start_section = self.discover_view.build_start_section(
+                is_logged_in=self.is_logged_in,
+                on_login_click=lambda _: self._open_login(),
+            )
             if self.start_section is None:
                 logger.error("_show_main_app: start_section ist None")
                 return
 
-            if self._redirect_loading_overlay and self._redirect_loading_overlay in self.page.overlay:
-                self.page.overlay.remove(self._redirect_loading_overlay)
-            if self.auth_view and getattr(self.auth_view, "_login_loading_overlay", None):
-                lo = self.auth_view._login_loading_overlay
+            if self._auth_flow:
+                overlay = self._auth_flow.redirect_loading_overlay
+                if overlay and overlay in self.page.overlay:
+                    self.page.overlay.remove(overlay)
+                auth_view = self._auth_flow.auth_view
+            else:
+                auth_view = None
+            if auth_view and getattr(auth_view, "_login_loading_overlay", None):
+                lo = auth_view._login_loading_overlay
                 if lo and lo in self.page.overlay:
                     self.page.overlay.remove(lo)
             
@@ -671,7 +596,7 @@ class PetBuddyApp:
                     DRAWER_KEY_SETTINGS,
                 ),
                 DRAWER_KEY_LOGOUT: self._confirm_logout,
-                DRAWER_KEY_LOGIN: self._show_login,
+                DRAWER_KEY_LOGIN: self._open_login,
             }
 
             drawer_items: list[DrawerItem] = build_drawer_items(
@@ -718,7 +643,7 @@ class PetBuddyApp:
                         on_menu=self._open_drawer,
                         page=self.page,
                         on_title_click=self._go_to_start,
-                        on_login=lambda _: self._show_login(),
+                        on_login=lambda _: self._open_login(),
                     )
                     self._main_column.controls[0] = self._app_bar_control
                     self.page.update()
@@ -730,7 +655,7 @@ class PetBuddyApp:
                 on_menu=self._open_drawer,
                 page=self.page,
                 on_title_click=self._go_to_start,
-                on_login=lambda _: self._show_login(),
+                on_login=lambda _: self._open_login(),
             )
             self._content_scroll = ft.Column(
                 [self.body],
@@ -759,87 +684,18 @@ class PetBuddyApp:
         except Exception as e:
             logger.error(f"Fehler in _show_main_app: {e}", exc_info=True)
 
-    async def _navigate_after_login(self) -> None:
-        """Kurze Verzögerung, dann Navigation zur Startseite (nach Login)."""
-        import asyncio
-        await asyncio.sleep(1.2)
-        self.page.go("/")
-    
-    def _show_login(self) -> None:
-        """Zeigt die Login-Maske."""
-        from ui.theme import get_theme_color
+    def _open_login(self) -> None:
+        """Startet den Login-Flow."""
+        if not self._auth_flow:
+            logger.error("AuthFlow ist nicht initialisiert")
+            return
+        self._auth_flow.show_login()
 
-        # Setze Route direkt, um Endlosschleife zu vermeiden
-        self.page.route = "/login"
+    def _set_logged_in(self, is_logged_in: bool) -> None:
+        self.is_logged_in = is_logged_in
 
-        # Lade-Overlay für „nach Login“ (einmalig erstellen)
-        if self._redirect_loading_overlay is None:
-            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
-            self._redirect_loading_overlay = ft.Container(
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.ProgressRing(
-                                width=48, height=48, stroke_width=3, color=PRIMARY_COLOR
-                            ),
-                            ft.Container(height=16),
-                            ft.Text(
-                                "Einen Moment, Sie werden weitergeleitet…",
-                                size=16,
-                                weight=ft.FontWeight.W_500,
-                                color=get_theme_color("text_primary", is_dark),
-                                text_align=ft.TextAlign.CENTER,
-                            ),
-                            ft.Container(height=12),
-                            ft.ProgressBar(
-                                width=200,
-                                color=PRIMARY_COLOR,
-                                bgcolor=ft.Colors.with_opacity(0.2, PRIMARY_COLOR),
-                            ),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    bgcolor=get_theme_color("card", is_dark),
-                    padding=32,
-                    border_radius=16,
-                    shadow=ft.BoxShadow(
-                        blur_radius=24,
-                        spread_radius=0,
-                        color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK),
-                    ),
-                ),
-                alignment=ft.alignment.center,
-                expand=True,
-                bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
-            )
-        
-        def on_login_success() -> None:
-            self.is_logged_in = True
-            self.pending_tab_after_login = None
-            if self._redirect_loading_overlay not in self.page.overlay:
-                self.page.overlay.append(self._redirect_loading_overlay)
-            self.page.update()
-            self.page.run_task(self._navigate_after_login)
-        
-        def on_continue_without_account() -> None:
-            self.is_logged_in = False
-            self.pending_tab_after_login = None
-            self.page.go("/")
-        
-        self.auth_view = AuthView(
-            page=self.page,
-            sb=self.sb,
-            on_auth_success=on_login_success,
-            on_continue_without_account=on_continue_without_account
-        )
-        
-        # Seite für Login vorbereiten
-        self.page.appbar = None
-        self.page.navigation_bar = None
-        self.page.controls.clear()
-        self.page.add(self.auth_view.build())
-        self.page.update()
+    def _clear_pending_tab(self) -> None:
+        self.pending_tab_after_login = None
 
     def _open_drawer(self, _e: Optional[ft.ControlEvent] = None) -> None:
         if self._nav_drawer:
