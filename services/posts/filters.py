@@ -70,7 +70,7 @@ def filter_by_location_text(
 
 
 def filter_by_search(items: List[Dict[str, Any]], search_query: str) -> List[Dict[str, Any]]:
-    """Filtert Einträge nach Suchbegriff (headline, description, location_text).
+    """Filtert Einträge nach Suchbegriff (headline, description).
 
     Args:
         items: Liste von Post-Dictionaries
@@ -96,8 +96,7 @@ def filter_by_search(items: List[Dict[str, Any]], search_query: str) -> List[Dic
     def matches(it: dict) -> bool:
         h = (it.get("headline") or "").lower()
         d = (it.get("description") or "").lower()
-        loc = (it.get("location_text") or "").lower()
-        return q in h or q in d or q in loc
+        return q in h or q in d
     
     return [it for it in items if matches(it)]
 
