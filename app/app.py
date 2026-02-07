@@ -77,7 +77,7 @@ class PetBuddyApp:
         
         # UI-Komponenten
         self.body: ft.Container = ft.Container(
-            padding=ft.padding.only(left=16, right=16, top=16, bottom=0),
+            padding=ft.padding.only(left=16, right=16, top=4, bottom=0),
             expand=True,
         )
         self.nav: Optional[ft.NavigationBar] = None
@@ -618,6 +618,7 @@ class PetBuddyApp:
                 items=drawer_items,
                 selected_index=self.current_tab,
                 on_change=self._on_drawer_change,
+                page=self.page,
             )
             profile_key = get_profile_drawer_key(
                 self.profile_view.current_view if self.profile_view else None

@@ -91,7 +91,7 @@ def create_app_bar(
             spacing=8,
         ),
         bgcolor=bgcolor,
-        padding=ft.padding.symmetric(horizontal=12, vertical=8),
+        padding=ft.padding.symmetric(horizontal=12, vertical=4),
     )
 
 
@@ -107,6 +107,7 @@ def create_navigation_drawer(
     items: list[DrawerItem],
     selected_index: int,
     on_change: Callable[[ft.ControlEvent], None],
+    page: Optional[ft.Page] = None,
 ) -> tuple[ft.NavigationDrawer, dict[str, int], list[Callable[[], None]]]:
     """Erstellt den NavigationDrawer inklusive Aktionen und Index-Mapping."""
     drawer_controls: list[ft.Control] = []
@@ -124,7 +125,29 @@ def create_navigation_drawer(
         selected_index=selected_index,
         on_change=on_change,
         controls=drawer_controls,
+        tile_padding=ft.padding.symmetric(horizontal=8, vertical=2),
     )
+
+    # Schließen-Button oben im Drawer einfügen
+    def close_drawer(_):
+        if page:
+            page.close(drawer)
+
+    close_btn = ft.Container(
+        content=ft.Row(
+            [
+                ft.IconButton(
+                    icon=ft.Icons.CLOSE,
+                    icon_size=20,
+                    tooltip="Menü schließen",
+                    on_click=close_drawer,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.START,
+        ),
+        padding=ft.padding.only(top=4, right=4, bottom=0),
+    )
+    drawer.controls.insert(0, close_btn)
 
     return drawer, drawer_index_map, drawer_actions
 
