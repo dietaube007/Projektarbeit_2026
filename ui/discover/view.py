@@ -728,17 +728,25 @@ class DiscoverView:
                 style=ft.ButtonStyle(padding=4),
             )
 
+            toggle_row = ft.Container(
+                content=ft.Row(
+                    [
+                        toggle_btn,
+                        ft.Text("Filter & Suche", weight=ft.FontWeight.W_700, size=14),
+                    ],
+                    alignment=ft.MainAxisAlignment.START,
+                    spacing=4,
+                ),
+                on_click=toggle_search,
+                ink=True,
+                border_radius=8,
+                padding=ft.padding.symmetric(vertical=4),
+            )
+
             search_toggle_card = soft_card(
                 ft.Column(
                     [
-                        ft.Row(
-                            [
-                                toggle_btn,
-                                ft.Text("Filter & Suche", weight=ft.FontWeight.W_700, size=14),
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=4,
-                        ),
+                        toggle_row,
                         search_filters,
                     ],
                     spacing=0,
