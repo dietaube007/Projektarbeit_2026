@@ -74,6 +74,8 @@ class PetBuddyApp:
         self.is_logged_in: bool = False
         # Merkt sich gewünschten Tab nach Login
         self.pending_tab_after_login: Optional[int] = None
+        # Flag: Discover-Filter beim naechsten Anzeigen zuruecksetzen
+        self._reset_discover_on_show: bool = False
         
         # UI-Komponenten
         self.body: ft.Container = ft.Container(
@@ -213,6 +215,11 @@ class PetBuddyApp:
                 if not self.build_ui():
                     logger.error("_show_discover: build_ui() fehlgeschlagen")
                     return
+
+            # Filter zuruecksetzen wenn Flag gesetzt (Seitenwechsel)
+            if self._reset_discover_on_show and self.discover_view:
+                self._reset_discover_on_show = False
+                self.discover_view.reset_filters_silent()
 
             self.current_tab = TAB_START
             profile_key = get_profile_drawer_key(
@@ -396,6 +403,10 @@ class PetBuddyApp:
         if self.current_tab == TAB_MELDEN and new_tab != TAB_MELDEN and self.post_form:
             self.post_form.cleanup_local_uploads()
 
+        # Filter-Reset Flag setzen wenn zur Startseite gewechselt wird
+        if new_tab == TAB_START and self.current_tab != TAB_START:
+            self._reset_discover_on_show = True
+
         # Navigation zu Routen
         if new_tab == TAB_START:
             self.page.go("/")
@@ -448,6 +459,8 @@ class PetBuddyApp:
         """Navigiert zur Startseite (z. B. beim Klick auf die PetBuddy-Überschrift)."""
         if self.current_tab == TAB_MELDEN and self.post_form:
             self.post_form.cleanup_local_uploads()
+        if self.current_tab != TAB_START:
+            self._reset_discover_on_show = True
         self.current_tab = TAB_START
         profile_key = get_profile_drawer_key(
             self.profile_view.current_view if self.profile_view else None

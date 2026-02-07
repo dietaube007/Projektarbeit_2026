@@ -156,14 +156,71 @@ def create_sort_dropdown(
         Dropdown für Sortier-Optionen
     """
     dropdown = ft.Dropdown(
-        label="Sortieren",
+        label=None,
+        hint_text="Sortieren",
+        prefix_icon=ft.Icons.SORT,
         options=[
-            ft.dropdown.Option("created_at_desc", "Erstellungsdatum (neueste)"),
-            ft.dropdown.Option("created_at_asc", "Erstellungsdatum (älteste)"),
-            ft.dropdown.Option("event_date_desc", "Event-Datum (neueste)"),
-            ft.dropdown.Option("event_date_asc", "Event-Datum (älteste)"),
+            ft.dropdown.Option("created_at_desc", "Erstelldatum (neueste)"),
+            ft.dropdown.Option("created_at_asc", "Erstelldatum (älteste)"),
+            ft.dropdown.Option("event_date_desc", "Ereignisdatum (neueste)"),
+            ft.dropdown.Option("event_date_asc", "Ereignisdatum (älteste)"),
         ],
         value="created_at_desc",
+        expand=True,
+        on_change=on_change,
+        border_color=ft.Colors.TRANSPARENT,
+        focused_border_color=ft.Colors.TRANSPARENT,
+    )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
+
+
+def create_location_filter_field(
+    on_change: Optional[Callable[[ft.ControlEvent], None]] = None
+) -> ft.TextField:
+    """Erstellt das Ort-Suchfeld fuer die Umkreissuche.
+
+    Args:
+        on_change: Optional Callback bei Eingabe (triggert Geocoding-Vorschlaege)
+
+    Returns:
+        TextField fuer Orteingabe
+    """
+    return ft.TextField(
+        label="Ort oder PLZ",
+        prefix_icon=ft.Icons.LOCATION_ON,
+        expand=True,
+        on_change=on_change,
+        border_radius=12,
+        focused_border_color=PRIMARY_COLOR,
+        content_padding=ft.padding.symmetric(horizontal=16, vertical=14),
+    )
+
+
+def create_radius_dropdown(
+    on_change: Optional[Callable[[ft.ControlEvent], None]] = None
+) -> ft.Dropdown:
+    """Erstellt das Umkreis-Dropdown.
+
+    Args:
+        on_change: Optional Callback bei Aenderung
+
+    Returns:
+        Dropdown mit Umkreis-Optionen in km
+    """
+    dropdown = ft.Dropdown(
+        label="Umkreis",
+        options=[
+            ft.dropdown.Option("all", "Ganzer Ort"),
+            ft.dropdown.Option("5", "5 km"),
+            ft.dropdown.Option("10", "10 km"),
+            ft.dropdown.Option("25", "25 km"),
+            ft.dropdown.Option("50", "50 km"),
+            ft.dropdown.Option("100", "100 km"),
+            ft.dropdown.Option("200", "200 km"),
+        ],
+        value="all",
         expand=True,
         on_change=on_change,
     )

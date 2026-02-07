@@ -11,6 +11,9 @@ from utils.validators import sanitize_string
 from .filters import (
     filter_by_search,
     filter_by_colors,
+    filter_by_location,
+    filter_by_location_text,
+    enrich_with_distance,
     sort_by_event_date,
     mark_favorites,
 )
@@ -25,6 +28,7 @@ SORT_CREATED_DESC = "created_at_desc"
 SORT_CREATED_ASC = "created_at_asc"
 SORT_EVENT_DESC = "event_date_desc"
 SORT_EVENT_ASC = "event_date_asc"
+SORT_DISTANCE = "distance"
 
 
 class SearchService:
@@ -157,8 +161,12 @@ class SearchService:
         sort_option: str = SORT_CREATED_DESC,
         favorite_ids: Optional[Set[str]] = None,
         limit: int = MAX_POSTS_LIMIT,
+        location_lat: Optional[float] = None,
+        location_lon: Optional[float] = None,
+        radius_km: Optional[float] = None,
+        location_text_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Sucht Posts mit Filtern, Suche, Farben und Sortierung.
+        """Sucht Posts mit Filtern, Suche, Farben, Umkreis und Sortierung.
 
         Enthält Retry-Logik für transiente Netzwerkfehler (HTTP/2 Connection-Pool).
 
@@ -169,6 +177,9 @@ class SearchService:
             sort_option: Sortier-Option (created_at_desc, created_at_asc, event_date_desc, event_date_asc)
             favorite_ids: Optional Set mit Post-IDs der Favoriten (für Markierung)
             limit: Maximale Anzahl der Posts (Standard: MAX_POSTS_LIMIT)
+            location_lat: Optional Breitengrad des Suchzentrums (Umkreissuche)
+            location_lon: Optional Laengengrad des Suchzentrums (Umkreissuche)
+            radius_km: Optional Umkreis in Kilometern
 
         Returns:
             Liste von Post-Dictionaries mit is_favorite Flag und user_display_name.
@@ -198,8 +209,21 @@ class SearchService:
                 if selected_colors:
                     items = filter_by_colors(items, selected_colors)
 
-                # Event-Datum Sortierung in Python (falls gewählt)
-                if sort_option == SORT_EVENT_DESC:
+                # Ort-Filter: Umkreis (Koordinaten) oder Stadtname (Text)
+                if location_lat is not None and location_lon is not None and radius_km:
+                    items = filter_by_location(
+                        items, location_lat, location_lon, radius_km,
+                    )
+                elif location_text_filter:
+                    items = filter_by_location_text(items, location_text_filter)
+
+                # Sortierung in Python (falls gewählt)
+                if sort_option == SORT_DISTANCE:
+                    # Entfernungen berechnen falls noch nicht vorhanden
+                    if location_lat is not None and location_lon is not None:
+                        items = enrich_with_distance(items, location_lat, location_lon)
+                    items.sort(key=lambda x: x.get("_distance_km", 9999))
+                elif sort_option == SORT_EVENT_DESC:
                     items = sort_by_event_date(items, desc=True)
                 elif sort_option == SORT_EVENT_ASC:
                     items = sort_by_event_date(items, desc=False)

@@ -6,7 +6,8 @@ für konsistente Datenbankabfragen.
 
 # Vollständiges Post-Select mit allen Relationen
 POST_SELECT_FULL = """
-    id, headline, description, location_text, event_date, created_at, is_active, user_id,
+    id, headline, description, location_text, location_lat, location_lon,
+    event_date, created_at, is_active, user_id,
     post_status(id, name),
     species(id, name),
     breed(id, name),

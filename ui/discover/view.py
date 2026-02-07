@@ -27,6 +27,8 @@ from .components import (
     create_farben_header,
     create_reset_button,
     create_sort_dropdown,
+    create_location_filter_field,
+    create_radius_dropdown,
 )
 from .handlers import (
     handle_view_toggle_favorite,
@@ -101,6 +103,15 @@ class DiscoverView:
         self._empty_state_card: Optional[ft.Container] = None
         self.search_row = ft.ResponsiveRow(controls=[], spacing=10, run_spacing=10) 
 
+        # Ort/Umkreis-Filter
+        self._location_field: Optional[ft.TextField] = None
+        self._radius_dropdown: Optional[ft.Dropdown] = None
+        self._location_suggestions_list: Optional[ft.Column] = None
+        self._location_suggestions_box: Optional[ft.Container] = None
+        self._location_selected: Dict[str, Any] = {"text": None, "lat": None, "lon": None}
+        self._location_query_version: int = 0
+        self._location_setting_value: bool = False  # Verhindert on_change bei programmatischer Aenderung
+
         self._all_breeds = {"breeds": {}}
 
         self._init_ui_elements()
@@ -153,6 +164,7 @@ class DiscoverView:
             on_filter_change(e)
         
         def on_reset_filters(_: Optional[ft.ControlEvent] = None) -> None:
+            self._hide_distance_sort_option()
             handle_view_reset_filters(
                 search_field=self._search_q,
                 filter_typ=self._filter_typ,
@@ -170,6 +182,9 @@ class DiscoverView:
                     all_breeds=self._all_breeds,
                     page=self.page,
                 ),
+                location_field=self._location_field,
+                radius_dropdown=self._radius_dropdown,
+                location_selected=self._location_selected,
             )
         
         def on_toggle_farben_panel(_: Optional[ft.ControlEvent] = None) -> None:
@@ -193,10 +208,28 @@ class DiscoverView:
                 current_user_id=self.current_user_id,
                 on_save_search_login_required=self.on_save_search_login_required,
                 on_login_required=self.on_login_required,
+                location_selected=self._location_selected,
+                radius_dropdown=self._radius_dropdown,
             )
         
         self._search_q = create_search_field(
             on_change=on_filter_change
+        )
+
+        # Ort/Umkreis-Filter initialisieren
+        self._location_field = create_location_filter_field(
+            on_change=lambda _: self._on_location_input_change()
+        )
+        self._radius_dropdown = create_radius_dropdown(
+            on_change=on_filter_change
+        )
+        self._location_suggestions_list = ft.Column(spacing=2)
+        self._location_suggestions_box = ft.Container(
+            content=self._location_suggestions_list,
+            visible=False,
+            padding=8,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
         )
 
         self._filter_typ = create_dropdown(
@@ -269,14 +302,21 @@ class DiscoverView:
             self._farben_header is not None,
             self._farben_panel is not None,
         ]):
+            # Ort-Feld + Vorschlaege zusammen in einer Column
+            location_col = ft.Column(
+                [self._location_field, self._location_suggestions_box],
+                spacing=0,
+            )
+
             self.search_row = ft.ResponsiveRow(
                 controls=[
-                    ft.Container(self._search_q, col={"xs": 12, "md": 2}),
+                    ft.Container(self._search_q, col={"xs": 12, "md": 4}),
                     ft.Container(self._filter_typ, col={"xs": 6, "md": 2}),
                     ft.Container(self._filter_art, col={"xs": 6, "md": 2}),
                     ft.Container(self._filter_geschlecht, col={"xs": 6, "md": 2}),
                     ft.Container(self._filter_rasse, col={"xs": 6, "md": 2}),
-                    ft.Container(self._sort_dropdown, col={"xs": 6, "md": 2}),
+                    ft.Container(location_col, col={"xs": 8, "md": 4}),
+                    ft.Container(self._radius_dropdown, col={"xs": 4, "md": 2}),
                     ft.Container(self._farben_header, col={"xs": 12, "md": 12}),
                     ft.Container(self._farben_panel, col={"xs": 12, "md": 12}),
                     ft.Container(
@@ -302,6 +342,122 @@ class DiscoverView:
                     elif isinstance(control, ft.Icon):
                         control.color = get_theme_color("text_secondary", is_dark)
     
+    # ─────────────────────────────────────────────────────────────
+    # Entfernungs-Sortierung dynamisch ein-/ausblenden
+    # ─────────────────────────────────────────────────────────────
+
+    _DISTANCE_OPTION_KEY = "distance"
+
+    def _show_distance_sort_option(self) -> None:
+        """Fuegt die 'Entfernung'-Option zum Sortier-Dropdown hinzu (falls nicht vorhanden)."""
+        if self._sort_dropdown is None:
+            return
+        existing_keys = {o.key for o in self._sort_dropdown.options}
+        if self._DISTANCE_OPTION_KEY not in existing_keys:
+            self._sort_dropdown.options.append(
+                ft.dropdown.Option(self._DISTANCE_OPTION_KEY, "Entfernung (nächste)")
+            )
+
+    def _hide_distance_sort_option(self) -> None:
+        """Entfernt die 'Entfernung'-Option aus dem Sortier-Dropdown."""
+        if self._sort_dropdown is None:
+            return
+        self._sort_dropdown.options = [
+            o for o in self._sort_dropdown.options
+            if o.key != self._DISTANCE_OPTION_KEY
+        ]
+        # Falls aktuell 'distance' gewaehlt war, auf Standard zuruecksetzen
+        if self._sort_dropdown.value == self._DISTANCE_OPTION_KEY:
+            self._sort_dropdown.value = "created_at_desc"
+
+    # ─────────────────────────────────────────────────────────────
+    # Ort/Umkreis-Filter Methoden
+    # ─────────────────────────────────────────────────────────────
+
+    def _on_location_input_change(self) -> None:
+        """Wird aufgerufen wenn der Nutzer im Ort-Feld tippt.
+        
+        Ignoriert programmatische Wertaenderungen (Flag _location_setting_value).
+        """
+        if self._location_setting_value:
+            return
+
+        self._location_selected = {"text": None, "lat": None, "lon": None}
+        self._location_query_version += 1
+        query = self._location_field.value or ""
+
+        # Entfernungs-Sortierung entfernen wenn kein Ort mehr gewaehlt
+        self._hide_distance_sort_option()
+
+        # Bei leerem Feld: Vorschlaege schliessen und Posts ohne Ort-Filter laden
+        if not query or not query.strip():
+            self._clear_location_suggestions()
+            self.page.update()
+            self.page.run_task(self.load_posts)
+            return
+
+        self.page.run_task(
+            self._update_location_suggestions,
+            query,
+            self._location_query_version,
+        )
+
+    async def _update_location_suggestions(self, query: str, version: int) -> None:
+        """Laedt Geocoding-Vorschlaege fuer den eingegebenen Ort (async mit Debounce)."""
+        import asyncio
+        await asyncio.sleep(0.3)
+        if version != self._location_query_version:
+            return
+        if not query or len(query.strip()) < 3:
+            self._clear_location_suggestions()
+            return
+
+        from services.geocoding import geocode_suggestions
+        suggestions = geocode_suggestions(query)
+        if not suggestions:
+            self._clear_location_suggestions()
+            return
+
+        def build_item(item: Dict[str, Any]) -> ft.Control:
+            return ft.TextButton(
+                text=item.get("text", ""),
+                on_click=lambda _, i=item: self._select_location_suggestion(i),
+                style=ft.ButtonStyle(alignment=ft.alignment.center_left),
+            )
+
+        self._location_suggestions_list.controls = [build_item(s) for s in suggestions]
+        self._location_suggestions_box.visible = True
+        self.page.update()
+
+    def _select_location_suggestion(self, item: Dict[str, Any]) -> None:
+        """Nutzer hat einen Vorschlag ausgewaehlt."""
+        self._location_selected = {
+            "text": item.get("text"),
+            "lat": item.get("lat"),
+            "lon": item.get("lon"),
+        }
+
+        # Flag setzen damit on_change die Auswahl nicht zuruecksetzt
+        self._location_setting_value = True
+        self._location_field.value = item.get("text", "")
+        self._location_setting_value = False
+
+        self._clear_location_suggestions()
+
+        # Sicherstellen, dass ein Umkreis gewaehlt ist
+        if not self._radius_dropdown.value:
+            self._radius_dropdown.value = "all"
+
+        self.page.update()
+        # Posts neu laden mit Umkreis
+        self.page.run_task(self.load_posts)
+
+    def _clear_location_suggestions(self) -> None:
+        """Loescht die Vorschlagsliste."""
+        self._location_suggestions_list.controls = []
+        self._location_suggestions_box.visible = False
+        self.page.update()
+
     # ─────────────────────────────────────────────────────────────
     # Private Methoden für Handler-Callbacks
     # ─────────────────────────────────────────────────────────────
@@ -339,6 +495,36 @@ class DiscoverView:
     async def load_posts(self, _: Optional[ft.ControlEvent] = None) -> None:
         """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen."""
         self.refresh_user()
+
+        # Umkreis-Daten sammeln
+        orig_lat = self._location_selected.get("lat")
+        orig_lon = self._location_selected.get("lon")
+        location_text = self._location_selected.get("text")
+        location_lat = orig_lat
+        location_lon = orig_lon
+        radius_km = None
+        radius_val = self._radius_dropdown.value if self._radius_dropdown else "all"
+        location_text_filter = None
+        has_radius = False
+        if radius_val == "all" and location_text:
+            # "Ganzer Ort": per Stadtname filtern, kein Umkreis
+            location_lat = orig_lat
+            location_lon = orig_lon
+            radius_km = None
+            location_text_filter = location_text
+        elif location_lat is not None and location_lon is not None:
+            try:
+                radius_km = float(radius_val)
+                has_radius = True
+            except (ValueError, TypeError):
+                radius_km = 25.0
+                has_radius = True
+
+        # Entfernungs-Sortierung nur bei konkretem Umkreis anzeigen
+        if has_radius and orig_lat is not None:
+            self._show_distance_sort_option()
+        else:
+            self._hide_distance_sort_option()
         
         await handle_view_load_posts(
             search_service=self.search_service,
@@ -356,6 +542,10 @@ class DiscoverView:
             page=self.page,
             on_render=self._render_items,
             get_filter_value=handle_view_get_filter_value,
+            location_lat=location_lat,
+            location_lon=location_lon,
+            radius_km=radius_km,
+            location_text_filter=location_text_filter,
         )
         self._has_loaded_posts = True
 
@@ -364,6 +554,66 @@ class DiscoverView:
         if self._has_loaded_posts:
             return
         await self.load_posts()
+
+    def reset_filters(self) -> None:
+        """Setzt alle Filter zurueck und laedt Posts neu.
+
+        Wird z.B. vom Reset-Button aufgerufen.
+        """
+        self._hide_distance_sort_option()
+        handle_view_reset_filters(
+            search_field=self._search_q,
+            filter_typ=self._filter_typ,
+            filter_art=self._filter_art,
+            filter_geschlecht=self._filter_geschlecht,
+            filter_rasse=self._filter_rasse,
+            sort_dropdown=self._sort_dropdown,
+            selected_colors=self.selected_farben,
+            color_checkboxes_container=self._farben_filter_container,
+            page=self.page,
+            on_reset=lambda: self.page.run_task(self.load_posts),
+            update_breeds_callback=lambda: handle_view_update_rassen_dropdown(
+                filter_art=self._filter_art,
+                filter_rasse=self._filter_rasse,
+                all_breeds=self._all_breeds,
+                page=self.page,
+            ),
+            location_field=self._location_field,
+            radius_dropdown=self._radius_dropdown,
+            location_selected=self._location_selected,
+        )
+
+    def reset_filters_silent(self) -> None:
+        """Setzt alle Filter zurueck OHNE Posts neu zu laden.
+
+        Wird aufgerufen wenn von einem anderen Tab zur Startseite
+        zuruecknavigiert wird. Die Posts werden danach von
+        ensure_loaded/load_posts separat geladen.
+        """
+        self._hide_distance_sort_option()
+        handle_view_reset_filters(
+            search_field=self._search_q,
+            filter_typ=self._filter_typ,
+            filter_art=self._filter_art,
+            filter_geschlecht=self._filter_geschlecht,
+            filter_rasse=self._filter_rasse,
+            sort_dropdown=self._sort_dropdown,
+            selected_colors=self.selected_farben,
+            color_checkboxes_container=self._farben_filter_container,
+            page=self.page,
+            on_reset=None,
+            update_breeds_callback=lambda: handle_view_update_rassen_dropdown(
+                filter_art=self._filter_art,
+                filter_rasse=self._filter_rasse,
+                all_breeds=self._all_breeds,
+                page=self.page,
+            ),
+            location_field=self._location_field,
+            radius_dropdown=self._radius_dropdown,
+            location_selected=self._location_selected,
+        )
+        # Posts muessen neu geladen werden
+        self._has_loaded_posts = False
     
     def _render_items(self, items: list[dict]) -> None:
         """Rendert die geladenen Items in der Listen-Ansicht."""
@@ -427,7 +677,17 @@ class DiscoverView:
             update_breeds_callback=update_breeds_callback,
             load_posts_callback=self.load_posts,
             page=self.page,
+            location_field=self._location_field,
+            radius_dropdown=self._radius_dropdown,
+            location_selected=self._location_selected,
         )
+        # Entfernungs-Sortierung nur bei konkretem Umkreis (nicht "Ganzer Ort")
+        has_location = self._location_selected and self._location_selected.get("lat")
+        has_radius = self._radius_dropdown and self._radius_dropdown.value and self._radius_dropdown.value != "all"
+        if has_location and has_radius:
+            self._show_distance_sort_option()
+        else:
+            self._hide_distance_sort_option()
 
     def build_start_section(
         self,
@@ -573,7 +833,19 @@ class DiscoverView:
         ]
 
         tab_bar = ft.Container(
-            content=ft.Row(tab_buttons, spacing=0, alignment=ft.MainAxisAlignment.START),
+            content=ft.Row(
+                [
+                    *tab_buttons,
+                    ft.Container(expand=True),  # Spacer
+                    ft.Container(
+                        self._sort_dropdown,
+                        width=200,
+                    ),
+                ],
+                spacing=0,
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
             padding=ft.padding.symmetric(horizontal=8, vertical=4),
         )
 

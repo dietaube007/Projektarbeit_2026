@@ -23,8 +23,17 @@ def geocode_suggestions(
     query: str,
     limit: int = 5,
     language: str = "de",
+    country: str = "de",
 ) -> List[Dict[str, Any]]:
     """Liefert Ortsvorschlaege inkl. Koordinaten fuer einen Suchtext.
+
+    Ergebnisse werden standardmaessig auf Deutschland begrenzt.
+
+    Args:
+        query: Suchtext (Ort, PLZ, Adresse)
+        limit: Maximale Anzahl Vorschlaege (Standard: 5)
+        language: Sprache der Ergebnisse (Standard: "de")
+        country: ISO-3166-1 Laendercode zur Begrenzung (Standard: "de")
 
     Rueckgabe: Liste mit Schluesseln "text", "lat", "lon".
     """
@@ -44,6 +53,7 @@ def geocode_suggestions(
             f"&autocomplete=true"
             f"&limit={limit}"
             f"&language={language}"
+            f"&country={country}"
             f"&types=address,place,locality,postcode"
         )
         ssl_context = ssl.create_default_context(cafile=certifi.where())

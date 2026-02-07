@@ -20,6 +20,9 @@ def reset_filters(
     page: ft.Page,
     on_reset: Optional[Callable[[], None]] = None,
     update_breeds_callback: Optional[Callable[[], None]] = None,
+    location_field: Optional[ft.TextField] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
+    location_selected: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Setzt alle Filter zurück.
 
@@ -34,7 +37,10 @@ def reset_filters(
         color_checkboxes_container: Container mit Farb-Checkboxen
         page: Flet Page-Instanz
         on_reset: Optional Callback nach Reset
-        update_breeds_callback: Optional Callback zum Aktualisieren des Rassen-Dropdowns (Tierart „Alle“)
+        update_breeds_callback: Optional Callback zum Aktualisieren des Rassen-Dropdowns (Tierart „Alle")
+        location_field: Optional Ort-Suchfeld (wird geleert)
+        radius_dropdown: Optional Umkreis-Dropdown (wird auf "none" gesetzt)
+        location_selected: Optional Dict mit Koordinaten (wird zurueckgesetzt)
     """
     search_field.value = ""
     filter_typ.value = "alle"
@@ -44,12 +50,22 @@ def reset_filters(
     sort_dropdown.value = "created_at_desc"
     selected_colors.clear()
 
+    # Ort/Umkreis zuruecksetzen
+    if location_field is not None:
+        location_field.value = ""
+    if radius_dropdown is not None:
+        radius_dropdown.value = "all"
+    if location_selected is not None:
+        location_selected["text"] = None
+        location_selected["lat"] = None
+        location_selected["lon"] = None
+
     # Farben-Checkboxen zurücksetzen
     for container in color_checkboxes_container.controls:
         if hasattr(container, "content") and isinstance(container.content, ft.Checkbox):
             container.content.value = False
 
-    # Rassen-Dropdown an Tierart „Alle“ anpassen (alle Rassen anzeigen)
+    # Rassen-Dropdown an Tierart „Alle" anpassen (alle Rassen anzeigen)
     if update_breeds_callback:
         update_breeds_callback()
 
@@ -69,6 +85,9 @@ def apply_saved_search_filters(
     color_checkboxes_container: ft.ResponsiveRow,
     update_breeds_callback: Optional[Callable[[], None]] = None,
     page: Optional[ft.Page] = None,
+    location_field: Optional[ft.TextField] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
+    location_selected: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Wendet einen gespeicherten Suchauftrag auf die Filter an.
 
@@ -83,6 +102,9 @@ def apply_saved_search_filters(
         color_checkboxes_container: Container mit Farb-Checkboxen
         update_breeds_callback: Optional Callback zum Aktualisieren der Rassen-Dropdown
         page: Optional Flet Page-Instanz für Updates
+        location_field: Optional Ort-Suchfeld
+        radius_dropdown: Optional Umkreis-Dropdown
+        location_selected: Optional Dict mit Koordinaten
     """
     # Saved Search speichert Filter als JSON in search["filters"]
     filters = search.get("filters") or {}
@@ -137,6 +159,24 @@ def apply_saved_search_filters(
     else:
         filter_rasse.value = "alle"
 
+    # Ort/Umkreis aus gespeicherter Suche wiederherstellen
+    saved_location_text = filters.get("location_text")
+    saved_location_lat = filters.get("location_lat")
+    saved_location_lon = filters.get("location_lon")
+    saved_radius_km = filters.get("radius_km")
+
+    if location_field is not None:
+        location_field.value = saved_location_text or ""
+    if radius_dropdown is not None:
+        if saved_radius_km:
+            radius_dropdown.value = str(int(saved_radius_km))
+        else:
+            radius_dropdown.value = "all"
+    if location_selected is not None:
+        location_selected["text"] = saved_location_text
+        location_selected["lat"] = saved_location_lat
+        location_selected["lon"] = saved_location_lon
+
     if page:
         page.update()
 
@@ -148,6 +188,8 @@ def collect_current_filters(
     filter_geschlecht: ft.Dropdown,
     filter_rasse: ft.Dropdown,
     selected_colors: list[int],
+    location_selected: Optional[Dict[str, Any]] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
 ) -> Dict[str, Any]:
     """Sammelt die aktuellen Filterwerte in einem Dictionary.
 
@@ -158,6 +200,8 @@ def collect_current_filters(
         filter_geschlecht: Geschlecht-Dropdown
         filter_rasse: Rasse-Dropdown
         selected_colors: Liste der ausgewählten Farb-IDs
+        location_selected: Optional Dict mit ausgewaehlten Koordinaten
+        radius_dropdown: Optional Umkreis-Dropdown
 
     Returns:
         Dictionary mit Filterwerten für SavedSearchService
@@ -200,7 +244,7 @@ def collect_current_filters(
     except (ValueError, TypeError):
         pass
 
-    return {
+    result = {
         "filters": filters,  # Für SearchService
         "search_query": search_query,
         "status_id": status_id,
@@ -209,6 +253,22 @@ def collect_current_filters(
         "sex_id": sex_id,
         "colors": selected_colors if selected_colors else None,
     }
+
+    # Ort/Umkreis hinzufuegen falls vorhanden
+    if location_selected:
+        loc_lat = location_selected.get("lat")
+        loc_lon = location_selected.get("lon")
+        if loc_lat is not None and loc_lon is not None:
+            result["location_text"] = location_selected.get("text")
+            result["location_lat"] = loc_lat
+            result["location_lon"] = loc_lon
+            if radius_dropdown and radius_dropdown.value:
+                try:
+                    result["radius_km"] = float(radius_dropdown.value)
+                except (ValueError, TypeError):
+                    result["radius_km"] = 25.0
+
+    return result
 
 
 # ─────────────────────────────────────────────────────────────
@@ -227,6 +287,9 @@ def handle_view_reset_filters(
     page: ft.Page,
     on_reset: Optional[Callable[[], None]] = None,
     update_breeds_callback: Optional[Callable[[], None]] = None,
+    location_field: Optional[ft.TextField] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
+    location_selected: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Setzt alle Filter zurück (View-Wrapper für reset_filters).
     
@@ -242,6 +305,9 @@ def handle_view_reset_filters(
         page: Flet Page-Instanz
         on_reset: Optional Callback nach Reset
         update_breeds_callback: Optional Callback zum Aktualisieren des Rassen-Dropdowns
+        location_field: Optional Ort-Suchfeld
+        radius_dropdown: Optional Umkreis-Dropdown
+        location_selected: Optional Dict mit Koordinaten
     """
     reset_filters(
         search_field=search_field,
@@ -255,6 +321,9 @@ def handle_view_reset_filters(
         page=page,
         on_reset=on_reset,
         update_breeds_callback=update_breeds_callback,
+        location_field=location_field,
+        radius_dropdown=radius_dropdown,
+        location_selected=location_selected,
     )
 
 
@@ -270,6 +339,9 @@ def handle_view_apply_saved_search(
     update_breeds_callback: Optional[Callable[[], None]] = None,
     load_posts_callback: Optional[Callable[[], None]] = None,
     page: Optional[ft.Page] = None,
+    location_field: Optional[ft.TextField] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
+    location_selected: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Wendet einen gespeicherten Suchauftrag auf die Filter an (View-Wrapper).
     
@@ -285,6 +357,9 @@ def handle_view_apply_saved_search(
         update_breeds_callback: Optional Callback zum Aktualisieren der Rassen-Dropdown
         load_posts_callback: Optional Callback zum Neuladen der Posts
         page: Optional Flet Page-Instanz für Updates
+        location_field: Optional Ort-Suchfeld
+        radius_dropdown: Optional Umkreis-Dropdown
+        location_selected: Optional Dict mit Koordinaten
     """
     apply_saved_search_filters(
         search=search,
@@ -297,6 +372,9 @@ def handle_view_apply_saved_search(
         color_checkboxes_container=color_checkboxes_container,
         update_breeds_callback=update_breeds_callback,
         page=page,
+        location_field=location_field,
+        radius_dropdown=radius_dropdown,
+        location_selected=location_selected,
     )
     if load_posts_callback:
         if page:
@@ -317,6 +395,8 @@ def handle_view_show_save_search_dialog(
     current_user_id: Optional[str],
     on_save_search_login_required: Optional[Callable[[], None]] = None,
     on_login_required: Optional[Callable[[], None]] = None,
+    location_selected: Optional[Dict[str, Any]] = None,
+    radius_dropdown: Optional[ft.Dropdown] = None,
 ) -> None:
     """Zeigt Dialog zum Speichern der aktuellen Suche (View-Wrapper).
     
@@ -332,6 +412,8 @@ def handle_view_show_save_search_dialog(
         current_user_id: Aktuelle User-ID (None wenn nicht eingeloggt)
         on_save_search_login_required: Optional Callback wenn Login für Save Search erforderlich
         on_login_required: Optional Callback wenn Login erforderlich
+        location_selected: Optional Dict mit ausgewaehlten Koordinaten
+        radius_dropdown: Optional Umkreis-Dropdown
     """
     if not current_user_id:
         if on_save_search_login_required:
@@ -349,6 +431,8 @@ def handle_view_show_save_search_dialog(
         filter_geschlecht=filter_geschlecht,
         filter_rasse=filter_rasse,
         selected_colors=selected_colors,
+        location_selected=location_selected,
+        radius_dropdown=radius_dropdown,
     )
 
     from .saved_search_handler import show_save_search_dialog

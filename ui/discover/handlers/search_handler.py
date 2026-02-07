@@ -25,6 +25,10 @@ def _fetch_posts_sync(
     selected_colors: List[int],
     sort_option: str,
     current_user_id: Optional[str],
+    location_lat: Optional[float] = None,
+    location_lon: Optional[float] = None,
+    radius_km: Optional[float] = None,
+    location_text_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Lädt Meldungen synchron (für asyncio.to_thread). Gibt Items zurück."""
     favorite_ids = favorites_service.get_favorite_ids(current_user_id) if current_user_id else set()
@@ -34,6 +38,10 @@ def _fetch_posts_sync(
         selected_colors=set(selected_colors) if selected_colors else None,
         sort_option=sort_option,
         favorite_ids=favorite_ids,
+        location_lat=location_lat,
+        location_lon=location_lon,
+        radius_km=radius_km,
+        location_text_filter=location_text_filter,
     )
 
 
@@ -118,6 +126,10 @@ async def handle_view_load_posts(
     page: ft.Page,
     on_render: Callable[[list[dict]], None],
     get_filter_value: Callable[[ft.Dropdown, str], str],
+    location_lat: Optional[float] = None,
+    location_lon: Optional[float] = None,
+    radius_km: Optional[float] = None,
+    location_text_filter: Optional[str] = None,
 ) -> None:
     """Lädt Meldungen aus der Datenbank mit aktiven Filteroptionen (View-Wrapper).
     
@@ -137,6 +149,10 @@ async def handle_view_load_posts(
         page: Flet Page-Instanz
         on_render: Callback zum Rendern der Items
         get_filter_value: Funktion zum Abrufen von Dropdown-Werten
+        location_lat: Optional Breitengrad des Suchzentrums
+        location_lon: Optional Laengengrad des Suchzentrums
+        radius_km: Optional Umkreis in Kilometern
+        location_text_filter: Optional Stadtname fuer "Ganzer Ort"-Filter
     """
     if filter_typ is None:
         return
@@ -166,6 +182,10 @@ async def handle_view_load_posts(
             selected_colors=selected_colors,
             sort_option=sort_option,
             current_user_id=current_user_id,
+            location_lat=location_lat,
+            location_lon=location_lon,
+            radius_km=radius_km,
+            location_text_filter=location_text_filter,
         )
         on_render(items)
     except Exception as ex:

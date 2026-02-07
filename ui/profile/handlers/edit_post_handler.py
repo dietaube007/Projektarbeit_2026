@@ -29,6 +29,8 @@ def validate_edit_form(
     location_value: Optional[str],
     date_value: Optional[str],
     selected_photo: Dict[str, Any],
+    location_selected: Optional[Dict[str, Any]] = None,
+    location_changed: bool = False,
 ) -> List[str]:
     """Validiert alle Formularfelder des Edit-Dialogs.
 
@@ -40,6 +42,8 @@ def validate_edit_form(
         location_value: Wert des Orts-Feldes
         date_value: Wert des Datums-Feldes
         selected_photo: Dictionary mit Foto-Informationen
+        location_selected: Ausgewaehlter Standort (text/lat/lon)
+        location_changed: Ob der Ort-Text geaendert wurde
 
     Returns:
         Liste von Fehlermeldungen (leer wenn alles valide)
@@ -58,6 +62,16 @@ def validate_edit_form(
     for value, name in checks:
         if not value or (isinstance(value, str) and not value.strip()):
             errors.append(f"• {name}")
+
+    # Ort muss aus Vorschlagsliste gewaehlt sein (wenn geaendert)
+    if location_changed:
+        has_coords = (
+            location_selected
+            and location_selected.get("lat") is not None
+            and location_selected.get("lon") is not None
+        )
+        if not has_coords:
+            errors.append("• Bitte Ort aus der Vorschlagsliste auswählen")
 
     # Foto erforderlich
     has_photo = (
@@ -183,6 +197,7 @@ def save_edit_post(
     selected_photo: Dict[str, Any],
     image_changed: bool,
     original_image_url: Optional[str],
+    location_selected: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Speichert die Änderungen einer bearbeiteten Meldung.
 
@@ -227,6 +242,14 @@ def save_edit_post(
         "event_date": event_date.isoformat(),
         "location_text": location_value.strip(),
     }
+
+    # Koordinaten aktualisieren wenn ein neuer Ort ausgewaehlt wurde
+    if location_selected and location_selected.get("lat") is not None:
+        post_data["location_lat"] = location_selected["lat"]
+        post_data["location_lon"] = location_selected["lon"]
+        # Ort-Text aus der Geocoding-Auswahl verwenden
+        if location_selected.get("text"):
+            post_data["location_text"] = location_selected["text"]
 
     post_id = post["id"]
     post_service.update(post_id, post_data)

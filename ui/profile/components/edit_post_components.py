@@ -395,6 +395,9 @@ class EditPostDialog:
         self.location_suggestions_list.controls = [build_item(s) for s in suggestions]
         self.location_suggestions_box.visible = True
         self.page.update()
+        # Nach unten scrollen damit Vorschlaege sichtbar sind
+        if self.content_column:
+            self.content_column.scroll_to(offset=99999, duration=300)
 
     def _select_location_suggestion(self, item: Dict[str, Any]):
         """Wählt einen Location-Vorschlag aus."""
@@ -602,6 +605,11 @@ class EditPostDialog:
 
     def _save(self, _):
         """Speichert die Änderungen."""
+        # Pruefen ob der Ort geaendert wurde (Freitext statt Vorschlag)
+        original_location = self.post.get("location_text", "")
+        current_location = (self.location_tf.value or "").strip()
+        location_changed = current_location != original_location
+
         # Validierung
         errors = validate_edit_form(
             name_value=self.name_tf.value,
@@ -611,6 +619,8 @@ class EditPostDialog:
             location_value=self.location_tf.value,
             date_value=self.date_tf.value,
             selected_photo=self.selected_photo,
+            location_selected=self.location_selected,
+            location_changed=location_changed,
         )
         if errors:
             self._show_error("Pflichtfelder fehlen:\n" + "\n".join(errors))
@@ -653,6 +663,7 @@ class EditPostDialog:
                 selected_photo=self.selected_photo,
                 image_changed=self._image_changed,
                 original_image_url=self._original_image_url,
+                location_selected=self.location_selected,
             )
 
             self.page.close(self.dialog)
