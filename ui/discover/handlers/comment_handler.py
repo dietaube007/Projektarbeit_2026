@@ -96,7 +96,6 @@ def handle_post_comment(
     replying_to: Optional[str],
     page: ft.Page,
     on_success: Callable[[], None],
-    show_snackbar: Callable[[str, str], None],
 ) -> bool:
     """Speichert einen neuen Kommentar.
     
@@ -111,7 +110,6 @@ def handle_post_comment(
         replying_to: Optional UUID des Kommentars auf den geantwortet wird
         page: Flet Page-Instanz
         on_success: Callback nach erfolgreichem Speichern (z.B. Kommentare neu laden)
-        show_snackbar: Funktion zum Anzeigen von Snackbar-Nachrichten
     
     Returns:
         True bei Erfolg, False bei Fehler oder ungültiger Eingabe
@@ -122,7 +120,6 @@ def handle_post_comment(
     
     # Login-Check
     if not user_id:
-        show_snackbar("Sie müssen eingeloggt sein, um zu kommentieren!", ft.Colors.RED_400)
         return False
     
     # Button während des Sendens deaktivieren
@@ -154,20 +151,15 @@ def handle_post_comment(
                 reply_banner.visible = False
                 comment_input.hint_text = "Schreibe einen Kommentar..."
             
-            # Success-Nachricht
-            show_snackbar("Kommentar gepostet!", ft.Colors.GREEN_400)
-            
             # Kommentare neu laden
             on_success()
             
             return True
         else:
-            show_snackbar("Fehler beim Senden des Kommentars.", ft.Colors.RED_400)
             return False
         
     except Exception as e:
         logger.error(f"Fehler beim Posten des Kommentars: {e}", exc_info=True)
-        show_snackbar(f"Fehler beim Senden: {str(e)}", ft.Colors.RED_400)
         return False
     
     finally:
@@ -181,7 +173,6 @@ def handle_delete_comment(
     comment_id: Union[int, str],
     page: ft.Page,
     on_success: Callable[[], None],
-    show_snackbar: Callable[[str, str], None],
 ) -> bool:
     """Löscht einen Kommentar (Soft-Delete).
     
@@ -190,7 +181,6 @@ def handle_delete_comment(
         comment_id: ID des Kommentars (serial integer oder String)
         page: Flet Page-Instanz
         on_success: Callback nach erfolgreichem Löschen (z.B. Kommentare neu laden)
-        show_snackbar: Funktion zum Anzeigen von Snackbar-Nachrichten
     
     Returns:
         True bei Erfolg, False bei Fehler
@@ -200,15 +190,12 @@ def handle_delete_comment(
         success = comment_service.delete_comment(comment_id)
         
         if success:
-            show_snackbar("Kommentar gelöscht", ft.Colors.ORANGE_400)
             # Kommentare neu laden
             on_success()
             return True
         else:
-            show_snackbar("Fehler beim Löschen", ft.Colors.RED_400)
             return False
         
     except Exception as e:
         logger.error(f"Fehler beim Löschen des Kommentars (ID: {comment_id}): {e}", exc_info=True)
-        show_snackbar("Fehler beim Löschen", ft.Colors.RED_400)
         return False

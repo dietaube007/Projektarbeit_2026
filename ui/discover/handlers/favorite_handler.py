@@ -9,7 +9,7 @@ import flet as ft
 
 from utils.logging_config import get_logger
 from services.posts import FavoritesService
-from ui.shared_components import show_success_dialog, show_error_dialog, show_login_required_snackbar
+from ui.shared_components import show_error_dialog
 
 logger = get_logger(__name__)
 
@@ -36,10 +36,7 @@ def handle_toggle_favorite(
         if on_login_required:
             on_login_required()
         else:
-            show_login_required_snackbar(
-                page,
-                "Bitte melden Sie sich an, um Meldungen zu favorisieren."
-            )
+            return
         return
 
     post_id = item.get("id")
@@ -54,22 +51,12 @@ def handle_toggle_favorite(
                 item["is_favorite"] = False
                 icon_button.icon = ft.Icons.FAVORITE_BORDER
                 icon_button.icon_color = ft.Colors.GREY_600
-                show_success_dialog(
-                    page,
-                    "Aus Favoriten entfernt",
-                    "Die Meldung wurde aus Ihren Favoriten entfernt."
-                )
         else:
             success = favorites_service.add_favorite(post_id)
             if success:
                 item["is_favorite"] = True
                 icon_button.icon = ft.Icons.FAVORITE
                 icon_button.icon_color = ft.Colors.RED
-                show_success_dialog(
-                    page,
-                    "Zu Favoriten hinzugefügt",
-                    "Die Meldung wurde zu Ihren Favoriten hinzugefügt."
-                )
 
         if success:
             page.update()

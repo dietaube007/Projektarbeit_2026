@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 def populate_dropdown_options(
-    dropdown: ft.Dropdown,
+    dropdown: Any,
     items: List[Dict[str, Any]],
     with_none_option: bool = False
 ) -> None:

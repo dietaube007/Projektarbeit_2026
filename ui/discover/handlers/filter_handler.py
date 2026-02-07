@@ -8,7 +8,6 @@ from typing import Callable, Optional, Dict, Any, List
 import flet as ft
 
 from utils.logging_config import get_logger
-from ui.shared_components import show_login_required_snackbar
 
 logger = get_logger(__name__)
 
@@ -344,10 +343,7 @@ def handle_view_show_save_search_dialog(
         elif on_login_required:
             on_login_required()
         else:
-            show_login_required_snackbar(
-                page,
-                "Bitte melden Sie sich an, um Suchaufträge zu speichern."
-            )
+            return
         return
 
     current_filters = collect_current_filters(

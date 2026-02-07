@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Callable, Optional, List, Dict, Any
 import flet as ft
 
-from ui.constants import BORDER_COLOR, PRIMARY_COLOR
+from ui.constants import BORDER_COLOR, PRIMARY_COLOR, DROPDOWN_MENU_HEIGHT
 
 
 def create_search_field(on_change: Optional[Callable[[ft.ControlEvent], None]] = None) -> ft.TextField:
@@ -48,13 +48,16 @@ def create_dropdown(
     if initial_options is None:
         initial_options = [ft.dropdown.Option("alle", "Alle")]
     
-    return ft.Dropdown(
+    dropdown = ft.Dropdown(
         label=label,
         options=initial_options,
         value="alle",
         expand=True,
         on_change=on_change,
     )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
 
 
 def populate_dropdown(
@@ -152,7 +155,7 @@ def create_sort_dropdown(
     Returns:
         Dropdown für Sortier-Optionen
     """
-    return ft.Dropdown(
+    dropdown = ft.Dropdown(
         label="Sortieren",
         options=[
             ft.dropdown.Option("created_at_desc", "Erstellungsdatum (neueste)"),
@@ -164,6 +167,9 @@ def create_sort_dropdown(
         expand=True,
         on_change=on_change,
     )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
 
 
 def create_reset_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.TextButton:

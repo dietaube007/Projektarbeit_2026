@@ -15,7 +15,6 @@ from utils.logging_config import get_logger
 from ui.theme import soft_card, get_theme_color
 from ui.shared_components import (
     show_error_dialog,
-    show_login_required_snackbar,
     create_empty_state_card,
     create_loading_indicator,
 )

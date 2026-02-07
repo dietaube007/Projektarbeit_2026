@@ -226,14 +226,13 @@ class PetBuddyApp:
         self._show_main_app()
 
     def _show_error(self, message: str) -> None:
-        """Zeigt eine Fehlermeldung in der Snackbar.
+        """Zeigt eine Fehlermeldung als Dialog.
         
         Args:
             message: Fehlermeldung die angezeigt werden soll
         """
-        self.page.snack_bar = ft.SnackBar(ft.Text(message))
-        self.page.snack_bar.open = True
-        self.page.update()
+        from ui.shared_components import show_error_dialog
+        show_error_dialog(self.page, "Fehler", message)
     
     
     # ════════════════════════════════════════════════════════════════════

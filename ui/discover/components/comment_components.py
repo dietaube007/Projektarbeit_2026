@@ -674,7 +674,6 @@ class CommentSection(ft.Container):
             replying_to=self.replying_to,
             page=self._page,
             on_success=on_success_callback,
-            show_snackbar=self.show_snackbar,
         )
     
     def _request_delete_comment(self, comment_id) -> None:
@@ -694,20 +693,4 @@ class CommentSection(ft.Container):
             comment_id=comment_id,
             page=self._page,
             on_success=self.load_comments,
-            show_snackbar=self.show_snackbar,
         )
-    
-    def show_snackbar(self, message: str, bgcolor: str) -> None:
-        """Zeigt eine Snackbar-Nachricht.
-        
-        Args:
-            message: Nachricht die angezeigt werden soll
-            bgcolor: Hintergrundfarbe der Snackbar
-        """
-        self._page.snack_bar = ft.SnackBar(
-            content=ft.Text(message),
-            bgcolor=bgcolor,
-            duration=3000
-        )
-        self._page.snack_bar.open = True
-        self._page.update()

@@ -9,7 +9,7 @@ Enthält:
 
 from __future__ import annotations
 
-from typing import List, Dict, Callable, Tuple, Any
+from typing import List, Dict, Callable, Tuple, Any, Optional
 
 import flet as ft
 
@@ -17,6 +17,7 @@ from ui.constants import (
     FIELD_WIDTH_SMALL,
     FIELD_WIDTH_MEDIUM,
     FIELD_WIDTH_LARGE,
+    DROPDOWN_MENU_HEIGHT,
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
@@ -80,11 +81,14 @@ def create_species_dropdown() -> ft.Dropdown:
     Returns:
         Dropdown-Widget für Tierart-Auswahl
     """
-    return ft.Dropdown(
+    dropdown = ft.Dropdown(
         label="Tierart﹡",
         text_size=14,
-        width=FIELD_WIDTH_SMALL
+        width=FIELD_WIDTH_SMALL,
     )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
 
 
 def create_breed_dropdown() -> ft.Dropdown:
@@ -93,10 +97,13 @@ def create_breed_dropdown() -> ft.Dropdown:
     Returns:
         Dropdown-Widget für Rassen-Auswahl (optional)
     """
-    return ft.Dropdown(
+    dropdown = ft.Dropdown(
         label="Rasse (optional)",
-        width=FIELD_WIDTH_SMALL
+        width=FIELD_WIDTH_SMALL,
     )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
 
 
 def create_sex_dropdown() -> ft.Dropdown:
@@ -105,10 +112,13 @@ def create_sex_dropdown() -> ft.Dropdown:
     Returns:
         Dropdown-Widget für Geschlechts-Auswahl (optional)
     """
-    return ft.Dropdown(
+    dropdown = ft.Dropdown(
         label="Geschlecht (optional)",
-        width=FIELD_WIDTH_SMALL
+        width=FIELD_WIDTH_SMALL,
     )
+    if hasattr(dropdown, "max_menu_height"):
+        dropdown.max_menu_height = DROPDOWN_MENU_HEIGHT
+    return dropdown
 
 
 def create_description_field() -> ft.TextField:
@@ -366,9 +376,9 @@ def create_form_photo_section(
 def create_form_basic_info_section(
     title_label: ft.Text,
     name_tf: ft.TextField,
-    species_dd: ft.Dropdown,
-    breed_dd: ft.Dropdown,
-    sex_dd: ft.Dropdown,
+    species_dd: ft.Control,
+    breed_dd: ft.Control,
+    sex_dd: ft.Control,
 ) -> List[ft.Control]:
     """Erstellt die Basis-Informationen-Sektion.
     

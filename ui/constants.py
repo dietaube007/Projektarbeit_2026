@@ -120,6 +120,9 @@ FIELD_WIDTH_MEDIUM: int = 400
 FIELD_WIDTH_LARGE: int = 500
 """Breite für große Formularfelder (z.B. Beschreibung)."""
 
+DROPDOWN_MENU_HEIGHT: int = 260
+"""Maximale Höhe der Dropdown-Liste (ermöglicht Scrollen)."""
+
 # ══════════════════════════════════════════════════════════════════════
 # DATUMSFORMATE
 # ══════════════════════════════════════════════════════════════════════

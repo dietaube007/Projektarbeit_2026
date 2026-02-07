@@ -472,27 +472,6 @@ def create_no_results_card(on_reset: Optional[Callable] = None) -> ft.Container:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# SNACKBAR HELPER
-# ══════════════════════════════════════════════════════════════════════
-
-def show_login_required_snackbar(
-    page: ft.Page,
-    message: str = "Bitte melden Sie sich an, um diese Aktion durchzuführen.",
-) -> None:
-    """Zeigt eine SnackBar-Nachricht für Login-Required-Fälle.
-    
-    Args:
-        page: Flet Page-Instanz
-        message: Nachricht die angezeigt werden soll
-    """
-    page.snack_bar = ft.SnackBar(
-        ft.Text(message),
-        open=True,
-    )
-    page.update()
-
-
-# ══════════════════════════════════════════════════════════════════════
 # PROGRESS DIALOGS
 # ══════════════════════════════════════════════════════════════════════
 

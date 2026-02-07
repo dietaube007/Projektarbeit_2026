@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Callable, List, Optional
 import flet as ft
 
-from ui.shared_components import loading_indicator
+from ui.shared_components import loading_indicator, show_confirm_dialog
 from ..components.my_favorites_components import build_favorite_card
 from utils.logging_config import get_logger
 
@@ -157,33 +157,45 @@ def remove_favorite(
         sb: Supabase Client
         on_favorites_changed: Optionaler Callback wenn Favoriten geändert wurden
     """
-    try:
-        from services.posts import FavoritesService
-        favorites_service = FavoritesService(sb)
-        
-        # Aus Datenbank löschen
-        if favorites_service.remove_favorite(str(post_id)):
-            # Lokal entfernen
-            favorites_items[:] = [
-                p for p in favorites_items if p.get("id") != post_id
-            ]
-            render_favorites_list(
-                favorites_list,
-                favorites_items,
-                lambda pid: remove_favorite(
-                    post_id=pid,
-                    favorites_items=favorites_items,
-                    favorites_list=favorites_list,
-                    page=page,
-                    sb=sb,
-                    on_favorites_changed=on_favorites_changed,
-                ),
+    def on_confirm() -> None:
+        try:
+            from services.posts import FavoritesService
+            favorites_service = FavoritesService(sb)
+
+            # Aus Datenbank löschen
+            if favorites_service.remove_favorite(str(post_id)):
+                # Lokal entfernen
+                favorites_items[:] = [
+                    p for p in favorites_items if p.get("id") != post_id
+                ]
+                render_favorites_list(
+                    favorites_list,
+                    favorites_items,
+                    lambda pid: remove_favorite(
+                        post_id=pid,
+                        favorites_items=favorites_items,
+                        favorites_list=favorites_list,
+                        page=page,
+                        sb=sb,
+                        on_favorites_changed=on_favorites_changed,
+                    ),
+                )
+                page.update()
+
+                # Startseite informieren
+                if on_favorites_changed:
+                    on_favorites_changed()
+
+        except Exception as e:
+            logger.error(
+                f"Fehler beim Entfernen aus Favoriten (Post {post_id}): {e}",
+                exc_info=True,
             )
-            page.update()
 
-            # Startseite informieren
-            if on_favorites_changed:
-                on_favorites_changed()
-
-    except Exception as e:
-        logger.error(f"Fehler beim Entfernen aus Favoriten (Post {post_id}): {e}", exc_info=True)
+    show_confirm_dialog(
+        page=page,
+        title="Aus Favoriten entfernen?",
+        message="Moechten Sie diese Meldung wirklich aus Ihren Favoriten entfernen?",
+        confirm_text="Entfernen",
+        on_confirm=on_confirm,
+    )
