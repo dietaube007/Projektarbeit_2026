@@ -90,6 +90,7 @@ class PetBuddyApp:
 
             # Routing einrichten
             self.page.on_route_change = self._handle_route_change
+            self.page.on_disconnect = self._handle_disconnect
             
             # Theme anwenden
             self.theme_manager = ThemeManager(self.page)
@@ -121,6 +122,15 @@ class PetBuddyApp:
         
         # Route verarbeiten
         self._navigate_to(route)
+
+    def _handle_disconnect(self, _e: ft.ControlEvent) -> None:
+        """Cleanup bei App-Schliessen oder Verbindungsabbruch."""
+        self._cleanup_post_form_uploads()
+
+    def _cleanup_post_form_uploads(self) -> None:
+        """Entfernt lokale Uploads aus dem Meldeformular, falls vorhanden."""
+        if self.post_form:
+            self.post_form.cleanup_local_uploads()
     
     def _navigate_to(self, route: str) -> None:
         """Navigiert zu einer bestimmten Route.
@@ -336,6 +346,8 @@ class PetBuddyApp:
         """
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
+        if self.post_form:
+            self.post_form.cleanup_local_uploads()
         # Zur Startseite navigieren
         self.page.go("/")
     
@@ -352,6 +364,10 @@ class PetBuddyApp:
             self._show_login_required_dialog(new_tab)
             return
         
+        # Cleanup wenn Melden verlassen wird
+        if self.current_tab == TAB_MELDEN and new_tab != TAB_MELDEN and self.post_form:
+            self.post_form.cleanup_local_uploads()
+
         # Navigation zu Routen
         if new_tab == TAB_START:
             self.page.go("/")
@@ -365,6 +381,8 @@ class PetBuddyApp:
     
     def _go_to_start(self, _e: ft.ControlEvent) -> None:
         """Navigiert zur Startseite (z. B. beim Klick auf die PetBuddy-Überschrift)."""
+        if self.current_tab == TAB_MELDEN and self.post_form:
+            self.post_form.cleanup_local_uploads()
         self.current_tab = TAB_START
         if self.nav is not None:
             self.nav.selected_index = TAB_START
@@ -374,6 +392,7 @@ class PetBuddyApp:
     def _logout(self) -> None:
         """Meldet den Benutzer ab."""
         try:
+            self._cleanup_post_form_uploads()
             self.sb.auth.sign_out()
             self.is_logged_in = False
             

@@ -321,7 +321,7 @@ def create_form_header() -> List[ft.Control]:
     """
     return [
         ft.Text("Tier melden", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-        ft.Divider(height=20),
+        ft.Divider(height=8),
     ]
 
 
@@ -335,17 +335,22 @@ def create_form_meldungsart_section(meldungsart: ft.SegmentedButton) -> List[ft.
         Liste von Controls für die Meldungsart-Sektion
     """
     return [
+        ft.Divider(height=8),
         ft.Text("Meldungsart﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         meldungsart,
-        ft.Divider(height=20),
     ]
 
 
-def create_form_photo_section(photo_area: ft.Control, page: ft.Page) -> List[ft.Control]:
+def create_form_photo_section(
+    photo_area: ft.Control,
+    photo_status_text: ft.Text,
+    page: ft.Page,
+) -> List[ft.Control]:
     """Erstellt die Foto-Upload-Sektion.
     
     Args:
         photo_area: Container mit Photo-Upload-Bereich
+        photo_status_text: Statusanzeige fuer Fotoaktionen
         page: Flet Page-Instanz für Theme-Erkennung
     
     Returns:
@@ -354,7 +359,7 @@ def create_form_photo_section(photo_area: ft.Control, page: ft.Page) -> List[ft.
     return [
         ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         photo_area,
-        ft.Divider(height=20),
+        photo_status_text,
     ]
 
 
@@ -387,12 +392,16 @@ def create_form_basic_info_section(
 def create_form_ai_section(
     ai_button: ft.Control,
     ai_result_container: ft.Container,
+    ai_status_text: ft.Text,
+    divider: ft.Divider,
 ) -> List[ft.Control]:
     """Erstellt die KI-Rassenerkennungs-Sektion (unterhalb des Bildes).
     
     Args:
         ai_button: Button für KI-Erkennung
         ai_result_container: Container für KI-Ergebnisse
+        ai_status_text: Statusanzeige fuer KI-Aktionen
+        divider: Trennlinie unter dem KI-Bereich
     
     Returns:
         Liste von Controls für die KI-Sektion
@@ -400,7 +409,8 @@ def create_form_ai_section(
     return [
         ai_button,
         ai_result_container,
-        ft.Divider(height=20),
+        ai_status_text,
+        divider,
     ]
 
 
@@ -485,12 +495,15 @@ def create_form_layout(
     info_tf: ft.TextField,
     ai_button: ft.Control,
     ai_result_container: ft.Container,
+    ai_status_text: ft.Text,
+    ai_divider: ft.Divider,
     location_tf: ft.TextField,
     location_suggestions: ft.Control,
     date_tf: ft.TextField,
     save_button: ft.FilledButton,
     status_text: ft.Text,
     photo_area: ft.Control,
+    photo_status_text: ft.Text,
     page: ft.Page,
     meldungsart: ft.SegmentedButton,
 ) -> ft.Column:
@@ -507,12 +520,15 @@ def create_form_layout(
         info_tf: TextField für Beschreibung
         ai_button: Button für KI-Erkennung
         ai_result_container: Container für AI-Ergebnisse
+        ai_status_text: Statusanzeige fuer KI-Aktionen
+        ai_divider: Trennlinie unter dem KI-Bereich
         location_tf: TextField für Standort
         location_suggestions: Vorschlagsliste für Standort
         date_tf: TextField für Datum
         save_button: Button zum Speichern
         status_text: Text-Widget für Status-Nachrichten
         photo_area: Container mit Photo-Upload-Bereich
+        photo_status_text: Statusanzeige fuer Fotoaktionen
         page: Flet Page-Instanz für Theme-Erkennung
         meldungsart: SegmentedButton für Meldungsart (Vermisst/Fundtier)
     
@@ -526,13 +542,13 @@ def create_form_layout(
     controls.extend(create_form_header())
     
     # Foto-Sektion
-    controls.extend(create_form_photo_section(photo_area, page))
-    
-    # KI-Rassenerkennung (unterhalb des Bildes)
-    controls.extend(create_form_ai_section(ai_button, ai_result_container))
+    controls.extend(create_form_photo_section(photo_area, photo_status_text, page))
     
     # Meldungsart-Sektion (zwischen Bild und Name/Überschrift)
     controls.extend(create_form_meldungsart_section(meldungsart))
+
+    # KI-Rassenerkennung (nur bei Fundtier)
+    controls.extend(create_form_ai_section(ai_button, ai_result_container, ai_status_text, ai_divider))
     
     # Basis-Info-Sektion
     controls.extend(create_form_basic_info_section(

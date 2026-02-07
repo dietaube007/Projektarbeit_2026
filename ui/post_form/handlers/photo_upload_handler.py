@@ -56,6 +56,7 @@ async def handle_pick_photo(
     selected_photo: Dict[str, Any],
     photo_preview: ft.Image,
     show_status_callback: Callable[[str, bool, bool], None],
+    set_loading_callback: Optional[Callable[[bool], None]] = None,
 ) -> None:
     """Öffnet Dateiauswahl und speichert das Bild nur lokal. Upload zu Supabase erfolgt beim Speichern der Meldung.
     
@@ -70,6 +71,8 @@ async def handle_pick_photo(
         if ev.files:
             f = ev.files[0]
             selected_photo["name"] = f.name
+            if set_loading_callback:
+                set_loading_callback(True)
             
             fp.upload([ft.FilePickerUploadFile(
                 f.name,
@@ -100,13 +103,15 @@ async def handle_pick_photo(
                     
                     photo_preview.src_base64 = base64_data
                     photo_preview.visible = True
-                    show_status_callback(f"Bild ausgewählt: {ev.file_name}", is_error=False, is_loading=False)
                 else:
                     show_status_callback("Fehler beim Verarbeiten des Bildes", is_error=True, is_loading=False)
                     cleanup_local_file(local_path)
                 
             except Exception as ex:
                 show_status_callback(f"Fehler: {ex}", is_error=True, is_loading=False)
+            finally:
+                if set_loading_callback:
+                    set_loading_callback(False)
     
     fp = ft.FilePicker(on_result=on_result, on_upload=on_upload)
     page.overlay.append(fp)
@@ -155,6 +160,7 @@ async def handle_view_pick_photo(
     selected_photo: Dict[str, Any],
     photo_preview: ft.Image,
     show_status_callback: Callable[[str, bool, bool], None],
+    set_loading_callback: Optional[Callable[[bool], None]] = None,
 ) -> None:
     """Öffnet Dateiauswahl und lädt Bild hoch (View-Wrapper).
     
@@ -171,6 +177,7 @@ async def handle_view_pick_photo(
         selected_photo=selected_photo,
         photo_preview=photo_preview,
         show_status_callback=show_status_callback,
+        set_loading_callback=set_loading_callback,
     )
 
 

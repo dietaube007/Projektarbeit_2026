@@ -31,6 +31,7 @@ def create_photo_preview() -> ft.Image:
 
 def create_photo_upload_area(
     photo_preview: ft.Image,
+    loading_indicator: ft.Control,
     on_pick_photo: Callable[[ft.ControlEvent], None],
     on_remove_photo: Callable[[ft.ControlEvent], None],
     page: Optional[ft.Page] = None,
@@ -39,6 +40,7 @@ def create_photo_upload_area(
     
     Args:
         photo_preview: Image-Widget für Vorschau
+        loading_indicator: Ladeanzeige fuer Upload
         on_pick_photo: Callback für Foto-Auswahl
         on_remove_photo: Callback für Foto-Entfernung
         page: Optional Flet Page-Instanz für Theme-Erkennung
@@ -52,23 +54,26 @@ def create_photo_upload_area(
     border_color = getattr(ft.Colors, "OUTLINE_VARIANT", None) or ft.Colors.ON_SURFACE_VARIANT
     
     return ft.Container(
-        content=ft.Column([
-            ft.Container(
-                content=ft.Column([
-                    ft.Icon(ft.Icons.CAMERA_ALT, size=40, color=icon_color),
-                    ft.Text("Foto hochladen (Tippen)", color=text_color, size=12),
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                width=400,
-                height=150,
-                border=ft.border.all(2, border_color),
-                border_radius=8,
-                on_click=on_pick_photo,
-            ),
-            photo_preview,
-            ft.TextButton(
-                "Foto entfernen",
-                icon=ft.Icons.DELETE,
-                on_click=on_remove_photo
-            ),
-        ], spacing=10),
+        content=ft.Column(
+            [
+                photo_preview,
+                loading_indicator,
+                ft.Row(
+                    [
+                        ft.FilledButton(
+                            "Foto hochladen",
+                            icon=ft.Icons.UPLOAD,
+                            on_click=on_pick_photo,
+                        ),
+                        ft.TextButton(
+                            "Foto entfernen",
+                            icon=ft.Icons.DELETE,
+                            on_click=on_remove_photo,
+                        ),
+                    ],
+                    spacing=12,
+                ),
+            ],
+            spacing=10,
+        ),
     )

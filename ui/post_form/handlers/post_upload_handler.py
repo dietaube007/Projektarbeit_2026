@@ -21,7 +21,7 @@ from ui.constants import (
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
 )
-from ui.shared_components import show_error_dialog, show_success_dialog
+from ui.shared_components import show_error_dialog, show_success_dialog, show_progress_dialog
 
 logger = get_logger(__name__)
 
@@ -92,8 +92,9 @@ async def handle_save_post(
         show_error_dialog(page, "Fehler", f"Fehler beim Abrufen des Benutzers: {e}")
         return
     
+    progress_dlg = None
     try:
-        show_status_callback("Erstelle Meldung...", is_error=False, is_loading=True)
+        progress_dlg = show_progress_dialog(page, "Meldung wird gespeichert...")
         
         # Input sanitizen vor dem Speichern
         headline = sanitize_string(name_tf.value, max_length=MAX_HEADLINE_LENGTH)
@@ -106,6 +107,8 @@ async def handle_save_post(
                 "Bitte waehlen Sie einen Standort aus der Vorschlagsliste.",
                 ["• Geben Sie einen konkreten Ort oder eine Adresse ein."],
             )
+            if progress_dlg:
+                page.close(progress_dlg)
             return
 
         post_data = {
@@ -143,14 +146,16 @@ async def handle_save_post(
         elif photo_url:
             post_relations_service.add_photo(post_id, photo_url)
         
-        show_status_callback("", is_error=False, is_loading=False)
+        if progress_dlg:
+            page.close(progress_dlg)
         show_success_dialog(page, "Meldung erstellt", "Ihre Meldung wurde erfolgreich veröffentlicht!")
         
         if on_saved_callback:
             on_saved_callback(post_id)
                 
     except Exception as ex:
-        show_status_callback("", is_error=False, is_loading=False)
+        if progress_dlg:
+            page.close(progress_dlg)
         show_error_dialog(page, "Speichern fehlgeschlagen", f"Fehler beim Erstellen der Meldung: {ex}")
         logger.error(f"Fehler beim Speichern des Posts: {ex}", exc_info=True)
 
@@ -219,7 +224,9 @@ def reset_form_fields(
     selected_farben.clear()
     for cb in farben_checkboxes.values():
         cb.value = False
-    
+    local_path = selected_photo.get("local_path")
+    if local_path:
+        cleanup_local_file(local_path)
     selected_photo.update({"path": None, "name": None, "url": None, "base64": None, "local_path": None})
     photo_preview.visible = False
     title_label.value = "Name﹡"

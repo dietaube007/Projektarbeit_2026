@@ -17,7 +17,7 @@ import flet as ft
 from services.posts import PostStorageService
 from services.ai.pet_recognition import PetRecognitionService
 from utils.logging_config import get_logger
-from ui.shared_components import show_error_dialog, show_progress_dialog
+from ui.shared_components import show_error_dialog, show_progress_dialog, show_success_dialog
 from ..components.ai_components import (
     create_consent_dialog,
     create_ai_result_content,
@@ -115,7 +115,6 @@ async def perform_ai_recognition(
         
         # Zeige Fortschrittsdialog
         progress_dlg = show_progress_dialog(page, "KI analysiert das Bild...")
-        show_status_callback("KI analysiert das Bild...", is_error=False, is_loading=True)
         await asyncio.sleep(0.05)
         
         # Prüfe auf Abbruch
@@ -127,7 +126,11 @@ async def perform_ai_recognition(
         local_path = selected_photo.get("local_path")
         storage_path = selected_photo.get("path")
         if not local_path and not storage_path:
-            show_status_callback("Kein Bild vorhanden", is_error=True, is_loading=False)
+            show_error_dialog(
+                page,
+                "Kein Bild vorhanden",
+                "Bitte laden Sie zuerst ein Foto hoch, bevor Sie die KI-Erkennung starten.",
+            )
             page.close(progress_dlg)
             return
         
@@ -137,11 +140,11 @@ async def perform_ai_recognition(
             else:
                 image_data = post_storage_service.download_post_image(storage_path)
             if not image_data:
-                show_status_callback("Fehler beim Laden des Bildes", is_error=True, is_loading=False)
+                show_error_dialog(page, "Fehler", "Fehler beim Laden des Bildes")
                 page.close(progress_dlg)
                 return
         except Exception as ex:
-            show_status_callback(f"Fehler beim Laden des Bildes: {ex}", is_error=True, is_loading=False)
+            show_error_dialog(page, "Fehler", f"Fehler beim Laden des Bildes: {ex}")
             page.close(progress_dlg)
             return
         
@@ -176,30 +179,25 @@ async def perform_ai_recognition(
         
         if result["success"]:
             show_ai_result_callback(result)
-            show_status_callback("Erkennung abgeschlossen!", is_error=False, is_loading=False)
         else:
-            # Wenn es einen Vorschlag gibt, biete Übernahme in die Beschreibung an
             suggested_breed = result.get("suggested_breed")
             suggested_species = result.get("suggested_species")
+            confidence = result.get("confidence", 0.0)
+            base_message = result.get("error") or (
+                "Die KI konnte das Tier nicht sicher erkennen. "
+                "Bitte versuchen Sie ein anderes Bild oder tragen Sie die Rasse manuell ein. "
+                "Sie können auch das Tierheim kontaktieren und das Tier beschreiben."
+            )
             if suggested_breed:
-                show_ai_suggestion_callback(
-                    result.get("error") or "Die KI konnte das Tier nicht sicher erkennen.",
-                    suggested_breed,
-                    suggested_species,
-                    result.get("confidence", 0.0),
-                )
+                confidence_percent = int(confidence * 100)
+                suggestion_text = f"Vorschlag: {suggested_species or 'Tier'}, {suggested_breed} ({confidence_percent}% Konfidenz)"
+                message = f"{base_message}\n\n{suggestion_text}"
             else:
-                show_error_dialog(
-                    page,
-                    "Erkennung fehlgeschlagen",
-                    result.get("error") or "Die KI konnte das Tier nicht sicher erkennen. "
-                    "Bitte versuchen Sie ein anderes Bild oder tragen Sie die Rasse manuell ein. "
-                    "Sie können auch das Tierheim kontaktieren und das Tier beschreiben."
-                )
-            show_status_callback("", is_error=False, is_loading=False)
+                message = base_message
+            show_error_dialog(page, "KI-Erkennung", message)
                 
     except Exception as ex:
-        show_status_callback(f"Fehler: {ex}", is_error=True, is_loading=False)
+        show_error_dialog(page, "Fehler", f"Fehler: {ex}")
         if 'progress_dlg' in locals():
             try:
                 page.close(progress_dlg)
@@ -233,8 +231,10 @@ def show_ai_result(
     
     ai_result_container.content = result_content
     ai_result_container.visible = True
-    ai_result_container.update()
-    page.update()
+    if getattr(ai_result_container, "page", None):
+        ai_result_container.update()
+    else:
+        page.update()
     
     # Ergebnis in den sichtbaren Bereich scrollen
     if form_scroll_column and hasattr(form_scroll_column, "scroll_to"):
@@ -398,6 +398,7 @@ def handle_view_accept_ai_result(
     page: ft.Page,
     update_breeds_callback: Callable[[], None],
     show_status_callback: Callable[[str, bool, bool], None],
+    update_description_counter: Optional[Callable[[], None]] = None,
 ) -> None:
     """Übernimmt das KI-Erkennungsergebnis in die Formularfelder (View-Wrapper).
     
@@ -451,9 +452,11 @@ def handle_view_accept_ai_result(
                 info_tf.value = f"{ai_info}\n\n{current_description}"
             else:
                 info_tf.value = ai_info
+            if update_description_counter:
+                update_description_counter()
             
             ai_result_container.visible = False
-            show_status_callback("KI-Vorschlag übernommen!", is_error=False, is_loading=False)
+            show_success_dialog(page, "KI-Vorschlag übernommen", "Die KI-Erkennung wurde übernommen.")
             page.update()
         
         page.run_task(set_breed_async)
@@ -475,7 +478,11 @@ def handle_view_reject_ai_result(
     """
     ai_result["result"] = None
     ai_result_container.visible = False
-    show_status_callback("KI-Vorschlag abgelehnt. Bitte tragen Sie die Daten manuell ein.", is_error=False, is_loading=False)
+    show_error_dialog(
+        page,
+        "KI-Vorschlag abgelehnt",
+        "Bitte tragen Sie die Daten manuell ein.",
+    )
     page.update()
 
 
@@ -529,6 +536,7 @@ async def handle_ai_recognition_flow(
     show_status_callback: Callable[[str, bool, bool], None],
     update_breeds_callback: Callable[[], None],
     form_scroll_column: Optional[ft.Control] = None,
+    update_description_counter: Optional[Callable[[], None]] = None,
 ) -> None:
     """Kompletter AI-Recognition-Flow von Start bis Ergebnis.
     
@@ -599,6 +607,7 @@ async def handle_ai_recognition_flow(
             page=page,
             update_breeds_callback=update_breeds_callback,
             show_status_callback=show_status_callback,
+            update_description_counter=update_description_counter,
         )
     
     # Callback für AI-Ergebnis ablehnen

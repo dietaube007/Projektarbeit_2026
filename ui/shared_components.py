@@ -454,13 +454,19 @@ def show_progress_dialog(page: ft.Page, message: str = "Lädt...") -> ft.AlertDi
     """
     dlg = ft.AlertDialog(
         modal=True,
-        content=ft.Row(
-            [
-                ft.ProgressRing(width=24, height=24),
-                ft.Text(message, size=14),
-            ],
-            spacing=20,
-            alignment=ft.MainAxisAlignment.CENTER,
+        content=ft.Container(
+            content=ft.Row(
+                [
+                    ft.ProgressRing(width=24, height=24),
+                    ft.Text(message, size=14),
+                ],
+                spacing=12,
+                alignment=ft.MainAxisAlignment.CENTER,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            alignment=ft.alignment.center,
+            height=56,
+            padding=0,
         ),
     )
     page.open(dlg)

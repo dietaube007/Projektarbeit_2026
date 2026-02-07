@@ -55,6 +55,7 @@ from .handlers import (
     handle_view_update_breeds,
     handle_ai_recognition_flow,
 )
+from .handlers.photo_upload_handler import cleanup_local_file
 from ui.helpers import parse_date
 
 logger = get_logger(__name__)
@@ -139,6 +140,15 @@ class PostForm:
         
         # Foto-Vorschau
         self.photo_preview = create_photo_preview()
+        self.photo_status_text = create_status_text()
+        self.photo_status_text.visible = False
+        self.photo_loading = ft.Container(
+            content=ft.Row(
+                [ft.ProgressRing(width=18, height=18, stroke_width=2), ft.Text("Bild wird geladen...", size=12)],
+                spacing=8,
+            ),
+            visible=False,
+        )
         
         # Name/Überschrift
         self.title_label = create_title_label()
@@ -209,6 +219,9 @@ class PostForm:
         # KI-Button und Container
         self.ai_button = create_ai_recognition_button(on_start_ai_recognition)
         self.ai_result_container = create_ai_result_container()
+        self.ai_status_text = create_status_text()
+        self.ai_status_text.visible = False
+        self.ai_section_divider = ft.Divider(height=20)
         self.ai_hint_badge: Optional[ft.Control] = None
         
         # Save-Button erstellen
@@ -220,16 +233,40 @@ class PostForm:
     # Private Methoden für Handler-Callbacks
     # ─────────────────────────────────────────────────────────────
     
-    def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
-        """Zeigt eine Statusnachricht an."""
+    def _set_status_text(self, target: ft.Text, message: str, is_error: bool = False, is_loading: bool = False) -> None:
+        """Setzt eine Statusnachricht auf dem angegebenen Text-Control."""
         if is_error:
-            self.status_text.color = ft.Colors.RED
+            target.color = ft.Colors.RED
         elif is_loading:
-            self.status_text.color = ft.Colors.BLUE
+            target.color = ft.Colors.BLUE
         else:
-            self.status_text.color = ft.Colors.GREEN
-        self.status_text.value = message
-        self.page.update()
+            target.color = ft.Colors.GREEN
+        target.value = message
+        target.visible = bool(message)
+        if getattr(target, "page", None):
+            target.update()
+        else:
+            self.page.update()
+
+    def _show_status(self, message: str, is_error: bool = False, is_loading: bool = False):
+        """Zeigt eine Statusnachricht im unteren Formularbereich an."""
+        self._set_status_text(self.status_text, message, is_error, is_loading)
+
+    def _show_photo_status(self, message: str, is_error: bool = False, is_loading: bool = False):
+        """Zeigt eine Statusnachricht im Foto-Bereich an."""
+        self._set_status_text(self.photo_status_text, message, is_error, is_loading)
+
+    def _set_photo_loading(self, is_loading: bool) -> None:
+        """Steuert die Ladeanzeige im Foto-Bereich."""
+        self.photo_loading.visible = is_loading
+        if getattr(self.photo_loading, "page", None):
+            self.photo_loading.update()
+        else:
+            self.page.update()
+
+    def _show_ai_status(self, message: str, is_error: bool = False, is_loading: bool = False):
+        """Zeigt eine Statusnachricht im KI-Bereich an."""
+        self._set_status_text(self.ai_status_text, message, is_error, is_loading)
     
     def _show_validation_dialog(self, title: str, message: str, items: List[str]):
         """Zeigt einen Validierungs-Dialog mit Fehlermeldungen."""
@@ -245,12 +282,18 @@ class PostForm:
                 selected_status = status["name"].lower()
                 break
         
+        ai_visible = selected_status == "fundtier"
         if selected_status == "vermisst":
             self.title_label.value = "Name﹡"
-            self.ai_button.visible = False
         else:
             self.title_label.value = "Überschrift﹡"
-            self.ai_button.visible = True
+        self.ai_button.visible = ai_visible
+        if not ai_visible:
+            self.ai_result_container.visible = False
+            self.ai_status_text.visible = False
+            self.ai_section_divider.visible = False
+        else:
+            self.ai_section_divider.visible = True
         
         self.page.update()
     
@@ -370,9 +413,10 @@ class PostForm:
             breed_dd=self.breed_dd,
             info_tf=self.info_tf,
             ai_result_container=self.ai_result_container,
-            show_status_callback=self._show_status,
+            show_status_callback=self._show_ai_status,
             update_breeds_callback=lambda: self.page.run_task(self._update_breeds),
             form_scroll_column=scroll_column,
+            update_description_counter=self._update_description_counter,
         )
     
     async def _pick_photo(self):
@@ -382,7 +426,8 @@ class PostForm:
             post_storage_service=self.post_storage_service,
             selected_photo=self.selected_photo,
             photo_preview=self.photo_preview,
-            show_status_callback=self._show_status,
+            show_status_callback=self._show_photo_status,
+            set_loading_callback=self._set_photo_loading,
         )
     
     def _remove_photo(self):
@@ -391,9 +436,29 @@ class PostForm:
             post_storage_service=self.post_storage_service,
             selected_photo=self.selected_photo,
             photo_preview=self.photo_preview,
-            status_text=self.status_text,
+            status_text=self.photo_status_text,
             page=self.page,
         )
+
+    def cleanup_local_uploads(self) -> None:
+        """Entfernt lokale Uploads aus image_uploads und setzt den Foto-State zurueck."""
+        local_path = self.selected_photo.get("local_path")
+        if local_path:
+            cleanup_local_file(local_path)
+        self.selected_photo.update({
+            "path": None,
+            "name": None,
+            "url": None,
+            "base64": None,
+            "local_path": None,
+        })
+        self.photo_preview.visible = False
+        self.photo_status_text.value = ""
+        self.photo_status_text.visible = False
+        if getattr(self.photo_preview, "page", None):
+            self.photo_preview.update()
+        else:
+            self.page.update()
     
     async def _save_post(self, _=None):
         """Speichert die Meldung in der Datenbank."""
@@ -422,7 +487,7 @@ class PostForm:
             photo_preview=self.photo_preview,
             status_text=self.status_text,
             ai_hint_badge=self.ai_hint_badge,
-            show_status_callback=self._show_status,
+            show_status_callback=lambda *_args, **_kwargs: None,
             show_validation_dialog_callback=self._show_validation_dialog,
             parse_event_date=parse_date,
             on_saved_callback=self.on_saved_callback,
@@ -478,6 +543,7 @@ class PostForm:
         # Photo-Upload-Bereich erstellen
         photo_area = create_photo_upload_area(
             photo_preview=self.photo_preview,
+            loading_indicator=self.photo_loading,
             on_pick_photo=lambda _: self.page.run_task(self._pick_photo),
             on_remove_photo=lambda _: self._remove_photo(),
             page=self.page,
@@ -495,12 +561,15 @@ class PostForm:
             info_tf=self.info_tf,
             ai_button=self.ai_button,
             ai_result_container=self.ai_result_container,
+            ai_status_text=self.ai_status_text,
+            ai_divider=self.ai_section_divider,
             location_tf=self.location_tf,
             location_suggestions=self.location_suggestions_box,
             date_tf=self.date_tf,
             save_button=self.save_button,
             status_text=self.status_text,
             photo_area=photo_area,
+            photo_status_text=self.photo_status_text,
             page=self.page,
             meldungsart=self.meldungsart,
         )
