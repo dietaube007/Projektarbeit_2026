@@ -76,37 +76,6 @@ def image_placeholder(height: int = 160, icon_size: int = 48, expand: bool = Fal
     )
 
 
-def create_login_banner(on_login_click: Callable[[ft.ControlEvent], None]) -> ft.Container:
-    """Erstellt ein Banner für nicht eingeloggte Benutzer."""
-    return ft.Container(
-        content=ft.Row(
-            [
-                ft.Icon(ft.Icons.INFO_OUTLINE, color=PRIMARY_COLOR, size=20),
-                ft.Text(
-                    "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
-                    color=PRIMARY_COLOR,
-                    size=14,
-                    expand=True,
-                ),
-                ft.TextButton(
-                    "Anmelden",
-                    icon=ft.Icons.LOGIN,
-                    on_click=on_login_click,
-                    style=ft.ButtonStyle(
-                        color=PRIMARY_COLOR,
-                    ),
-                ),
-            ],
-            spacing=12,
-            alignment=ft.MainAxisAlignment.START,
-        ),
-        padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        bgcolor=ft.Colors.with_opacity(0.08, PRIMARY_COLOR),
-        border_radius=10,
-        border=ft.border.all(1, ft.Colors.with_opacity(0.25, PRIMARY_COLOR)),
-    )
-
-
 # ══════════════════════════════════════════════════════════════════════
 # LEERE ZUSTÄNDE
 # ══════════════════════════════════════════════════════════════════════
