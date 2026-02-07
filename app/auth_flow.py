@@ -47,58 +47,64 @@ class AuthFlow:
         await asyncio.sleep(1.2)
         self.page.go("/")
 
-    def show_login(self) -> None:
-        """Zeigt die Login-Maske inkl. Redirect-Overlay."""
+    def _build_loading_overlay(self) -> ft.Container:
+        """Erstellt das Lade-Overlay passend zum aktuellen Theme-Modus (Light/Dark)."""
         from ui.theme import get_theme_color
 
-        # Setze Route direkt, um Endlosschleife zu vermeiden
-        self.page.route = "/login"
-
-        # Lade-Overlay fuer 'nach Login' (einmalig erstellen)
-        if self._redirect_loading_overlay is None:
-            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
-            self._redirect_loading_overlay = ft.Container(
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.ProgressRing(
-                                width=48, height=48, stroke_width=3, color=PRIMARY_COLOR
-                            ),
-                            ft.Container(height=16),
-                            ft.Text(
-                                "Einen Moment, Sie werden weitergeleitet...",
-                                size=16,
-                                weight=ft.FontWeight.W_500,
-                                color=get_theme_color("text_primary", is_dark),
-                                text_align=ft.TextAlign.CENTER,
-                            ),
-                            ft.Container(height=12),
-                            ft.ProgressBar(
-                                width=200,
-                                color=PRIMARY_COLOR,
-                                bgcolor=ft.Colors.with_opacity(0.2, PRIMARY_COLOR),
-                            ),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    bgcolor=get_theme_color("card", is_dark),
-                    padding=32,
-                    border_radius=16,
-                    shadow=ft.BoxShadow(
-                        blur_radius=24,
-                        spread_radius=0,
-                        color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK),
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        return ft.Container(
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.ProgressRing(
+                            width=48, height=48, stroke_width=3, color=PRIMARY_COLOR
+                        ),
+                        ft.Container(height=16),
+                        ft.Text(
+                            "Einen Moment, Sie werden weitergeleitet...",
+                            size=16,
+                            weight=ft.FontWeight.W_500,
+                            color=get_theme_color("text_primary", is_dark),
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Container(height=12),
+                        ft.ProgressBar(
+                            width=200,
+                            color=PRIMARY_COLOR,
+                            bgcolor=ft.Colors.with_opacity(0.2, PRIMARY_COLOR),
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                bgcolor=get_theme_color("card", is_dark),
+                padding=32,
+                border_radius=0,
+                shadow=ft.BoxShadow(
+                    blur_radius=24,
+                    spread_radius=0,
+                    color=ft.Colors.with_opacity(
+                        0.25 if is_dark else 0.15, ft.Colors.BLACK
                     ),
                 ),
-                alignment=ft.alignment.center,
-                expand=True,
-                bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
-            )
+            ),
+            alignment=ft.alignment.center,
+            expand=True,
+            bgcolor=ft.Colors.with_opacity(
+                0.7 if is_dark else 0.5, ft.Colors.BLACK
+            ),
+        )
+
+    def show_login(self) -> None:
+        """Zeigt die Login-Maske inkl. Redirect-Overlay."""
+        # Setze Route direkt, um Endlosschleife zu vermeiden
+        self.page.route = "/login"
 
         def on_login_success() -> None:
             self._set_logged_in(True)
             self._clear_pending_tab()
+            # Overlay immer neu erstellen, damit es den aktuellen Theme-Modus widerspiegelt
+            self._redirect_loading_overlay = self._build_loading_overlay()
             if self._redirect_loading_overlay not in self.page.overlay:
                 self.page.overlay.append(self._redirect_loading_overlay)
             self.page.update()
