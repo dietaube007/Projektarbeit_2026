@@ -2,10 +2,6 @@
 Profile Components - UI-Komponenten für ProfileView.
 """
 
-from .menu_components import (
-    create_section_title,
-    create_setting_row,
-)
 from .edit_profile_components import (
     # Sections
     create_profile_image_section,
@@ -39,9 +35,6 @@ from .settings_components import (
 )
 
 __all__ = [
-    # Common
-    "create_section_title",
-    "create_setting_row",
     # Edit Profile Components
     "create_profile_image_section",
     "create_display_name_section",

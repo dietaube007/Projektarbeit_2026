@@ -7,22 +7,40 @@ Enthält:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, date
 from typing import Callable, Dict, List, Optional, Any
 import flet as ft
 
 from services.posts.references import ReferenceService
-from services.posts import PostService, PostRelationsService
+from services.posts import PostService, PostRelationsService, PostStorageService
+from services.geocoding import geocode_suggestions
 from ui.constants import (
     PRIMARY_COLOR,
+    BORDER_COLOR,
     DATE_FORMAT,
     NO_SELECTION_VALUE,
     NO_SELECTION_LABEL,
     ALLOWED_POST_STATUSES,
+    PLACEHOLDER_IMAGE,
 )
-from ui.helpers import format_date, parse_date, get_nested_id
+from ui.helpers import format_date, get_nested_id
 from utils.logging_config import get_logger
+from utils.constants import (
+    MAX_HEADLINE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+)
 from ui.shared_components import show_success_dialog
+from ui.post_form.handlers.photo_upload_handler import (
+    handle_pick_photo,
+    cleanup_local_file,
+)
+from ui.profile.handlers.edit_post_handler import (
+    validate_edit_form,
+    has_edit_changes,
+    save_edit_post,
+)
 
 logger = get_logger(__name__)
 
@@ -49,6 +67,7 @@ class EditPostDialog:
         self.ref_service = ReferenceService(self.sb)
         self.post_service = PostService(self.sb)
         self.post_relations_service = PostRelationsService(self.sb)
+        self.post_storage_service = PostStorageService(self.sb)
 
         # Referenzdaten
         self.post_statuses: List[dict] = []
@@ -59,6 +78,17 @@ class EditPostDialog:
 
         # Ausgewählte Farben
         self.selected_farben: List[int] = []
+
+        # Foto-State
+        self.selected_photo: Dict[str, Any] = {
+            "path": None, "name": None, "url": None, "base64": None, "local_path": None
+        }
+        self._original_image_url: Optional[str] = None
+        self._image_changed: bool = False
+
+        # Location-State
+        self.location_selected: Dict[str, Any] = {"text": None, "lat": None, "lon": None}
+        self._location_query_version: int = 0
 
         # UI-Elemente
         self._init_ui_elements()
@@ -91,12 +121,28 @@ class EditPostDialog:
             allow_empty_selection=False,
             allow_multiple_selection=False,
             expand=True,
+            on_change=lambda _: self._on_meldungsart_change(),
         )
 
+        # Dynamisches Label für Name/Überschrift
+        self.title_label = ft.Text(
+            "Name﹡",
+            size=12,
+            weight=ft.FontWeight.W_600,
+            color=ft.Colors.GREY_700,
+        )
+
+        headline_value = self.post.get("headline", "")
         self.name_tf = ft.TextField(
-            label="Name / Überschrift﹡",
-            value=self.post.get("headline", ""),
+            label="Name﹡",
+            value=headline_value,
             border_radius=8,
+            max_length=MAX_HEADLINE_LENGTH,
+            counter_text=f"{len(headline_value)} / {MAX_HEADLINE_LENGTH}",
+            helper_text=f"Max. {MAX_HEADLINE_LENGTH} Zeichen",
+            border_color=BORDER_COLOR,
+            focused_border_color=PRIMARY_COLOR,
+            on_change=lambda _: self._update_name_counter(),
         )
 
         self.species_dd = ft.Dropdown(
@@ -118,21 +164,71 @@ class EditPostDialog:
             border_radius=8,
         )
 
+        # Farben-Container mit auf-/zuklappbarem Panel
         self.farben_container = ft.ResponsiveRow(spacing=4, run_spacing=8)
+        self.farben_panel_visible = True
+        self.farben_toggle_icon = ft.Icon(ft.Icons.KEYBOARD_ARROW_UP)
 
+        outline_color = getattr(ft.Colors, "OUTLINE_VARIANT", ft.Colors.GREY_400)
+
+        self.farben_panel = ft.Container(
+            content=self.farben_container,
+            padding=12,
+            visible=self.farben_panel_visible,
+            bgcolor=ft.Colors.TRANSPARENT,
+            border_radius=8,
+            border=ft.border.all(1, outline_color),
+        )
+
+        self.farben_header = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.PALETTE, size=18, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Text("Farben﹡", size=14, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    ft.Container(expand=True),
+                    self.farben_toggle_icon,
+                ],
+                spacing=12,
+            ),
+            padding=8,
+            on_click=lambda _: self._toggle_farben_panel(),
+            border_radius=8,
+            bgcolor=ft.Colors.TRANSPARENT,
+            border=ft.border.all(1, outline_color),
+        )
+
+        description_value = self.post.get("description", "")
         self.info_tf = ft.TextField(
             label="Beschreibung﹡",
-            value=self.post.get("description", ""),
+            value=description_value,
             multiline=True,
             min_lines=3,
             max_lines=6,
             border_radius=8,
+            max_length=MAX_DESCRIPTION_LENGTH,
+            counter_text=f"{len(description_value)} / {MAX_DESCRIPTION_LENGTH}",
+            helper_text=f"Min. {MIN_DESCRIPTION_LENGTH}, max. {MAX_DESCRIPTION_LENGTH} Zeichen",
+            border_color=BORDER_COLOR,
+            focused_border_color=PRIMARY_COLOR,
+            on_change=lambda _: self._update_description_counter(),
         )
 
         self.location_tf = ft.TextField(
             label="Ort﹡",
             value=self.post.get("location_text", ""),
             border_radius=8,
+            on_change=lambda _: self._on_location_change(),
+        )
+
+        # Location-Vorschläge
+        self.location_suggestions_list = ft.Column(spacing=2)
+        self.location_suggestions_box = ft.Container(
+            content=self.location_suggestions_list,
+            visible=False,
+            padding=8,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.with_opacity(0.02, ft.Colors.BLACK),
         )
 
         self.date_tf = ft.TextField(
@@ -175,18 +271,190 @@ class EditPostDialog:
             except (ValueError, TypeError):
                 pass
 
-    def _get_dropdown_id(self, dropdown: ft.Dropdown) -> Optional[int]:
-        """Extrahiert die ID aus einem Dropdown, None bei 'Keine Angabe'."""
-        val = dropdown.value
-        return int(val) if val and val != NO_SELECTION_VALUE else None
+        # ── Foto-Vorschau und -Buttons ──
+        self.photo_preview = ft.Image(
+            width=400,
+            height=200,
+            fit=ft.ImageFit.COVER,
+            visible=False,
+            border_radius=8,
+            src_base64=PLACEHOLDER_IMAGE,
+        )
+        self.photo_loading = ft.Container(
+            content=ft.Row(
+                [ft.ProgressRing(width=18, height=18, stroke_width=2), ft.Text("Bild wird geladen...", size=12)],
+                spacing=8,
+            ),
+            visible=False,
+        )
+        self.photo_status_text = ft.Text("", color=PRIMARY_COLOR, size=12, visible=False)
 
-    def _get_original_color_ids(self) -> List[int]:
-        """Extrahiert die ursprünglichen Farb-IDs."""
-        return sorted([
-            pc["color"]["id"]
-            for pc in (self.post.get("post_color") or [])
-            if pc.get("color") and pc["color"].get("id")
-        ])
+        # Aktuelles Bild des Posts laden
+        self._init_current_photo()
+
+    def _init_current_photo(self):
+        """Lädt das aktuelle Bild des Posts in die Vorschau."""
+        post_images = self.post.get("post_image") or []
+        if post_images:
+            url = post_images[0].get("url", "")
+            if url:
+                self._original_image_url = url
+                self.selected_photo["url"] = url
+                self.photo_preview.src = url
+                self.photo_preview.src_base64 = None
+                self.photo_preview.visible = True
+
+    # ─────────────────────────────────────────────────────────────
+    # Foto-Verwaltung
+    # ─────────────────────────────────────────────────────────────
+
+    def _pick_photo(self):
+        """Öffnet Dateiauswahl für ein neues Foto."""
+        self.page.run_task(self._async_pick_photo)
+
+    async def _async_pick_photo(self):
+        """Async-Handler für Foto-Auswahl."""
+        def show_status(msg: str, is_error: bool = False, is_loading: bool = False):
+            if is_error:
+                self.photo_status_text.color = ft.Colors.RED
+            elif is_loading:
+                self.photo_status_text.color = PRIMARY_COLOR
+            else:
+                self.photo_status_text.color = ft.Colors.GREEN
+            self.photo_status_text.value = msg
+            self.photo_status_text.visible = bool(msg)
+            self.page.update()
+
+        def set_loading(loading: bool):
+            self.photo_loading.visible = loading
+            self.page.update()
+
+        await handle_pick_photo(
+            page=self.page,
+            post_storage_service=self.post_storage_service,
+            selected_photo=self.selected_photo,
+            photo_preview=self.photo_preview,
+            show_status_callback=show_status,
+            set_loading_callback=set_loading,
+        )
+        self._image_changed = True
+
+    def _remove_photo(self):
+        """Entfernt das aktuelle Foto aus der Vorschau."""
+        # Nur lokale Datei löschen (nicht Storage - dort erst beim Speichern)
+        local_path = self.selected_photo.get("local_path")
+        if local_path:
+            cleanup_local_file(local_path)
+
+        self.selected_photo.update({
+            "path": None, "name": None, "url": None, "base64": None, "local_path": None
+        })
+        self.photo_preview.visible = False
+        self.photo_preview.src = None
+        self.photo_preview.src_base64 = PLACEHOLDER_IMAGE
+        self.photo_status_text.value = ""
+        self.photo_status_text.visible = False
+        self._image_changed = True
+        self.page.update()
+
+    # ─────────────────────────────────────────────────────────────
+    # Location-Vorschläge (Geocoding)
+    # ─────────────────────────────────────────────────────────────
+
+    def _on_location_change(self):
+        """Lädt Vorschläge für den Standort basierend auf dem Freitext."""
+        self.location_selected = {"text": None, "lat": None, "lon": None}
+        self._location_query_version += 1
+        query = self.location_tf.value or ""
+        self.page.run_task(
+            self._update_location_suggestions,
+            query,
+            self._location_query_version,
+        )
+
+    async def _update_location_suggestions(self, query: str, version: int):
+        """Aktualisiert die Location-Vorschläge asynchron mit Debounce."""
+        await asyncio.sleep(0.3)
+        if version != self._location_query_version:
+            return
+        if not query or len(query.strip()) < 3:
+            self._clear_location_suggestions()
+            return
+        suggestions = geocode_suggestions(query)
+        if not suggestions:
+            self._clear_location_suggestions()
+            return
+
+        def build_item(item: Dict[str, Any]) -> ft.Control:
+            return ft.TextButton(
+                item.get("text", ""),
+                on_click=lambda e, it=item: self._select_location_suggestion(it),
+                style=ft.ButtonStyle(alignment=ft.alignment.center_left),
+            )
+
+        self.location_suggestions_list.controls = [build_item(s) for s in suggestions]
+        self.location_suggestions_box.visible = True
+        self.page.update()
+
+    def _select_location_suggestion(self, item: Dict[str, Any]):
+        """Wählt einen Location-Vorschlag aus."""
+        self.location_selected = {
+            "text": item.get("text"),
+            "lat": item.get("lat"),
+            "lon": item.get("lon"),
+        }
+        self.location_tf.value = item.get("text", "")
+        self._clear_location_suggestions()
+        self.page.update()
+
+    def _clear_location_suggestions(self):
+        """Leert die Location-Vorschlagsliste."""
+        self.location_suggestions_list.controls = []
+        self.location_suggestions_box.visible = False
+        self.page.update()
+
+    # ─────────────────────────────────────────────────────────────
+    # Sonstige Handler
+    # ─────────────────────────────────────────────────────────────
+
+    def _on_meldungsart_change(self):
+        """Aktualisiert das Label basierend auf der gewählten Meldungsart."""
+        selected_id = list(self.meldungsart.selected)[0] if self.meldungsart.selected else None
+        selected_status = None
+        for status in self.post_statuses:
+            if str(status["id"]) == selected_id:
+                selected_status = status["name"].lower()
+                break
+
+        if selected_status == "vermisst":
+            self.title_label.value = "Name﹡"
+            self.name_tf.label = "Name﹡"
+        else:
+            self.title_label.value = "Überschrift﹡"
+            self.name_tf.label = "Überschrift﹡"
+        self.page.update()
+
+    def _update_name_counter(self):
+        """Aktualisiert den Zeichenzähler für das Name/Überschrift-Feld."""
+        text = self.name_tf.value or ""
+        self.name_tf.counter_text = f"{len(text)} / {MAX_HEADLINE_LENGTH}"
+        self.page.update()
+
+    def _update_description_counter(self):
+        """Aktualisiert den Zeichenzähler für das Beschreibungsfeld."""
+        text = self.info_tf.value or ""
+        self.info_tf.counter_text = f"{len(text)} / {MAX_DESCRIPTION_LENGTH}"
+        self.page.update()
+
+    def _toggle_farben_panel(self):
+        """Toggle für das Farben-Panel (auf- und zuklappen)."""
+        self.farben_panel_visible = not self.farben_panel_visible
+        self.farben_panel.visible = self.farben_panel_visible
+        self.farben_toggle_icon.name = (
+            ft.Icons.KEYBOARD_ARROW_UP if self.farben_panel_visible
+            else ft.Icons.KEYBOARD_ARROW_DOWN
+        )
+        self.page.update()
 
     def _on_species_change(self):
         """Handler für Tierart-Änderung."""
@@ -237,6 +505,10 @@ class EditPostDialog:
             pass
         self.breed_dd.value = NO_SELECTION_VALUE
 
+    # ─────────────────────────────────────────────────────────────
+    # Referenzdaten laden
+    # ─────────────────────────────────────────────────────────────
+
     def _load_refs(self):
         """Lädt alle Referenzdaten und initialisiert die Formularfelder."""
         try:
@@ -263,6 +535,9 @@ class EditPostDialog:
             self.meldungsart.selected = {str(current_id)}
         elif self.post_statuses:
             self.meldungsart.selected = {str(self.post_statuses[0]["id"])}
+
+        # Label basierend auf aktueller Meldungsart setzen
+        self._on_meldungsart_change()
 
     def _load_dropdowns(self):
         """Lädt Tierart, Rasse und Geschlecht."""
@@ -321,104 +596,79 @@ class EditPostDialog:
             for color in self.colors_list
         ]
 
-    def _validate(self) -> List[str]:
-        """Validiert die Eingaben und gibt fehlende Pflichtfelder zurück."""
-        checks = [
-            (self.name_tf.value, "Name/Überschrift"),
-            (self.species_dd.value, "Tierart"),
-            (self.selected_farben, "Mindestens eine Farbe"),
-            (self.info_tf.value, "Beschreibung"),
-            (self.location_tf.value, "Ort"),
-            (self.date_tf.value, "Datum"),
-        ]
-        return [
-            f"• {name}" for value, name in checks
-            if not value or (isinstance(value, str) and not value.strip())
-        ]
-
-    def _has_changes(self) -> bool:
-        """Prüft, ob Änderungen vorgenommen wurden."""
-        try:
-            # Status
-            current_status = int(list(self.meldungsart.selected)[0]) if self.meldungsart.selected else None
-            if current_status != get_nested_id(self.post, "post_status"):
-                return True
-
-            # Textfelder
-            text_checks = [
-                (self.name_tf.value, "headline"),
-                (self.info_tf.value, "description"),
-                (self.location_tf.value, "location_text"),
-            ]
-            for field_value, post_key in text_checks:
-                if field_value.strip() != self.post.get(post_key, ""):
-                    return True
-
-            # Datum
-            if self.date_tf.value.strip() != format_date(self.post.get("event_date", "")):
-                return True
-
-            # Dropdowns
-            if int(self.species_dd.value) != get_nested_id(self.post, "species"):
-                return True
-            if self._get_dropdown_id(self.breed_dd) != get_nested_id(self.post, "breed"):
-                return True
-            if self._get_dropdown_id(self.sex_dd) != get_nested_id(self.post, "sex"):
-                return True
-
-            # Farben
-            if sorted(self.selected_farben) != self._get_original_color_ids():
-                return True
-
-            return False
-
-        except Exception as ex:
-            logger.error(f"Fehler beim Prüfen auf Änderungen: {ex}", exc_info=True)
-            return True
+    # ─────────────────────────────────────────────────────────────
+    # Validierung & Speichern (delegiert an edit_post_handler)
+    # ─────────────────────────────────────────────────────────────
 
     def _save(self, _):
         """Speichert die Änderungen."""
         # Validierung
-        errors = self._validate()
+        errors = validate_edit_form(
+            name_value=self.name_tf.value,
+            species_value=self.species_dd.value,
+            selected_farben=self.selected_farben,
+            description_value=self.info_tf.value,
+            location_value=self.location_tf.value,
+            date_value=self.date_tf.value,
+            selected_photo=self.selected_photo,
+        )
         if errors:
             self._show_error("Pflichtfelder fehlen:\n" + "\n".join(errors))
             return
 
         # Änderungsprüfung
-        if not self._has_changes():
+        if not has_edit_changes(
+            post=self.post,
+            meldungsart_selected=self.meldungsart.selected,
+            name_value=self.name_tf.value,
+            description_value=self.info_tf.value,
+            location_value=self.location_tf.value,
+            date_value=self.date_tf.value,
+            species_value=self.species_dd.value,
+            breed_value=self.breed_dd.value,
+            sex_value=self.sex_dd.value,
+            selected_farben=self.selected_farben,
+            image_changed=self._image_changed,
+        ):
             self._show_info_dialog("Keine Änderungen", "Es wurden keine Änderungen vorgenommen.")
-            return
-
-        # Datum parsen
-        event_date = parse_date(self.date_tf.value)
-        if not event_date:
-            self._show_error("Ungültiges Datumsformat.\nBitte verwende: TT.MM.YYYY")
             return
 
         # Speichern
         try:
-            post_data = {
-                "post_status_id": int(list(self.meldungsart.selected)[0]),
-                "headline": self.name_tf.value.strip(),
-                "description": self.info_tf.value.strip(),
-                "species_id": int(self.species_dd.value),
-                "breed_id": self._get_dropdown_id(self.breed_dd),
-                "sex_id": self._get_dropdown_id(self.sex_dd),
-                "event_date": event_date.isoformat(),
-                "location_text": self.location_tf.value.strip(),
-            }
+            save_edit_post(
+                sb=self.sb,
+                post=self.post,
+                post_service=self.post_service,
+                post_relations_service=self.post_relations_service,
+                post_storage_service=self.post_storage_service,
+                meldungsart_selected=self.meldungsart.selected,
+                name_value=self.name_tf.value,
+                description_value=self.info_tf.value,
+                species_value=self.species_dd.value,
+                breed_value=self.breed_dd.value,
+                sex_value=self.sex_dd.value,
+                event_date_str=self.date_tf.value,
+                location_value=self.location_tf.value,
+                selected_farben=self.selected_farben,
+                selected_photo=self.selected_photo,
+                image_changed=self._image_changed,
+                original_image_url=self._original_image_url,
+            )
 
-            self.post_service.update(self.post["id"], post_data)
-            self.post_relations_service.update_colors(self.post["id"], self.selected_farben)
             self.page.close(self.dialog)
-
             self._show_success_dialog("Erfolgreich gespeichert", "Die Meldung wurde erfolgreich aktualisiert.")
 
             if self.on_save_callback:
                 self.on_save_callback()
 
+        except ValueError as ve:
+            self._show_error(str(ve))
         except Exception as ex:
             self._show_error(f"Fehler beim Speichern: {ex}")
+
+    # ─────────────────────────────────────────────────────────────
+    # Dialoge & Feedback
+    # ─────────────────────────────────────────────────────────────
 
     def _show_error(self, message: str):
         """Zeigt einen Fehler-Banner im Dialog an und scrollt nach oben."""
@@ -448,27 +698,67 @@ class EditPostDialog:
 
     def _close(self, _):
         """Schließt den Dialog."""
+        # Lokale Dateien aufräumen (falls nicht gespeichert)
+        local_path = self.selected_photo.get("local_path")
+        if local_path and self._image_changed:
+            cleanup_local_file(local_path)
         self.page.close(self.dialog)
+
+    # ─────────────────────────────────────────────────────────────
+    # Dialog anzeigen
+    # ─────────────────────────────────────────────────────────────
 
     def show(self):
         """Zeigt den Bearbeitungsdialog an."""
         self._load_refs()
         self.error_banner.visible = False
 
+        # Foto-Bereich
+        photo_section = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Foto﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
+                    self.photo_preview,
+                    self.photo_loading,
+                    ft.Row(
+                        [
+                            ft.FilledButton(
+                                "Neues Foto",
+                                icon=ft.Icons.UPLOAD,
+                                on_click=lambda _: self._pick_photo(),
+                            ),
+                            ft.TextButton(
+                                "Foto entfernen",
+                                icon=ft.Icons.DELETE,
+                                on_click=lambda _: self._remove_photo(),
+                            ),
+                        ],
+                        spacing=12,
+                    ),
+                    self.photo_status_text,
+                ],
+                spacing=8,
+            ),
+        )
+
         self.content_column = ft.Column(
             [
                 self.error_banner,
+                photo_section,
+                ft.Divider(height=16, color=ft.Colors.GREY_200),
                 ft.Text("Meldungsart", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
                 self.meldungsart,
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
+                self.title_label,
                 self.name_tf,
                 ft.Row([self.species_dd, self.breed_dd, self.sex_dd], spacing=12, wrap=True),
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
-                ft.Text("Farben﹡", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_700),
-                self.farben_container,
+                self.farben_header,
+                self.farben_panel,
                 ft.Divider(height=16, color=ft.Colors.GREY_200),
                 self.info_tf,
                 ft.Row([ft.Container(self.location_tf, expand=True), self.date_tf], spacing=12),
+                self.location_suggestions_box,
             ],
             spacing=12,
             scroll=ft.ScrollMode.AUTO,
@@ -480,7 +770,7 @@ class EditPostDialog:
                 [ft.Icon(ft.Icons.EDIT, color=PRIMARY_COLOR, size=24), ft.Text("Meldung bearbeiten", size=18, weight=ft.FontWeight.W_600)],
                 spacing=8,
             ),
-            content=ft.Container(content=self.content_column, width=500, height=500),
+            content=ft.Container(content=self.content_column, width=600, height=700),
             actions=[
                 ft.TextButton("Abbrechen", on_click=self._close),
                 ft.FilledButton("Speichern", on_click=self._save),

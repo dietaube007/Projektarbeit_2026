@@ -11,7 +11,6 @@ import flet as ft
 from ui.theme import soft_card
 from ui.constants import STATUS_COLORS, SPECIES_COLORS
 from ui.helpers import extract_item_data
-from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -165,7 +164,7 @@ def create_favorites_view(
     """
     favorites_card = soft_card(
         ft.Column([
-            create_section_title("Favorisierte Meldungen"),
+            ft.Text("Favorisierte Meldungen", size=18, weight=ft.FontWeight.W_600),
             ft.Container(height=8),
             favorites_list,
         ], spacing=12),

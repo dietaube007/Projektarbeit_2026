@@ -11,7 +11,6 @@ import flet as ft
 from ui.theme import soft_card, get_theme_color
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
 from ui.helpers import extract_item_data, format_date
-from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -364,7 +363,7 @@ def create_my_posts_view(
 
     header = ft.Container(
         content=ft.Row([
-            create_section_title("Meine Meldungen"),
+            ft.Text("Meine Meldungen", size=18, weight=ft.FontWeight.W_600),
             ft.Container(expand=True),
             ft.Text(count_text, size=12, color=c_secondary),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),

@@ -11,7 +11,6 @@ import flet as ft
 
 from ui.theme import soft_card
 from utils.constants import MAX_DISPLAY_NAME_LENGTH
-from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -54,7 +53,7 @@ def create_profile_image_section(
     return soft_card(
         ft.Column(
             [
-                create_section_title("Profilbild"),
+                ft.Text("Profilbild", size=18, weight=ft.FontWeight.W_600),
                 ft.Container(height=8),
                 ft.Row(
                     [
@@ -104,7 +103,7 @@ def create_display_name_section(
     return soft_card(
         ft.Column(
             [
-                create_section_title("Anzeigename"),
+                ft.Text("Anzeigename", size=18, weight=ft.FontWeight.W_600),
                 ft.Container(height=8),
                 name_field,
                 ft.Container(height=8),
@@ -135,7 +134,7 @@ def create_password_section(
     return soft_card(
         ft.Column(
             [
-                create_section_title("Passwort"),
+                ft.Text("Passwort", size=18, weight=ft.FontWeight.W_600),
                 ft.Container(height=8),
                 ft.Text("Ändern Sie Ihr Passwort", size=14, color=ft.Colors.GREY_600),
                 ft.Container(height=8),
@@ -166,7 +165,7 @@ def create_delete_account_section(
     return soft_card(
         ft.Column(
             [
-                create_section_title("Konto löschen"),
+                ft.Text("Konto löschen", size=18, weight=ft.FontWeight.W_600),
                 ft.Container(height=8),
                 ft.Text(
                     "Wenn Sie Ihr Konto löschen, werden alle Ihre Daten unwiderruflich entfernt.",
