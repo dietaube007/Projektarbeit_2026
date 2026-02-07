@@ -92,6 +92,13 @@ class PetBuddyApp:
         self.discover_view: Optional[DiscoverView] = None
         self.profile_view: Optional[ProfileView] = None
         self._auth_flow: Optional[AuthFlow] = None
+        self._profile_routes: dict[str, str] = {
+            ProfileView.VIEW_EDIT_PROFILE: "/profile/edit",
+            ProfileView.VIEW_MY_POSTS: "/profile/my_posts",
+            ProfileView.VIEW_FAVORITES: "/profile/favorites",
+            ProfileView.VIEW_SAVED_SEARCHES: "/profile/saved_searches",
+            ProfileView.VIEW_SETTINGS: "/profile/settings",
+        }
     
     # ════════════════════════════════════════════════════════════════════
     # INITIALISIERUNG
@@ -144,8 +151,6 @@ class PetBuddyApp:
             e: RouteChangeEvent mit der neuen Route
         """
         route = e.route or "/"
-        logger.info(f"Route geändert: {route}")
-        
         # Route verarbeiten
         self._navigate_to(route)
 
@@ -173,8 +178,6 @@ class PetBuddyApp:
         if "?" in route:
             route_path = route.split("?")[0]
         
-        logger.info(f"Navigiere zu: {route_path} (Query-Parameter: {'Ja' if '?' in route else 'Nein'})")
-        
         # Route-Handler aufrufen
         if route_path == "/" or route_path == "/home":
             # Startseite leitet zu /discover weiter
@@ -186,6 +189,16 @@ class PetBuddyApp:
             self._show_discover()
         elif route_path == "/profile":
             self._show_profile()
+        elif route_path == "/profile/edit":
+            self._show_profile_view(ProfileView.VIEW_EDIT_PROFILE)
+        elif route_path == "/profile/my_posts":
+            self._show_profile_view(ProfileView.VIEW_MY_POSTS)
+        elif route_path == "/profile/favorites":
+            self._show_profile_view(ProfileView.VIEW_FAVORITES)
+        elif route_path == "/profile/saved_searches":
+            self._show_profile_view(ProfileView.VIEW_SAVED_SEARCHES)
+        elif route_path == "/profile/settings":
+            self._show_profile_view(ProfileView.VIEW_SETTINGS)
         elif route_path == "/post/new":
             self._show_new_post()
         else:
@@ -224,6 +237,10 @@ class PetBuddyApp:
     
     def _show_profile(self) -> None:
         """Zeigt die Profil-Seite."""
+        self._show_profile_view(None)
+
+    def _show_profile_view(self, view_name: Optional[str]) -> None:
+        """Zeigt eine Profil-Unterseite anhand der View-ID."""
         if not self.is_logged_in:
             self.page.go("/login")
             return
@@ -234,6 +251,9 @@ class PetBuddyApp:
         else:
             self.page.run_task(self.profile_view.refresh_user_data)
         
+        if view_name and self.profile_view:
+            self.profile_view.navigate_to(view_name)
+
         self.current_tab = TAB_PROFIL
         profile_key = get_profile_drawer_key(
             self.profile_view.current_view if self.profile_view else None
@@ -396,7 +416,7 @@ class PetBuddyApp:
         )
         self.render_tab()
 
-    def _open_profile_section(self, view_name: str, drawer_key: str) -> None:
+    def _open_profile_section(self, view_name: str, _drawer_key: str) -> None:
         if not self.is_logged_in:
             def on_login() -> None:
                 self.pending_tab_after_login = TAB_PROFIL
@@ -421,22 +441,8 @@ class PetBuddyApp:
                 on_cancel=on_cancel,
             )
             return
-        if not self.profile_view:
-            if not self.build_ui():
-                return
-        if self.profile_view:
-            self.profile_view.navigate_to(view_name)
-        self.current_tab = TAB_PROFIL
-        profile_key = get_profile_drawer_key(
-            self.profile_view.current_view if self.profile_view else None
-        )
-        set_drawer_selection(
-            self._nav_drawer,
-            self._drawer_index_map,
-            drawer_key,
-            profile_key,
-        )
-        self._show_main_app()
+        route = self._profile_routes.get(view_name, "/profile")
+        self.page.go(route)
     
     def _go_to_start(self, _e: ft.ControlEvent) -> None:
         """Navigiert zur Startseite (z. B. beim Klick auf die PetBuddy-Überschrift)."""
@@ -719,6 +725,5 @@ class PetBuddyApp:
         initial_route = self.page.route or "/"
         if not self.page.route:
             self.page.route = initial_route
-        logger.info(f"Initiale Route beim Start: {self.page.route}")
         self._navigate_to(initial_route)
 
