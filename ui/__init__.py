@@ -25,12 +25,12 @@ from ui.profile import ProfileView
 from ui.constants import (
     STATUS_COLORS,
     SPECIES_COLORS,
-    MAX_POSTS_LIMIT,
     CARD_IMAGE_HEIGHT,
     LIST_IMAGE_HEIGHT,
     DIALOG_IMAGE_HEIGHT,
     DEFAULT_PLACEHOLDER,
 )
+from utils.constants import MAX_POSTS_LIMIT
 
 # Komponenten
 from ui.shared_components import (

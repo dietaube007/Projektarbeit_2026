@@ -6,7 +6,7 @@ import os
 import base64
 import re
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from supabase import Client
 from PIL import Image

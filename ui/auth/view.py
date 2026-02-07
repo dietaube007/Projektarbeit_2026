@@ -8,9 +8,7 @@ import flet as ft
 
 from ui.constants import (
     PRIMARY_COLOR,
-    TEXT_SECONDARY,
     MESSAGE_TYPE_ERROR,
-    MESSAGE_TYPE_SUCCESS,
     MESSAGE_TYPE_INFO,
     MESSAGE_COLOR_MAP,
     MESSAGE_COLOR_INFO,
@@ -29,7 +27,6 @@ from .components import (
     create_register_button,
     create_continue_button,
     create_logout_button,
-    create_forgot_password_button,
     create_registration_error_banner,
     create_registration_modal,
     create_login_card,

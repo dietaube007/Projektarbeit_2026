@@ -10,7 +10,7 @@ Es definiert:
 
 """
 
-from typing import Callable, Optional, Any, Dict
+from typing import Callable, Optional, Any
 from ui.constants import TEXT_SECONDARY
 import flet as ft
 from utils.logging_config import get_logger

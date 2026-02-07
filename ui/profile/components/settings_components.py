@@ -9,7 +9,7 @@ from typing import Callable
 import flet as ft
 
 from ui.theme import soft_card
-from .menu_components import create_section_title, create_setting_row, create_back_button
+from .menu_components import create_section_title, create_setting_row
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -17,22 +17,18 @@ CARD_ELEVATION: int = 2
 
 
 def create_settings_view(
-    on_back: Callable,
     on_notification_change: Callable[[bool], None],
     on_email_notification_change: Callable[[bool], None],
 ) -> list[ft.Control]:
     """Erstellt die Einstellungen-Ansicht.
     
     Args:
-        on_back: Callback für Zurück-Button
         on_notification_change: Callback beim Ändern der Push-Benachrichtigungen
         on_email_notification_change: Callback beim Ändern der E-Mail-Benachrichtigungen
     
     Returns:
         Liste von Controls für Settings-View
     """
-    back_btn = create_back_button(on_back)
-
     notifications_section = soft_card(
         ft.Column([
             create_section_title("Benachrichtigungen"),
@@ -55,4 +51,4 @@ def create_settings_view(
         elev=CARD_ELEVATION,
     )
 
-    return [back_btn, notifications_section]
+    return [notifications_section]

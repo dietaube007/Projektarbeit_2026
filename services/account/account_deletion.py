@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Tuple, Optional, Any
+from typing import Tuple, Optional
 
 import httpx
 from supabase import Client

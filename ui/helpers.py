@@ -7,7 +7,6 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 
-import flet as ft
 
 from ui.constants import DATE_FORMAT
 from utils.logging_config import get_logger

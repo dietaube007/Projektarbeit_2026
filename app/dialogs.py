@@ -11,7 +11,7 @@ Enthält Funktionen zum Erstellen von:
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Optional
 
 import flet as ft
 
@@ -40,6 +40,16 @@ def _create_login_dialog(
     )
 
 
+def _handle_dialog_action(
+    page: ft.Page,
+    dialog: ft.AlertDialog,
+    callback: Optional[Callable[[], None]],
+) -> None:
+    page.close(dialog)
+    if callback:
+        callback()
+
+
 
 def create_login_required_dialog(
     page: ft.Page,
@@ -58,6 +68,22 @@ def create_login_required_dialog(
     return _create_login_dialog(message, on_login_click, on_cancel_click)
 
 
+def show_login_required_dialog(
+    page: ft.Page,
+    target_tab: int,
+    on_login: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+) -> None:
+    """Offnet den Login-Required Dialog und verdrahtet die Callbacks."""
+    dialog = create_login_required_dialog(
+        page,
+        target_tab,
+        lambda _e: _handle_dialog_action(page, dialog, on_login),
+        lambda _e: _handle_dialog_action(page, dialog, on_cancel),
+    )
+    page.open(dialog)
+
+
 def create_favorite_login_dialog(
     page: ft.Page,
     on_login_click: Callable[[ft.ControlEvent], None],
@@ -69,6 +95,20 @@ def create_favorite_login_dialog(
         on_login_click,
         on_cancel_click,
     )
+
+
+def show_favorite_login_dialog(
+    page: ft.Page,
+    on_login: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+) -> None:
+    """Offnet den Favoriten-Login-Dialog und verdrahtet die Callbacks."""
+    dialog = create_favorite_login_dialog(
+        page,
+        lambda _e: _handle_dialog_action(page, dialog, on_login),
+        lambda _e: _handle_dialog_action(page, dialog, on_cancel),
+    )
+    page.open(dialog)
 
 
 def create_saved_search_login_dialog(
@@ -84,6 +124,20 @@ def create_saved_search_login_dialog(
     )
 
 
+def show_saved_search_login_dialog(
+    page: ft.Page,
+    on_login: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+) -> None:
+    """Offnet den Suchauftrag-Login-Dialog und verdrahtet die Callbacks."""
+    dialog = create_saved_search_login_dialog(
+        page,
+        lambda _e: _handle_dialog_action(page, dialog, on_login),
+        lambda _e: _handle_dialog_action(page, dialog, on_cancel),
+    )
+    page.open(dialog)
+
+
 def create_comment_login_dialog(
     page: ft.Page,
     on_login_click: Callable[[ft.ControlEvent], None],
@@ -95,6 +149,20 @@ def create_comment_login_dialog(
         on_login_click,
         on_cancel_click,
     )
+
+
+def show_comment_login_dialog(
+    page: ft.Page,
+    on_login: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+) -> None:
+    """Offnet den Kommentar-Login-Dialog und verdrahtet die Callbacks."""
+    dialog = create_comment_login_dialog(
+        page,
+        lambda _e: _handle_dialog_action(page, dialog, on_login),
+        lambda _e: _handle_dialog_action(page, dialog, on_cancel),
+    )
+    page.open(dialog)
 
 
 def create_reaction_login_dialog(

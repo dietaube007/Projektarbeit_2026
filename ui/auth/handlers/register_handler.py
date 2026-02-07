@@ -8,14 +8,11 @@ from typing import Callable, Optional
 
 import flet as ft
 
-from utils.logging_config import get_logger
 from utils.validators import validate_email, validate_password
 from services.account import AuthService
 from ui.shared_components import show_success_dialog
 from ui.constants import MESSAGE_TYPE_INFO, MESSAGE_TYPE_ERROR
 from .error_handler import handle_auth_error
-
-logger = get_logger(__name__)
 
 
 def handle_register(

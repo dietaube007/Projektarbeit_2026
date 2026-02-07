@@ -11,10 +11,8 @@ from supabase import Client
 from services.posts.references import ReferenceService
 from services.posts import SavedSearchService, FavoritesService, SearchService
 from services.account import ProfileService
-from utils.logging_config import get_logger
-from ui.theme import soft_card, get_theme_color
+from ui.theme import get_theme_color
 from ui.shared_components import (
-    show_error_dialog,
     create_empty_state_card,
     create_loading_indicator,
 )
@@ -41,8 +39,6 @@ from .handlers import (
     handle_view_tierart_change,
     handle_view_update_rassen_dropdown,
 )
-
-logger = get_logger(__name__)
 
 
 class DiscoverView:
@@ -437,14 +433,14 @@ class DiscoverView:
         """Erstellt und gibt die komplette Discover-UI zurück."""
 
         # Scroll innerhalb des Tab-Contents
-        content_container = ft.Column(
-            [
+        content_container = ft.ListView(
+            controls=[
                 ft.Container(
                     padding=ft.padding.only(left=4, right=4, top=0),
                     content=self._list_view,
                 ),
             ],
-            scroll=ft.ScrollMode.AUTO,
+            spacing=0,
             expand=True,
         )
 

@@ -13,7 +13,6 @@ from ui.theme import soft_card
 from ui.shared_components import filter_chip, show_error_dialog
 from services.posts.references import ReferenceService
 from services.posts import SavedSearchService
-from .menu_components import create_back_button
 
 
 def build_search_card(
@@ -224,7 +223,6 @@ def build_saved_searches_list(
     page: ft.Page,
     saved_search_service: SavedSearchService,
     on_apply_search: Optional[Callable[[Dict[str, Any]], None]] = None,
-    on_back: Optional[Callable[[], None]] = None,
 ) -> ft.Column:
     """Erstellt die Liste der gespeicherten Suchaufträge (UI-Komponente).
 
@@ -232,8 +230,6 @@ def build_saved_searches_list(
         page: Flet Page-Instanz
         saved_search_service: Service für Suchaufträge
         on_apply_search: Callback wenn ein Suchauftrag angewendet werden soll
-        on_back: Callback für Zurück-Button
-
     Returns:
         Column mit der Suchaufträge-Liste
     """
@@ -276,16 +272,8 @@ def build_saved_searches_list(
 
         page.update()
 
-    # Zurück-Button
-    back_btn = create_back_button(lambda _: on_back() if on_back else None)
-    back_button = ft.Container(
-        content=ft.Row([
-            ft.IconButton(
-                ft.Icons.ARROW_BACK,
-                on_click=lambda _: on_back() if on_back else None,
-            ),
-            ft.Text("Gespeicherte Suchaufträge", size=18, weight=ft.FontWeight.BOLD),
-        ], spacing=8),
+    header = ft.Container(
+        content=ft.Text("Gespeicherte Suchaufträge", size=18, weight=ft.FontWeight.BOLD),
         padding=ft.padding.only(bottom=8),
     )
 
@@ -293,6 +281,6 @@ def build_saved_searches_list(
     load_searches()
 
     return ft.Column([
-        back_button,
+        header,
         searches_container,
     ], spacing=12, expand=True)

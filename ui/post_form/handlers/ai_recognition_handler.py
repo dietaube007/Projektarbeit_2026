@@ -16,15 +16,12 @@ import flet as ft
 
 from services.posts import PostStorageService
 from services.ai.pet_recognition import PetRecognitionService
-from utils.logging_config import get_logger
 from ui.shared_components import show_error_dialog, show_progress_dialog, show_success_dialog
 from ..components.ai_components import (
     create_consent_dialog,
     create_ai_result_content,
     create_ai_suggestion_dialog,
 )
-
-logger = get_logger(__name__)
 
 
 async def handle_start_ai_recognition(

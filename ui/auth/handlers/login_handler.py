@@ -6,13 +6,10 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from utils.logging_config import get_logger
 from utils.validators import validate_email
 from services.account import AuthService, AuthResult
-from ui.constants import MESSAGE_TYPE_INFO, MESSAGE_TYPE_SUCCESS, MESSAGE_TYPE_ERROR
+from ui.constants import MESSAGE_TYPE_SUCCESS, MESSAGE_TYPE_ERROR
 from .error_handler import handle_auth_error
-
-logger = get_logger(__name__)
 
 
 def handle_login(

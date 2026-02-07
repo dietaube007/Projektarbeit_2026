@@ -16,17 +16,12 @@ from services.posts.references import ReferenceService
 from services.geocoding import geocode_suggestions
 from services.posts import PostService, PostRelationsService, PostStorageService
 from services.ai.pet_recognition import get_recognition_service
-from utils.logging_config import get_logger
 from ui.constants import (
-    MAX_HEADLINE_LENGTH,
-    MAX_DESCRIPTION_LENGTH,
     DATE_FORMAT,
-    NO_SELECTION_VALUE,
     PRIMARY_COLOR,
 )
-from ui.shared_components import show_validation_dialog, show_success_dialog, show_error_dialog
-from ui.constants import MAX_HEADLINE_LENGTH, MAX_DESCRIPTION_LENGTH
-from ui.theme import get_theme_color
+from ui.shared_components import show_validation_dialog
+from utils.constants import MAX_HEADLINE_LENGTH, MAX_DESCRIPTION_LENGTH
 
 from .components import (
     create_meldungsart_button,
@@ -50,7 +45,6 @@ from .components import (
 from .handlers import (
     handle_view_pick_photo,
     handle_view_remove_photo,
-    validate_form_fields,
     handle_view_save_post,
     handle_view_load_references,
     handle_view_update_breeds,
@@ -58,8 +52,6 @@ from .handlers import (
 )
 from .handlers.photo_upload_handler import cleanup_local_file
 from ui.helpers import parse_date
-
-logger = get_logger(__name__)
 
 
 class PostForm:

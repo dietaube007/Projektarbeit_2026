@@ -9,20 +9,21 @@ Enthält:
 
 from __future__ import annotations
 
-from typing import List, Dict, Callable, Tuple, Any, Optional
+from typing import List, Dict, Callable, Tuple, Any
 
 import flet as ft
 
 from ui.constants import (
     FIELD_WIDTH_SMALL,
-    FIELD_WIDTH_MEDIUM,
     FIELD_WIDTH_LARGE,
     DROPDOWN_MENU_HEIGHT,
+    BORDER_COLOR,
+    PRIMARY_COLOR,
+)
+from utils.constants import (
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
-    BORDER_COLOR,
-    PRIMARY_COLOR,
 )
 
 

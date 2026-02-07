@@ -18,9 +18,6 @@ from services.account import ProfileService, AuthService
 from services.posts import SavedSearchService
 
 from .components import (
-    create_profile_header,
-    create_main_menu,
-    create_logout_button,
     build_saved_searches_list,
     create_settings_view,
     create_edit_profile_view,
@@ -30,7 +27,6 @@ from .components import (
 from .handlers.my_favorites_handler import (
     load_favorites,
     remove_favorite,
-    render_favorites_list,
 )
 from .handlers.my_posts_handler import (
     load_my_posts,
@@ -61,7 +57,6 @@ logger = get_logger(__name__)
 class ProfileView:
     """Benutzer-Profilbereich mit Einstellungen und Profilverwaltung."""
 
-    VIEW_MAIN: str = "main"
     VIEW_EDIT_PROFILE: str = "edit_profile"
     VIEW_SETTINGS: str = "settings"
     VIEW_FAVORITES: str = "favorites"
@@ -89,7 +84,7 @@ class ProfileView:
         self.saved_search_service = SavedSearchService(sb)
 
         self.user_data = None
-        self.current_view = self.VIEW_MAIN
+        self.current_view = self.VIEW_EDIT_PROFILE
 
         self.main_container = ft.Column(
             spacing=16,
@@ -172,10 +167,6 @@ class ProfileView:
     # NAVIGATION
     # ─────────────────────────────────────────────────────────────
 
-    def _show_main_menu(self):
-        self.current_view = self.VIEW_MAIN
-        self._rebuild()
-
     def _show_edit_profile(self):
         self.current_view = self.VIEW_EDIT_PROFILE
         self._rebuild()
@@ -198,12 +189,26 @@ class ProfileView:
         self.current_view = self.VIEW_SAVED_SEARCHES
         self._rebuild()
 
+    def navigate_to(self, view_name: str) -> None:
+        """Wechselt direkt zu einer Profil-Teilansicht."""
+        if view_name == self.VIEW_EDIT_PROFILE:
+            self._show_edit_profile()
+        elif view_name == self.VIEW_MY_POSTS:
+            self._show_my_posts()
+        elif view_name == self.VIEW_FAVORITES:
+            self._show_favorites()
+        elif view_name == self.VIEW_SAVED_SEARCHES:
+            self._show_saved_searches()
+        elif view_name == self.VIEW_SETTINGS:
+            self._show_settings()
+        else:
+            self._show_edit_profile()
+
     def _rebuild(self):
         """Baut die Ansicht basierend auf current_view neu."""
         self.main_container.controls.clear()
 
         view_builders = {
-            self.VIEW_MAIN: self._build_main_menu,
             self.VIEW_EDIT_PROFILE: self._build_edit_profile,
             self.VIEW_SETTINGS: self._build_settings,
             self.VIEW_FAVORITES: self._build_favorites,
@@ -211,7 +216,7 @@ class ProfileView:
             self.VIEW_SAVED_SEARCHES: self._build_saved_searches,
         }
 
-        builder = view_builders.get(self.current_view, self._build_main_menu)
+        builder = view_builders.get(self.current_view, self._build_edit_profile)
         self.main_container.controls = builder()
         self.page.update()
 
@@ -366,26 +371,6 @@ class ProfileView:
     # VIEW BUILDER
     # ─────────────────────────────────────────────────────────────
 
-    def _build_main_menu(self) -> list:
-        """Baut das Hauptmenü."""
-        profile_header = create_profile_header(
-            avatar=self.avatar,
-            display_name=self.display_name,
-            email_text=self.email_text,
-        )
-
-        menu_list = create_main_menu(
-            on_edit_profile=lambda _: self._show_edit_profile(),
-            on_my_posts=lambda _: self._show_my_posts(),
-            on_favorites=lambda _: self._show_favorites(),
-            on_saved_searches=lambda _: self._show_saved_searches(),
-            on_settings=lambda _: self._show_settings(),
-        )
-
-        logout_button = create_logout_button(on_logout=lambda _: self._logout())
-
-        return [profile_header, menu_list, logout_button]
-
     def _build_edit_profile(self) -> list:
         """Baut die Profil-Bearbeiten-Ansicht."""
         def handle_file_pick(_):
@@ -410,7 +395,6 @@ class ProfileView:
             page=self.page,
             on_change_password=lambda _: self._show_change_password_dialog(),
             on_delete_account=lambda _: self._confirm_delete_account(),
-            on_back=lambda _: self._show_main_menu(),
         )
 
     def _build_settings(self) -> list:
@@ -424,7 +408,6 @@ class ProfileView:
             pass
 
         return create_settings_view(
-            on_back=lambda _: self._show_main_menu(),
             on_notification_change=on_notification_change,
             on_email_notification_change=on_email_notification_change,
         )
@@ -433,7 +416,6 @@ class ProfileView:
         """Baut die Favoriten-Ansicht."""
         return create_favorites_view(
             favorites_list=self.favorites_list,
-            on_back=lambda _: self._show_main_menu(),
         )
 
     def _build_my_posts(self) -> list:
@@ -441,7 +423,6 @@ class ProfileView:
         return create_my_posts_view(
             my_posts_list=self.my_posts_list,
             my_posts_items=self.my_posts_items,
-            on_back=lambda _: self._show_main_menu(),
         )
 
     def _build_saved_searches(self) -> list:
@@ -451,7 +432,6 @@ class ProfileView:
                 page=self.page,
                 saved_search_service=self.saved_search_service,
                 on_apply_search=self._on_apply_saved_search,
-                on_back=self._show_main_menu,
             )
         ]
 
@@ -461,10 +441,18 @@ class ProfileView:
 
     def build(self) -> ft.Column:
         """Baut und gibt das Profil-Layout zurück."""
-        self.main_container.controls = self._build_main_menu()
+        view_builders = {
+            self.VIEW_EDIT_PROFILE: self._build_edit_profile,
+            self.VIEW_SETTINGS: self._build_settings,
+            self.VIEW_FAVORITES: self._build_favorites,
+            self.VIEW_MY_POSTS: self._build_my_posts,
+            self.VIEW_SAVED_SEARCHES: self._build_saved_searches,
+        }
+        builder = view_builders.get(self.current_view, self._build_edit_profile)
+        self.main_container.controls = builder()
         return self.main_container
 
     async def refresh(self):
         """Aktualisiert die Profildaten."""
         await self._load_user_data()
-        self._show_main_menu()
+        self._show_edit_profile()

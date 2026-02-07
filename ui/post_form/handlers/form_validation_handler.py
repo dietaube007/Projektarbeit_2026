@@ -4,7 +4,7 @@ Form Validation-Feature: Validierungslogik für das Meldungsformular.
 
 from __future__ import annotations
 
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional
 
 from utils.validators import (
     validate_not_empty,
@@ -12,12 +12,12 @@ from utils.validators import (
     validate_list_not_empty,
     validate_date_not_future,
 )
-from ui.constants import (
+from ui.constants import DATE_FORMAT
+from utils.constants import (
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
     MAX_LOCATION_LENGTH,
-    DATE_FORMAT,
 )
 
 

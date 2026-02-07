@@ -5,18 +5,6 @@ App-weite Konstanten (Validierung, Text-Limits) sind in utils/constants.py
 """
 
 import flet as ft
-from utils.constants import (
-    MAX_HEADLINE_LENGTH,
-    MAX_DESCRIPTION_LENGTH,
-    MIN_DESCRIPTION_LENGTH,
-    MAX_LOCATION_LENGTH,
-    MAX_DISPLAY_NAME_LENGTH,
-    MAX_SEARCH_QUERY_LENGTH,
-    MAX_COMMENT_LENGTH,
-    TRUNCATE_TEXT_LENGTH,
-    MAX_POSTS_LIMIT,
-    DEFAULT_POSTS_LIMIT,
-)
 
 # ══════════════════════════════════════════════════════════════════════
 # PRIMÄRFARBEN (App-weit verwendet)

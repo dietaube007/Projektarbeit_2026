@@ -10,7 +10,6 @@ Diese Klasse steuert:
 
 from __future__ import annotations
 
-import os
 from typing import Optional, Callable
 import flet as ft
 
@@ -33,18 +32,31 @@ from ui.constants import (
 )
 
 from app.dialogs import (
-    create_comment_login_dialog,
-    create_favorite_login_dialog,
     create_login_banner,
-    create_login_required_dialog,
-    create_saved_search_login_dialog,
+    show_comment_login_dialog,
+    show_favorite_login_dialog,
+    show_login_required_dialog,
+    show_saved_search_login_dialog,
 )
 from app.navigation import (
     TAB_START,
     TAB_MELDEN,
     TAB_PROFIL,
-    create_navigation_bar,
+    DRAWER_KEY_FAVORITES,
+    DRAWER_KEY_LOGIN,
+    DRAWER_KEY_LOGOUT,
+    DRAWER_KEY_MELDEN,
+    DRAWER_KEY_MY_POSTS,
+    DRAWER_KEY_PROFILE_EDIT,
+    DRAWER_KEY_SAVED_SEARCHES,
+    DRAWER_KEY_SETTINGS,
+    DRAWER_KEY_START,
     create_app_bar,
+    build_drawer_items,
+    create_navigation_drawer,
+    DrawerItem,
+    get_profile_drawer_key,
+    set_drawer_selection,
 )
 
 
@@ -71,6 +83,12 @@ class PetBuddyApp:
             expand=True,
         )
         self.nav: Optional[ft.NavigationBar] = None
+        self._nav_drawer: Optional[ft.NavigationDrawer] = None
+        self._drawer_actions: list[Callable[[], None]] = []
+        self._drawer_index_map: dict[str, int] = {}
+        self._app_bar_control: Optional[ft.Control] = None
+        self._content_scroll: Optional[ft.Column] = None
+        self._main_column: Optional[ft.Column] = None
         self.start_section: Optional[ft.Control] = None
         self.post_form: Optional[PostForm] = None
         self.discover_view: Optional[DiscoverView] = None
@@ -180,8 +198,15 @@ class PetBuddyApp:
                     return
 
             self.current_tab = TAB_START
-            if self.nav:
-                self.nav.selected_index = TAB_START
+            profile_key = get_profile_drawer_key(
+                self.profile_view.current_view if self.profile_view else None
+            )
+            set_drawer_selection(
+                self._nav_drawer,
+                self._drawer_index_map,
+                TAB_START,
+                profile_key,
+            )
 
             self._show_main_app()
 
@@ -206,8 +231,15 @@ class PetBuddyApp:
             self.page.run_task(self.profile_view.refresh_user_data)
         
         self.current_tab = TAB_PROFIL
-        if self.nav:
-            self.nav.selected_index = TAB_PROFIL
+        profile_key = get_profile_drawer_key(
+            self.profile_view.current_view if self.profile_view else None
+        )
+        set_drawer_selection(
+            self._nav_drawer,
+            self._drawer_index_map,
+            profile_key or DRAWER_KEY_PROFILE_EDIT,
+            profile_key,
+        )
         self._show_main_app()
     
     def _show_new_post(self) -> None:
@@ -221,8 +253,15 @@ class PetBuddyApp:
                 return
         
         self.current_tab = TAB_MELDEN
-        if self.nav:
-            self.nav.selected_index = TAB_MELDEN
+        profile_key = get_profile_drawer_key(
+            self.profile_view.current_view if self.profile_view else None
+        )
+        set_drawer_selection(
+            self._nav_drawer,
+            self._drawer_index_map,
+            TAB_MELDEN,
+            profile_key,
+        )
         self._show_main_app()
 
     def _show_error(self, message: str) -> None:
@@ -235,75 +274,6 @@ class PetBuddyApp:
         show_error_dialog(self.page, "Fehler", message)
     
     
-    # ════════════════════════════════════════════════════════════════════
-    # DIALOGE
-    # ════════════════════════════════════════════════════════════════════
-    
-    def _show_login_required_dialog(self, target_tab: int) -> None:
-        """Zeigt ein Pop-up Dialog für nicht eingeloggte Benutzer.
-        
-        Args:
-            target_tab: Tab-Index zu dem navigiert werden soll
-        """
-        def on_login_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-            self.pending_tab_after_login = target_tab
-            self._show_login()
-        
-        def on_cancel_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-            # Navigation zurücksetzen auf Start
-            if self.nav:
-                self.nav.selected_index = TAB_START
-            self.page.update()
-        
-        dialog = create_login_required_dialog(
-            self.page, target_tab, on_login_click, on_cancel_click
-        )
-        self.page.open(dialog)
-    
-    def _show_favorite_login_dialog(self) -> None:
-        """Zeigt ein Pop-up Dialog wenn Gast auf Favorit klickt."""
-        def on_login_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-            self._show_login()
-        
-        def on_cancel_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-        
-        dialog = create_favorite_login_dialog(
-            self.page, on_login_click, on_cancel_click
-        )
-        self.page.open(dialog)
-    
-    def _show_saved_search_login_dialog(self) -> None:
-        """Zeigt ein Pop-up Dialog wenn Gast auf 'Suche speichern' klickt."""
-        def on_login_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-            self._show_login()
-        
-        def on_cancel_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-        
-        dialog = create_saved_search_login_dialog(
-            self.page, on_login_click, on_cancel_click
-        )
-        self.page.open(dialog)
-
-    def _show_comment_login_dialog(self) -> None:
-        """Zeigt einen Dialog wenn Gast kommentieren möchte."""
-        def on_login_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-            self._show_login()
-
-        def on_cancel_click(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
-
-        dialog = create_comment_login_dialog(
-            self.page, on_login_click, on_cancel_click
-        )
-        self.page.open(dialog)
-
     # ════════════════════════════════════════════════════════════════════
     # NAVIGATION
     # ════════════════════════════════════════════════════════════════════
@@ -361,12 +331,43 @@ class PetBuddyApp:
             e: ControlEvent von der Navigation
         """
         new_tab = e.control.selected_index
-        
+        self._navigate_to_tab(new_tab)
+
+    def _on_drawer_change(self, e: ft.ControlEvent) -> None:
+        if self._nav_drawer:
+            self._nav_drawer.open = False
+        self.page.update()
+        new_tab = e.control.selected_index
+        if 0 <= new_tab < len(self._drawer_actions):
+            self._drawer_actions[new_tab]()
+
+    def _navigate_to_tab(self, new_tab: int) -> None:
         # Login erforderlich für Melden und Profil
         if new_tab in [TAB_MELDEN, TAB_PROFIL] and not self.is_logged_in:
-            self._show_login_required_dialog(new_tab)
+            def on_login() -> None:
+                self.pending_tab_after_login = new_tab
+                self._show_login()
+
+            def on_cancel() -> None:
+                profile_key = get_profile_drawer_key(
+                    self.profile_view.current_view if self.profile_view else None
+                )
+                set_drawer_selection(
+                    self._nav_drawer,
+                    self._drawer_index_map,
+                    TAB_START,
+                    profile_key,
+                )
+                self.page.update()
+
+            show_login_required_dialog(
+                self.page,
+                new_tab,
+                on_login=on_login,
+                on_cancel=on_cancel,
+            )
             return
-        
+
         # Cleanup wenn Melden verlassen wird
         if self.current_tab == TAB_MELDEN and new_tab != TAB_MELDEN and self.post_form:
             self.post_form.cleanup_local_uploads()
@@ -378,17 +379,75 @@ class PetBuddyApp:
             self.page.go("/post/new")
         elif new_tab == TAB_PROFIL:
             self.page.go("/profile")
-        
+
         self.current_tab = new_tab
+        profile_key = get_profile_drawer_key(
+            self.profile_view.current_view if self.profile_view else None
+        )
+        set_drawer_selection(
+            self._nav_drawer,
+            self._drawer_index_map,
+            new_tab,
+            profile_key,
+        )
         self.render_tab()
+
+    def _open_profile_section(self, view_name: str, drawer_key: str) -> None:
+        if not self.is_logged_in:
+            def on_login() -> None:
+                self.pending_tab_after_login = TAB_PROFIL
+                self._show_login()
+
+            def on_cancel() -> None:
+                profile_key = get_profile_drawer_key(
+                    self.profile_view.current_view if self.profile_view else None
+                )
+                set_drawer_selection(
+                    self._nav_drawer,
+                    self._drawer_index_map,
+                    TAB_START,
+                    profile_key,
+                )
+                self.page.update()
+
+            show_login_required_dialog(
+                self.page,
+                TAB_PROFIL,
+                on_login=on_login,
+                on_cancel=on_cancel,
+            )
+            return
+        if not self.profile_view:
+            if not self.build_ui():
+                return
+        if self.profile_view:
+            self.profile_view.navigate_to(view_name)
+        self.current_tab = TAB_PROFIL
+        profile_key = get_profile_drawer_key(
+            self.profile_view.current_view if self.profile_view else None
+        )
+        set_drawer_selection(
+            self._nav_drawer,
+            self._drawer_index_map,
+            drawer_key,
+            profile_key,
+        )
+        self._show_main_app()
     
     def _go_to_start(self, _e: ft.ControlEvent) -> None:
         """Navigiert zur Startseite (z. B. beim Klick auf die PetBuddy-Überschrift)."""
         if self.current_tab == TAB_MELDEN and self.post_form:
             self.post_form.cleanup_local_uploads()
         self.current_tab = TAB_START
-        if self.nav is not None:
-            self.nav.selected_index = TAB_START
+        profile_key = get_profile_drawer_key(
+            self.profile_view.current_view if self.profile_view else None
+        )
+        set_drawer_selection(
+            self._nav_drawer,
+            self._drawer_index_map,
+            TAB_START,
+            profile_key,
+        )
         self.page.go("/")
         self.render_tab()
     
@@ -428,11 +487,20 @@ class PetBuddyApp:
                     sb=self.sb,
                     on_contact_click=None,
                     on_melden_click=self.go_to_melden_tab,
-                    on_login_required=self._show_favorite_login_dialog,
-                    on_save_search_login_required=self._show_saved_search_login_dialog,
-                    on_comment_login_required=self._show_comment_login_dialog,
+                    on_login_required=lambda: show_favorite_login_dialog(
+                        self.page,
+                        on_login=self._show_login,
+                    ),
+                    on_save_search_login_required=lambda: show_saved_search_login_dialog(
+                        self.page,
+                        on_login=self._show_login,
+                    ),
+                    on_comment_login_required=lambda: show_comment_login_dialog(
+                        self.page,
+                        on_login=self._show_login,
+                    ),
                 )
-            
+
             # PostForm erstellen
             if self.post_form is None:
                 self.post_form = PostForm(
@@ -440,7 +508,7 @@ class PetBuddyApp:
                     sb=self.sb,
                     on_saved_callback=self.on_post_saved
                 )
-            
+
             # ProfileView erstellen
             if self.profile_view is None:
                 self.profile_view = ProfileView(
@@ -450,29 +518,28 @@ class PetBuddyApp:
                     on_favorites_changed=self._on_favorites_changed,
                     on_posts_changed=self._on_posts_changed,
                 )
-            
+
             return True
-            
         except Exception as e:
             logger.error(f"Fehler in build_ui: {e}", exc_info=True)
             self._show_error(f"Fehler beim Laden der UI: {str(e)}")
             return False
-    
+
     def _on_favorites_changed(self) -> None:
-        """Callback wenn sich Favoriten ändern."""
+        """Callback wenn sich Favoriten aendern."""
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
-    
+
     def _on_posts_changed(self) -> None:
-        """Callback wenn Meldungen bearbeitet/gelöscht werden."""
+        """Callback wenn Meldungen bearbeitet/geloscht werden."""
         if self.discover_view:
             self.page.run_task(self.discover_view.load_posts)
-    
+
     def _build_start_section(self) -> ft.Control:
         """Erstellt den Start-Tab mit Suchleiste und Liste."""
         try:
             controls = []
-            
+
             # Login-Banner für nicht eingeloggte Benutzer
             if not self.is_logged_in:
                 controls.append(
@@ -480,21 +547,21 @@ class PetBuddyApp:
                         lambda _: self._show_login(),
                     )
                 )
-            
+
             if not self.discover_view:
                 logger.error("discover_view ist None in _build_start_section")
                 return ft.Container(
                     content=ft.Text("Fehler: Discover-View nicht initialisiert"),
                     padding=20
                 )
-            
+
             if not hasattr(self.discover_view, 'search_row'):
                 logger.error("discover_view.search_row existiert nicht")
                 return ft.Container(
                     content=ft.Text("Fehler: search_row nicht initialisiert"),
                     padding=20
                 )
-            
+
             # Suchleiste auf-/zuklappbar
             search_filters = ft.Container(
                 content=self.discover_view.search_row,
@@ -538,9 +605,14 @@ class PetBuddyApp:
                 elev=2,
             )
 
+            content_area = ft.Container(
+                content=self.discover_view.build(),
+                expand=True,
+            )
+
             controls.extend([
                 search_toggle_card,
-                self.discover_view.build(),
+                content_area,
             ])
 
             return ft.Column(
@@ -562,10 +634,6 @@ class PetBuddyApp:
     def _show_main_app(self) -> None:
         """Zeigt die Hauptanwendung."""
         try:
-            if not self.build_ui():
-                logger.error("_show_main_app: build_ui() fehlgeschlagen")
-                return
-            
             # Komponenten erstellen
             self.start_section = self._build_start_section()
             if self.start_section is None:
@@ -579,7 +647,56 @@ class PetBuddyApp:
                 if lo and lo in self.page.overlay:
                     self.page.overlay.remove(lo)
             
-            self.nav = create_navigation_bar(self.current_tab, self._on_nav_change)
+            actions: dict[str, Callable[[], None]] = {
+                DRAWER_KEY_START: lambda: self._navigate_to_tab(TAB_START),
+                DRAWER_KEY_MELDEN: lambda: self._navigate_to_tab(TAB_MELDEN),
+                DRAWER_KEY_PROFILE_EDIT: lambda: self._open_profile_section(
+                    ProfileView.VIEW_EDIT_PROFILE,
+                    DRAWER_KEY_PROFILE_EDIT,
+                ),
+                DRAWER_KEY_MY_POSTS: lambda: self._open_profile_section(
+                    ProfileView.VIEW_MY_POSTS,
+                    DRAWER_KEY_MY_POSTS,
+                ),
+                DRAWER_KEY_FAVORITES: lambda: self._open_profile_section(
+                    ProfileView.VIEW_FAVORITES,
+                    DRAWER_KEY_FAVORITES,
+                ),
+                DRAWER_KEY_SAVED_SEARCHES: lambda: self._open_profile_section(
+                    ProfileView.VIEW_SAVED_SEARCHES,
+                    DRAWER_KEY_SAVED_SEARCHES,
+                ),
+                DRAWER_KEY_SETTINGS: lambda: self._open_profile_section(
+                    ProfileView.VIEW_SETTINGS,
+                    DRAWER_KEY_SETTINGS,
+                ),
+                DRAWER_KEY_LOGOUT: self._confirm_logout,
+                DRAWER_KEY_LOGIN: self._show_login,
+            }
+
+            drawer_items: list[DrawerItem] = build_drawer_items(
+                self.is_logged_in,
+                actions,
+            )
+
+            (
+                self._nav_drawer,
+                self._drawer_index_map,
+                self._drawer_actions,
+            ) = create_navigation_drawer(
+                items=drawer_items,
+                selected_index=self.current_tab,
+                on_change=self._on_drawer_change,
+            )
+            profile_key = get_profile_drawer_key(
+                self.profile_view.current_view if self.profile_view else None
+            )
+            set_drawer_selection(
+                self._nav_drawer,
+                self._drawer_index_map,
+                self.current_tab,
+                profile_key,
+            )
             
             # Seite leeren und neu aufbauen
             self.page.controls.clear()
@@ -593,26 +710,42 @@ class PetBuddyApp:
                     if hasattr(control, "_apply_theme"):
                         control._apply_theme()
                 # AppBar mit neuer Hintergrundfarbe neu erstellen
-                self.page.appbar = create_app_bar(
-                    self.is_logged_in,
-                    self._confirm_logout,
-                    self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
-                    page=self.page,
-                    on_title_click=self._go_to_start,
-                    on_login=lambda _: self._show_login(),
-                )
-                self.page.update()
+                if self._main_column:
+                    self._app_bar_control = create_app_bar(
+                        self.is_logged_in,
+                        self._confirm_logout,
+                        self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
+                        on_menu=self._open_drawer,
+                        page=self.page,
+                        on_title_click=self._go_to_start,
+                        on_login=lambda _: self._show_login(),
+                    )
+                    self._main_column.controls[0] = self._app_bar_control
+                    self.page.update()
             
-            self.page.appbar = create_app_bar(
+            self._app_bar_control = create_app_bar(
                 self.is_logged_in,
                 self._confirm_logout,
                 self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
+                on_menu=self._open_drawer,
                 page=self.page,
                 on_title_click=self._go_to_start,
                 on_login=lambda _: self._show_login(),
             )
-            self.page.navigation_bar = self.nav
-            self.page.add(self.body)
+            self._content_scroll = ft.Column(
+                [self.body],
+                spacing=0,
+                expand=True,
+            )
+            self._main_column = ft.Column(
+                [self._app_bar_control, self._content_scroll],
+                spacing=0,
+                expand=True,
+            )
+            self.page.appbar = None
+            self.page.navigation_bar = None
+            self.page.drawer = self._nav_drawer
+            self.page.add(self._main_column)
             
             # Tab rendern und Daten laden
             self.render_tab()
@@ -707,7 +840,12 @@ class PetBuddyApp:
         self.page.controls.clear()
         self.page.add(self.auth_view.build())
         self.page.update()
-    
+
+    def _open_drawer(self, _e: Optional[ft.ControlEvent] = None) -> None:
+        if self._nav_drawer:
+            self._nav_drawer.open = True
+            self.page.update()
+
     def run(self):
         """Startet die Anwendung."""
         if not self.initialize():

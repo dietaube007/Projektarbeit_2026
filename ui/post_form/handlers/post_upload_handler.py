@@ -15,11 +15,13 @@ from .photo_upload_handler import cleanup_local_file
 from utils.validators import sanitize_string
 from utils.logging_config import get_logger
 from ui.constants import (
+    NO_SELECTION_VALUE,
+    NO_SELECTION_LABEL,
+)
+from utils.constants import (
     MAX_HEADLINE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MAX_LOCATION_LENGTH,
-    NO_SELECTION_VALUE,
-    NO_SELECTION_LABEL,
 )
 from ui.shared_components import show_error_dialog, show_success_dialog, show_progress_dialog
 

@@ -14,15 +14,12 @@ from ui.constants import PRIMARY_COLOR
 from ui.helpers import format_time
 from ui.theme import get_theme_color
 from utils.constants import MAX_COMMENT_LENGTH
-from utils.logging_config import get_logger
 
 from ..handlers.comment_handler import (
     handle_delete_comment,
     handle_load_comments,
     handle_post_comment,
 )
-
-logger = get_logger(__name__)
 
 
 class CommentSection(ft.Container):

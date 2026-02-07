@@ -11,7 +11,7 @@ import flet as ft
 from ui.theme import soft_card
 from ui.constants import STATUS_COLORS, SPECIES_COLORS
 from ui.helpers import extract_item_data
-from .menu_components import create_back_button, create_section_title
+from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -155,19 +155,14 @@ def build_favorite_card(
 
 def create_favorites_view(
     favorites_list: ft.Column,
-    on_back: Callable,
 ) -> list[ft.Control]:
     """Erstellt die Favoriten-Ansicht.
     
     Args:
         favorites_list: Column-Container für die Favoriten-Liste
-        on_back: Callback für Zurück-Button
-    
     Returns:
         Liste von Controls für Favoriten-View
     """
-    back_btn = create_back_button(on_back)
-
     favorites_card = soft_card(
         ft.Column([
             create_section_title("Favorisierte Meldungen"),
@@ -178,4 +173,4 @@ def create_favorites_view(
         elev=CARD_ELEVATION,
     )
 
-    return [back_btn, favorites_card]
+    return [favorites_card]

@@ -5,7 +5,7 @@ Wiederverwendbare UI-Komponenten.
 from __future__ import annotations
 
 import flet as ft
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional
 
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
 from ui.theme import soft_card, chip

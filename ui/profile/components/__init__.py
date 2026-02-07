@@ -3,13 +3,8 @@ Profile Components - UI-Komponenten für ProfileView.
 """
 
 from .menu_components import (
-    create_back_button,
     create_section_title,
-    create_menu_item,
     create_setting_row,
-    create_profile_header,
-    create_main_menu,
-    create_logout_button,
 )
 from .edit_profile_components import (
     # Sections
@@ -45,13 +40,8 @@ from .settings_components import (
 
 __all__ = [
     # Common
-    "create_back_button",
     "create_section_title",
-    "create_menu_item",
     "create_setting_row",
-    "create_profile_header",
-    "create_main_menu",
-    "create_logout_button",
     # Edit Profile Components
     "create_profile_image_section",
     "create_display_name_section",

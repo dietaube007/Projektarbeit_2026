@@ -10,8 +10,8 @@ from typing import Any, Callable
 import flet as ft
 
 from ui.theme import soft_card
-from ui.constants import MAX_DISPLAY_NAME_LENGTH
-from .menu_components import create_section_title, create_back_button
+from utils.constants import MAX_DISPLAY_NAME_LENGTH
+from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -403,7 +403,6 @@ def create_edit_profile_view(
     page: ft.Page,
     on_change_password: Callable,
     on_delete_account: Callable,
-    on_back: Callable,
 ) -> list[ft.Control]:
     """Erstellt die Profil-Bearbeiten-Ansicht.
     
@@ -418,13 +417,9 @@ def create_edit_profile_view(
         page: Flet Page-Instanz
         on_change_password: Callback zum Ändern des Passworts
         on_delete_account: Callback zum Löschen des Kontos
-        on_back: Callback für Zurück-Button
-    
     Returns:
         Liste von Controls für Edit Profile-View
     """
-    back_btn = create_back_button(on_back)
-
     change_image_section = create_profile_image_section(
         avatar=avatar,
         profile_image_picker=profile_image_picker,
@@ -448,7 +443,6 @@ def create_edit_profile_view(
     )
 
     return [
-        back_btn,
         change_image_section,
         change_name_section,
         password_section,

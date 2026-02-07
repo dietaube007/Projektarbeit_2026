@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Callable, Optional, List, Dict, Any
 import flet as ft
 
-from ui.constants import BORDER_COLOR, PRIMARY_COLOR, DROPDOWN_MENU_HEIGHT
+from ui.constants import PRIMARY_COLOR, DROPDOWN_MENU_HEIGHT
 
 
 def create_search_field(on_change: Optional[Callable[[ft.ControlEvent], None]] = None) -> ft.TextField:

@@ -4,12 +4,8 @@ Filter-Handler: UI-Handler für Filter-Management.
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Dict, Any, List
+from typing import Callable, Optional, Dict, Any
 import flet as ft
-
-from utils.logging_config import get_logger
-
-logger = get_logger(__name__)
 
 
 def reset_filters(

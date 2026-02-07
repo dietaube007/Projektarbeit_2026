@@ -11,7 +11,7 @@ import flet as ft
 from ui.theme import soft_card
 from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
 from ui.helpers import extract_item_data, format_date
-from .menu_components import create_back_button, create_section_title
+from .menu_components import create_section_title
 
 # Konstanten
 SECTION_PADDING: int = 20
@@ -348,19 +348,15 @@ def build_my_post_card(
 def create_my_posts_view(
     my_posts_list: ft.Column,
     my_posts_items: List[dict],
-    on_back: Callable,
 ) -> list[ft.Control]:
     """Erstellt die Meine Posts-Ansicht.
     
     Args:
         my_posts_list: Column-Container für die Posts-Liste
         my_posts_items: Liste der Post-Dictionaries
-        on_back: Callback für Zurück-Button
-    
     Returns:
         Liste von Controls für My Posts-View
     """
-    back_btn = create_back_button(on_back)
     count_text = f"{len(my_posts_items)} Meldung(en)" if my_posts_items else ""
 
     my_posts_card = soft_card(
@@ -377,4 +373,4 @@ def create_my_posts_view(
         elev=CARD_ELEVATION,
     )
 
-    return [back_btn, my_posts_card]
+    return [my_posts_card]

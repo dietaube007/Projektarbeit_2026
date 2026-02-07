@@ -5,7 +5,6 @@ References-Feature: UI und Logik zum Laden und Befüllen von Referenz-Dropdowns.
 from __future__ import annotations
 
 from typing import Optional, Dict, Any, List, Callable
-import asyncio
 
 import flet as ft
 
