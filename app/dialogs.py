@@ -18,6 +18,28 @@ import flet as ft
 from ui.constants import PRIMARY_COLOR
 
 
+def _create_login_dialog(
+    message: str,
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None],
+) -> ft.AlertDialog:
+    """Erstellt einen generischen Login-Dialog mit einheitlichem Layout."""
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Anmeldung erforderlich"),
+        content=ft.Text(message),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel_click),
+            ft.ElevatedButton(
+                "Anmelden",
+                on_click=on_login_click,
+                style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
 
 def create_login_required_dialog(
     page: ft.Page,
@@ -33,16 +55,7 @@ def create_login_required_dialog(
     else:
         message = "Bitte melden Sie sich an, um auf Profilbereich zuzugreifen."
     
-    return ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Anmeldung erforderlich"),
-        content=ft.Text(message),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=on_cancel_click),
-            ft.ElevatedButton("Anmelden", on_click=on_login_click),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
+    return _create_login_dialog(message, on_login_click, on_cancel_click)
 
 
 def create_favorite_login_dialog(
@@ -51,17 +64,10 @@ def create_favorite_login_dialog(
     on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog wenn Gast auf Favorit klickt."""
-    return ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Anmeldung erforderlich"),
-        content=ft.Text(
-            "Bitte melden Sie sich an, um Meldungen zu favorisieren."
-        ),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=on_cancel_click),
-            ft.ElevatedButton("Anmelden", on_click=on_login_click),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    return _create_login_dialog(
+        "Bitte melden Sie sich an, um Meldungen zu favorisieren.",
+        on_login_click,
+        on_cancel_click,
     )
 
 
@@ -71,17 +77,10 @@ def create_saved_search_login_dialog(
     on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog wenn Gast eine Suche speichern möchte."""
-    return ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Anmeldung erforderlich"),
-        content=ft.Text(
-            "Bitte melden Sie sich an, um Suchen zu speichern."
-        ),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=on_cancel_click),
-            ft.ElevatedButton("Anmelden", on_click=on_login_click),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    return _create_login_dialog(
+        "Bitte melden Sie sich an, um Suchen zu speichern.",
+        on_login_click,
+        on_cancel_click,
     )
 
 
@@ -91,17 +90,10 @@ def create_comment_login_dialog(
     on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog wenn Gast kommentieren möchte."""
-    return ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Anmeldung erforderlich"),
-        content=ft.Text(
-            "Bitte melden Sie sich an, um zu kommentieren."
-        ),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=on_cancel_click),
-            ft.ElevatedButton("Anmelden", on_click=on_login_click),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    return _create_login_dialog(
+        "Bitte melden Sie sich an, um zu kommentieren.",
+        on_login_click,
+        on_cancel_click,
     )
 
 
@@ -111,17 +103,10 @@ def create_reaction_login_dialog(
     on_cancel_click: Callable[[ft.ControlEvent], None]
 ) -> ft.AlertDialog:
     """Erstellt einen Dialog wenn Gast auf eine Reaktion klickt."""
-    return ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Anmeldung erforderlich"),
-        content=ft.Text(
-            "Bitte melden Sie sich an, um auf Kommentare zu reagieren."
-        ),
-        actions=[
-            ft.TextButton("Abbrechen", on_click=on_cancel_click),
-            ft.ElevatedButton("Anmelden", on_click=on_login_click),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    return _create_login_dialog(
+        "Bitte melden Sie sich an, um auf Kommentare zu reagieren.",
+        on_login_click,
+        on_cancel_click,
     )
 
 
@@ -130,10 +115,10 @@ def create_login_banner(on_login_click: Callable) -> ft.Container:
     return ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700, size=20),
+                ft.Icon(ft.Icons.INFO_OUTLINE, color=PRIMARY_COLOR, size=20),
                 ft.Text(
                     "Melden Sie sich an, um Tiere zu melden oder Ihr Profil zu verwalten.",
-                    color=ft.Colors.BLUE_900,
+                    color=PRIMARY_COLOR,
                     size=14,
                     expand=True,
                 ),
@@ -150,7 +135,7 @@ def create_login_banner(on_login_click: Callable) -> ft.Container:
             alignment=ft.MainAxisAlignment.START,
         ),
         padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        bgcolor=ft.Colors.BLUE_50,
+        bgcolor=ft.Colors.with_opacity(0.08, PRIMARY_COLOR),
         border_radius=10,
-        border=ft.border.all(1, ft.Colors.BLUE_200),
+        border=ft.border.all(1, ft.Colors.with_opacity(0.25, PRIMARY_COLOR)),
     )

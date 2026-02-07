@@ -22,6 +22,7 @@ from ui.constants import (
     MAX_DESCRIPTION_LENGTH,
     DATE_FORMAT,
     NO_SELECTION_VALUE,
+    PRIMARY_COLOR,
 )
 from ui.shared_components import show_validation_dialog, show_success_dialog, show_error_dialog
 from ui.constants import MAX_HEADLINE_LENGTH, MAX_DESCRIPTION_LENGTH
@@ -238,7 +239,7 @@ class PostForm:
         if is_error:
             target.color = ft.Colors.RED
         elif is_loading:
-            target.color = ft.Colors.BLUE
+            target.color = PRIMARY_COLOR
         else:
             target.color = ft.Colors.GREEN
         target.value = message

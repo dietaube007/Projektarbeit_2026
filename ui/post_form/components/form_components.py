@@ -171,7 +171,7 @@ def create_status_text() -> ft.Text:
     Returns:
         Text-Widget für Status-Nachrichten (Fehler, Erfolg, etc.)
     """
-    return ft.Text("", color=ft.Colors.BLUE, size=12)
+    return ft.Text("", color=PRIMARY_COLOR, size=12)
 
 
 def create_farben_panel(

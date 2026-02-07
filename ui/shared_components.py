@@ -7,7 +7,7 @@ from __future__ import annotations
 import flet as ft
 from typing import Callable, Optional, Dict, Any
 
-from ui.constants import STATUS_COLORS, SPECIES_COLORS
+from ui.constants import STATUS_COLORS, SPECIES_COLORS, PRIMARY_COLOR
 from ui.theme import soft_card, chip
 
 
@@ -335,7 +335,7 @@ def meta_row(icon: str, text: str) -> ft.Control:
 # CHIPS
 # ══════════════════════════════════════════════════════════════════════
 
-def filter_chip(text: str, color: str = ft.Colors.BLUE_100) -> ft.Container:
+def filter_chip(text: str, color: Optional[str] = None) -> ft.Container:
     """Erstellt einen rechteckigen Filter-Chip für Filter-Anzeigen.
     
     Unterschied zu chip() aus theme.py:
@@ -346,14 +346,15 @@ def filter_chip(text: str, color: str = ft.Colors.BLUE_100) -> ft.Container:
     
     Args:
         text: Text des Chips
-        color: Hintergrundfarbe (Standard: BLUE_100)
+        color: Hintergrundfarbe (Standard: Primary mit leichter Deckkraft)
     
     Returns:
         Container mit Filter-Chip
     """
+    chip_color = color or ft.Colors.with_opacity(0.12, PRIMARY_COLOR)
     return ft.Container(
         content=ft.Text(text, size=12, color=ft.Colors.GREY_800),
-        bgcolor=color,
+        bgcolor=chip_color,
         border_radius=12,
         padding=ft.padding.symmetric(horizontal=10, vertical=4),
     )

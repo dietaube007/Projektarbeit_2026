@@ -65,7 +65,10 @@ class PetBuddyApp:
         self.pending_tab_after_login: Optional[int] = None
         
         # UI-Komponenten
-        self.body: ft.Container = ft.Container(padding=16, expand=True)
+        self.body: ft.Container = ft.Container(
+            padding=ft.padding.only(left=16, right=16, top=16, bottom=0),
+            expand=True,
+        )
         self.nav: Optional[ft.NavigationBar] = None
         self.start_section: Optional[ft.Control] = None
         self.post_form: Optional[PostForm] = None

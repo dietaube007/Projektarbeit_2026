@@ -159,7 +159,7 @@ MESSAGE_TYPE_INFO = "info"
 
 MESSAGE_COLOR_ERROR = ft.Colors.RED
 MESSAGE_COLOR_SUCCESS = ft.Colors.GREEN
-MESSAGE_COLOR_INFO = ft.Colors.BLUE
+MESSAGE_COLOR_INFO = PRIMARY_COLOR
 """Farben für verschiedene Message-Typen."""
 
 # Mapping für einfachen Zugriff

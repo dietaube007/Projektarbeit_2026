@@ -10,7 +10,7 @@ import flet as ft
 from ui.theme import soft_card, get_theme_color
 from ui.constants import (
     CARD_IMAGE_HEIGHT, LIST_IMAGE_HEIGHT, DIALOG_IMAGE_HEIGHT,
-    DEFAULT_PLACEHOLDER
+    DEFAULT_PLACEHOLDER, PRIMARY_COLOR
 )
 from ui.helpers import extract_item_data
 from .comment_components import CommentSection
@@ -85,7 +85,7 @@ def build_small_card(
             ft.CircleAvatar(
                 foreground_image_src=profile_img_sm if profile_img_sm else None,
                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=8) if not profile_img_sm else None,
-                bgcolor=ft.Colors.BLUE_GREY_400,
+                bgcolor=ft.Colors.with_opacity(0.6, PRIMARY_COLOR),
                 radius=8,
             ),
             ft.Text(data["username"], size=11, color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
@@ -176,7 +176,7 @@ def build_big_card(
             ft.CircleAvatar(
                 foreground_image_src=profile_img if profile_img else None,
                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=10) if not profile_img else None,
-                bgcolor=ft.Colors.BLUE_GREY_400,
+                bgcolor=ft.Colors.with_opacity(0.6, PRIMARY_COLOR),
                 radius=10,
             ),
             ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
@@ -208,6 +208,7 @@ def build_big_card(
                 "Kontakt",
                 icon=ft.Icons.EMAIL,
                 on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
+                style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
             ),
             favorite_btn,
         ],
@@ -297,6 +298,7 @@ def show_detail_dialog(
             "Kontakt",
             icon=ft.Icons.EMAIL,
             on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
+            style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
         )
     )
     if favorite_btn:
@@ -319,7 +321,7 @@ def show_detail_dialog(
                                 content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
                                 if not data.get("user_profile_image")
                                 else None,
-                                bgcolor=ft.Colors.BLUE_GREY_400,
+                                bgcolor=ft.Colors.with_opacity(0.6, PRIMARY_COLOR),
                                 radius=18,
                             ),
                             ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),

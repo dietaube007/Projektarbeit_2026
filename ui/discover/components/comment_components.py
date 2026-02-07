@@ -116,6 +116,12 @@ class CommentSection(ft.Container):
             icon_color=PRIMARY_COLOR,
             disabled=False
         )
+
+        self.comment_count_text = ft.Text(
+            "(0)",
+            size=12,
+            color=get_theme_color("text_secondary", self.is_dark),
+        )
         
         super().__init__(
             bgcolor=None,  # Transparent 
@@ -132,6 +138,7 @@ class CommentSection(ft.Container):
                             weight=ft.FontWeight.BOLD,
                             color=get_theme_color("text_primary", self.is_dark)
                         ),
+                        self.comment_count_text,
                         self.loading
                     ], spacing=10),
                     padding=ft.padding.only(top=20, bottom=10, left=10, right=10)
@@ -288,9 +295,30 @@ class CommentSection(ft.Container):
             create_empty_state=self._create_empty_state,
             create_comment_card=self.create_comment_card,
             create_error_state=self._create_error_state,
-            on_comments_loaded=lambda cs: setattr(self, "_current_comments", cs or []),
+            on_comments_loaded=lambda cs: self._set_comments(cs or []),
             show_loading=show_loading,
         )
+
+    def _set_comments(self, comments: list[dict]) -> None:
+        """Speichert Kommentare und aktualisiert den Counter."""
+        self._current_comments = comments
+        self._update_comment_count()
+
+    def _count_comments(self, comments: list[dict]) -> int:
+        """Zaehlt Kommentare inkl. Antworten."""
+        total = 0
+        for comment in comments:
+            total += 1
+            replies = comment.get("replies", []) or []
+            total += self._count_comments(replies)
+        return total
+
+    def _update_comment_count(self) -> None:
+        """Aktualisiert die Kommentar-Anzahl im Header."""
+        count = self._count_comments(self._current_comments or [])
+        self.comment_count_text.value = f"({count})"
+        if getattr(self.comment_count_text, "page", None):
+            self.comment_count_text.update()
 
     def _refresh_comments_ui(self) -> None:
         """Baut die Kommentar-Liste aus _current_comments neu (ohne erneutes Laden)."""
@@ -304,6 +332,7 @@ class CommentSection(ft.Container):
                     render(r, is_reply=True)
             for c in self._current_comments:
                 render(c, is_reply=False)
+        self._update_comment_count()
         self._page.update()
     
     def _create_empty_state(self) -> ft.Control:
@@ -405,8 +434,12 @@ class CommentSection(ft.Container):
                 on_click=lambda e, em=emoji, c=comment: self._toggle_reaction(c, em),
                 height=28,
                 style=ft.ButtonStyle(
-                    bgcolor=(ft.Colors.BLUE_50 if (is_active and not self.is_dark) else (ft.Colors.BLUE_GREY_800 if (is_active and self.is_dark) else None)),
-                    color=(ft.Colors.BLUE_700 if (is_active and not self.is_dark) else None),
+                    bgcolor=(
+                        ft.Colors.with_opacity(0.12, PRIMARY_COLOR)
+                        if (is_active and not self.is_dark)
+                        else (ft.Colors.with_opacity(0.2, PRIMARY_COLOR) if (is_active and self.is_dark) else None)
+                    ),
+                    color=(PRIMARY_COLOR if (is_active and not self.is_dark) else None),
                 ),
             )
 
