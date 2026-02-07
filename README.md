@@ -2,7 +2,7 @@
 
 Eine moderne Web-Anwendung zur Vermittlung von vermissten und gefundenen Tieren.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
 ![Flet](https://img.shields.io/badge/Flet-0.28.3-green.svg)
 ![Supabase](https://img.shields.io/badge/Supabase-Backend-orange.svg)
 
@@ -17,6 +17,8 @@ pip install -r requirements.txt
 # 2. .env Datei erstellen
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
+FLET_SECRET_KEY=...
+MAPBOX_TOKEN=...
 
 # 3. Anwendung starten
 python main.py
@@ -28,16 +30,14 @@ Die Anwendung öffnet sich automatisch im Browser unter `http://localhost:8550`
 
 ## Dokumentation
 
-**Vollständige Dokumentation:** Siehe [documentation/](documentation/) für die ausführliche MkDocs-Dokumentation.
+**Vollständige Dokumentation:** [https://dietaube007.github.io/Projektarbeit_2026/](https://dietaube007.github.io/Projektarbeit_2026/)
 
-### Dokumentation starten:
+Lokal starten:
 
 ```bash
 cd documentation
 mkdocs serve
 ```
-
-Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 
 ---
 
@@ -45,7 +45,7 @@ Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 
 - **Flet** - Python UI-Framework
 - **Supabase** - Backend (PostgreSQL, Auth, Storage)
-- **Python 3.11+** - Programmiersprache
+- **Python 3.13+** - Programmiersprache
 - **Material Design 3** - Design-System
 
 ---
@@ -60,15 +60,6 @@ Dokumentation wird unter `http://localhost:8000` verfügbar sein.
 ├── documentation/   # MkDocs Dokumentation
 └── main.py          # Einstiegspunkt
 ```
-
----
-
-## Weitere Informationen
-
-- **Installation & Setup**: Siehe [documentation/docs/entwickler/installation.md](documentation/docs/entwickler/installation.md)
-- **Architektur**: Siehe [documentation/docs/entwickler/architektur.md](documentation/docs/entwickler/architektur.md)
-- **API-Dokumentation**: Siehe [documentation/docs/entwickler/api.md](documentation/docs/entwickler/api.md)
-- **Benutzer-Anleitung**: Siehe [documentation/docs/nutzer/](documentation/docs/nutzer/)
 
 ---
 
