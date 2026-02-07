@@ -56,7 +56,7 @@ def extract_item_data(item: Dict[str, Any]) -> Dict[str, Any]:
     art = species.get("name", "") if isinstance(species, dict) else ""
 
     breed = item.get("breed") or {}
-    rasse = breed.get("name", "Mischling") if isinstance(breed, dict) else "Unbekannt"
+    rasse = breed.get("name", "Keine Angabe") if isinstance(breed, dict) else "Keine Angabe"
 
     farbe = get_color_names(item.get("post_color") or [])
 

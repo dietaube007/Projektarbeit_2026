@@ -265,6 +265,11 @@ def show_detail_dialog(
     """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentarbereich."""
     data = extract_item_data(item)
 
+    sex = item.get("sex") or {}
+    geschlecht = sex.get("name", "Keine Angabe") if isinstance(sex, dict) else "Keine Angabe"
+    if isinstance(geschlecht, str):
+        geschlecht = geschlecht.strip() or "Keine Angabe"
+
     is_dark = page.theme_mode == ft.ThemeMode.DARK
     
     visual = (
@@ -356,15 +361,30 @@ def show_detail_dialog(
             ft.Divider(height=16, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK)),
             ft.Column(
                 [
-                    meta_row(ft.Icons.LOCATION_ON, data["ort"] or DEFAULT_PLACEHOLDER),
+                    meta_row(ft.Icons.PETS, f"Tierart: {data['art']}"),
+                    meta_row(
+                        ft.Icons.MALE if geschlecht.lower() == "männlich"
+                        else ft.Icons.FEMALE if geschlecht.lower() == "weiblich"
+                        else ft.Icons.QUESTION_MARK,
+                        f"Geschlecht: {geschlecht}",
+                    ),
+                    meta_row(
+                        ft.Icons.LABEL,
+                        f"Rasse: {data['rasse']}" if data["rasse"] else "Rasse: Keine Angabe",
+                    ),
+                    meta_row(
+                        ft.Icons.PALETTE,
+                        f"Farbe: {data['farbe']}" if data["farbe"] else "Farbe: Keine Angabe",
+                    ),
+                    meta_row(ft.Icons.LOCATION_ON, f"Ort: {data['ort'] or DEFAULT_PLACEHOLDER}"),
                     meta_row(
                         ft.Icons.SCHEDULE,
                         f"{event_label}: {data['when']}" if data["when"] and data["when"] != "—" else DEFAULT_PLACEHOLDER,
                     ),
                     meta_row(ft.Icons.CALENDAR_TODAY, f"Erstellt am: {data['created_at']}"),
                 ],
+                spacing=6,
                 tight=True,
-                spacing=8,
             ),
         ],
         tight=True,

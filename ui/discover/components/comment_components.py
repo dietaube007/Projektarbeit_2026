@@ -117,6 +117,9 @@ class CommentSection(ft.Container):
             disabled=False
         )
 
+        if not self.is_logged_in:
+            self._set_guest_comment_state()
+
         self.comment_count_text = ft.Text(
             "(0)",
             size=12,
@@ -175,6 +178,13 @@ class CommentSection(ft.Container):
         if not hasattr(self._page, "_theme_listeners"):
             self._page._theme_listeners = []
         self._page._theme_listeners.append(self)
+
+    def _set_guest_comment_state(self) -> None:
+        """Sperrt das Kommentar-Textfeld im Gastmodus und zeigt Login-Hinweis."""
+        self.comment_input.read_only = True
+        self.comment_input.hint_text = "Zum Kommentieren bitte einloggen."
+        self.send_button.disabled = True
+        self.send_button.tooltip = "Bitte einloggen, um zu kommentieren"
     
     def _apply_theme(self) -> None:
         """Aktualisiert alle Theme-abhängigen Farben (Hintergrund, Text, Rahmen).
@@ -387,9 +397,11 @@ class CommentSection(ft.Container):
         cid = comment.get("id")
         is_confirming = is_author and (self._delete_confirming_id == cid)
         if is_confirming:
-            return ft.Row(
+            controls = []
+            if reply_button:
+                controls.append(reply_button)
+            controls.extend(
                 [
-                    reply_button,
                     ft.Text(
                         "Wirklich löschen?",
                         size=12,
@@ -403,21 +415,27 @@ class CommentSection(ft.Container):
                         "Löschen",
                         on_click=lambda e, cid=cid: self._do_delete_comment(cid),
                     ),
-                ],
+                ]
+            )
+            return ft.Row(
+                controls,
                 spacing=8,
             )
         if is_author:
+            controls = []
+            if reply_button:
+                controls.append(reply_button)
+            controls.append(
+                ft.IconButton(
+                    icon=ft.Icons.DELETE_OUTLINE,
+                    icon_size=16,
+                    icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
+                    tooltip="Löschen",
+                    on_click=lambda e, cid=cid: self._request_delete_comment(cid),
+                )
+            )
             return ft.Row(
-                [
-                    reply_button,
-                    ft.IconButton(
-                        icon=ft.Icons.DELETE_OUTLINE,
-                        icon_size=16,
-                        icon_color=ft.Colors.RED_400 if not is_dark else ft.Colors.RED_300,
-                        tooltip="Löschen",
-                        on_click=lambda e, cid=cid: self._request_delete_comment(cid),
-                    ),
-                ],
+                controls,
                 spacing=0,
             )
         return ft.Row([reply_button] if reply_button else [], spacing=0)
@@ -431,6 +449,7 @@ class CommentSection(ft.Container):
             label = f"{emoji} {count}"
             return ft.OutlinedButton(
                 label,
+                disabled=not self.is_logged_in,
                 on_click=lambda e, em=emoji, c=comment: self._toggle_reaction(c, em),
                 height=28,
                 style=ft.ButtonStyle(
@@ -445,19 +464,28 @@ class CommentSection(ft.Container):
 
         chips = [reaction_chip(e, c) for e, c in counts.items() if c]
 
-        emoji_menu = ft.PopupMenuButton(
-            icon=ft.Icons.ADD_REACTION,
-            tooltip="Reagieren",
-            items=[
-                ft.PopupMenuItem(
-                    text=e,
-                    on_click=lambda _, em=e, c=comment: self._toggle_reaction(c, em),
-                )
-                for e in self.reaction_emojis
-            ],
-        )
+        emoji_menu = None
+        if self.is_logged_in:
+            emoji_menu = ft.PopupMenuButton(
+                icon=ft.Icons.ADD_REACTION,
+                tooltip="Reagieren",
+                items=[
+                    ft.PopupMenuItem(
+                        text=e,
+                        on_click=lambda _, em=e, c=comment: self._toggle_reaction(c, em),
+                    )
+                    for e in self.reaction_emojis
+                ],
+            )
 
-        return ft.Row(chips + [emoji_menu], spacing=6, wrap=True)
+        row_controls = list(chips)
+        if emoji_menu is not None:
+            row_controls.append(emoji_menu)
+
+        if not row_controls:
+            return ft.Container()
+
+        return ft.Row(row_controls, spacing=6, wrap=True)
 
     def _toggle_reaction(self, comment: dict, emoji: str) -> None:
         if not self.is_logged_in:
