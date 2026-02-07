@@ -12,7 +12,7 @@ import flet as ft
 
 from ui.constants import PRIMARY_COLOR
 from utils.logging_config import get_logger
-from ui.shared_components import show_success_dialog, show_error_dialog
+from ui.shared_components import show_success_dialog, show_error_dialog, show_confirm_dialog
 
 from services.account import ProfileService, AuthService
 from services.posts import SavedSearchService
@@ -217,10 +217,19 @@ class ProfileView:
 
     def _logout(self):
         """Meldet den Benutzer ab."""
-        result = self.auth_service.logout()
-        if result.success:
-            if self.on_logout:
-                self.on_logout()
+        def on_confirm() -> None:
+            result = self.auth_service.logout()
+            if result.success:
+                if self.on_logout:
+                    self.on_logout()
+
+        show_confirm_dialog(
+            page=self.page,
+            title="Abmelden?",
+            message="Mochten Sie sich wirklich abmelden?",
+            confirm_text="Abmelden",
+            on_confirm=on_confirm,
+        )
 
     async def _save_display_name(self, name_field: ft.TextField):
         """Speichert den neuen Anzeigenamen."""

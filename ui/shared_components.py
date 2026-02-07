@@ -251,6 +251,59 @@ def show_validation_dialog(
     page.open(dlg)
 
 
+def show_confirm_dialog(
+    page: ft.Page,
+    title: str,
+    message: str,
+    confirm_text: str = "OK",
+    cancel_text: str = "Abbrechen",
+    on_confirm: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+    confirm_color: str = ft.Colors.RED_600,
+    confirm_text_color: str = ft.Colors.WHITE,
+) -> None:
+    """Zeigt einen Bestaetigungs-Dialog an.
+
+    Args:
+        page: Flet Page-Instanz
+        title: Titel des Dialogs
+        message: Nachricht die angezeigt werden soll
+        confirm_text: Text fuer die Bestaetigung
+        cancel_text: Text fuer Abbrechen
+        on_confirm: Optionaler Callback beim Bestaetigen
+        on_cancel: Optionaler Callback beim Abbrechen
+        confirm_color: Hintergrundfarbe des Bestaetigungs-Buttons
+        confirm_text_color: Textfarbe des Bestaetigungs-Buttons
+    """
+    def handle_confirm(e: ft.ControlEvent) -> None:
+        page.close(dlg)
+        if on_confirm:
+            on_confirm()
+
+    def handle_cancel(e: ft.ControlEvent) -> None:
+        page.close(dlg)
+        if on_cancel:
+            on_cancel()
+
+    dlg = ft.AlertDialog(
+        modal=True,
+        title=ft.Text(title, size=16, weight=ft.FontWeight.W_600),
+        content=ft.Text(message, size=13, color=ft.Colors.GREY_700),
+        actions=[
+            ft.TextButton(cancel_text, on_click=handle_cancel),
+            ft.ElevatedButton(
+                confirm_text,
+                bgcolor=confirm_color,
+                color=confirm_text_color,
+                on_click=handle_confirm,
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    page.open(dlg)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # LOADING INDICATOR
 # ══════════════════════════════════════════════════════════════════════

@@ -24,6 +24,7 @@ from ui.post_form import PostForm
 from ui.discover import DiscoverView
 from ui.profile import ProfileView
 from ui.auth import AuthView
+from ui.shared_components import show_confirm_dialog
 from ui.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_DEFAULT_WIDTH,
@@ -403,6 +404,16 @@ class PetBuddyApp:
             self.page.go("/login")
         except Exception as e:
             logger.error(f"Fehler beim Abmelden: {e}", exc_info=True)
+
+    def _confirm_logout(self, _e: Optional[ft.ControlEvent] = None) -> None:
+        """Zeigt einen Bestatigungsdialog vor dem Abmelden."""
+        show_confirm_dialog(
+            page=self.page,
+            title="Abmelden?",
+            message="Mochten Sie sich wirklich abmelden?",
+            confirm_text="Abmelden",
+            on_confirm=self._logout,
+        )
     
     # ════════════════════════════════════════════════════════════════════
     # UI-BEREICHE LADEN
@@ -585,7 +596,7 @@ class PetBuddyApp:
                 # AppBar mit neuer Hintergrundfarbe neu erstellen
                 self.page.appbar = create_app_bar(
                     self.is_logged_in,
-                    lambda _: self._logout(),
+                    self._confirm_logout,
                     self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
                     page=self.page,
                     on_title_click=self._go_to_start,
@@ -595,7 +606,7 @@ class PetBuddyApp:
             
             self.page.appbar = create_app_bar(
                 self.is_logged_in,
-                lambda _: self._logout(),
+                self._confirm_logout,
                 self.theme_manager.create_toggle_button(on_after_toggle=on_theme_toggle),
                 page=self.page,
                 on_title_click=self._go_to_start,

@@ -17,6 +17,7 @@ from ui.constants import (
 )
 from services.account import AuthService, ProfileService
 from ui.theme import ThemeManager, get_theme_color
+from ui.shared_components import show_confirm_dialog
 from .components import (
     create_login_email_field,
     create_login_password_field,
@@ -125,11 +126,20 @@ class AuthView:
 
     def _logout(self):
         """Meldet den Benutzer ab."""
-        handle_logout(
-            auth_service=self.auth_service,
-            show_message_callback=self._show_login_message,
+        def on_confirm() -> None:
+            handle_logout(
+                auth_service=self.auth_service,
+                show_message_callback=self._show_login_message,
+            )
+            self._update_login_card()
+
+        show_confirm_dialog(
+            page=self.page,
+            title="Abmelden?",
+            message="Mochten Sie sich wirklich abmelden?",
+            confirm_text="Abmelden",
+            on_confirm=on_confirm,
         )
-        self._update_login_card()
 
     # ─────────────────────────────────────────────────────────────
     # Passwort vergessen
