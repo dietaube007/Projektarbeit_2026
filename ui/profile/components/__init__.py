@@ -16,7 +16,6 @@ from .edit_profile_components import (
     create_edit_profile_view,
 )
 from .my_posts_components import (
-    create_post_details_dialog,
     build_my_post_card,
     create_my_posts_view,
 )
@@ -44,7 +43,6 @@ __all__ = [
     "create_delete_account_dialog",
     "create_delete_profile_image_dialog",
     # My Posts Components
-    "create_post_details_dialog",
     "build_my_post_card",
     "create_my_posts_view",
     "EditPostDialog",

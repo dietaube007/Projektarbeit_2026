@@ -98,7 +98,7 @@ class ProfileView:
         self.favorites_items: List[dict] = []
 
         # Meine Meldungen
-        self.my_posts_list = ft.Column(spacing=14)
+        self.my_posts_list = ft.ResponsiveRow(spacing=14, run_spacing=14)
         self.my_posts_items: List[dict] = []
 
         # UI-Elemente
@@ -216,6 +216,8 @@ class ProfileView:
                 on_edit=self._edit_post,
                 on_delete=self._confirm_delete_post,
                 on_mark_reunited=self._mark_reunited,
+                supabase=self.sb,
+                profile_service=self.profile_service,
             )
 
         self.main_container.controls.clear()
@@ -358,6 +360,7 @@ class ProfileView:
             on_edit=self._edit_post,
             on_delete=self._confirm_delete_post,
             on_mark_reunited=self._mark_reunited,
+            profile_service=self.profile_service,
         )
 
     def _mark_reunited(self, post: dict):

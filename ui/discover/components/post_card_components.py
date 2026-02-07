@@ -276,8 +276,9 @@ def show_detail_dialog(
     screen_width = page.width or getattr(page, "window_width", None) or 0
     is_mobile = bool(screen_width and screen_width < 720)
     
+    dialog_img_width = None if is_mobile else 480
     visual = (
-        ft.Image(src=data["img_src"], height=DIALOG_IMAGE_HEIGHT, fit=ft.ImageFit.COVER)
+        ft.Image(src=data["img_src"], width=dialog_img_width, height=DIALOG_IMAGE_HEIGHT, fit=ft.ImageFit.CONTAIN)
         if data["img_src"]
         else image_placeholder(DIALOG_IMAGE_HEIGHT, icon_size=72, page=page)
     )
@@ -293,7 +294,16 @@ def show_detail_dialog(
             on_click=lambda e, it=item: on_favorite_click(it, e.control),
         )
 
-    title_row = ft.Container(height=0)
+    # X-Button oben rechts (on_click wird nach dlg-Erstellung gesetzt)
+    close_btn = ft.IconButton(
+        icon=ft.Icons.CLOSE,
+        icon_size=20,
+        tooltip="Schließen",
+    )
+    title_row = ft.Row(
+        [ft.Container(expand=True), close_btn],
+        alignment=ft.MainAxisAlignment.END,
+    )
 
     # Eventdatum-Label je nach Meldungstyp
     typ_lower = (data["typ"] or "").lower().strip()
@@ -306,7 +316,7 @@ def show_detail_dialog(
     else:
         event_label = "Ereignis am"
 
-    # Aktions-Zeile: Kontakt links, Herz daneben
+    # Aktions-Controls: Kontakt + Herz (werden in Ersteller-Zeile eingebaut)
     action_controls = []
     action_controls.append(
         ft.FilledButton(
@@ -319,27 +329,37 @@ def show_detail_dialog(
     if favorite_btn:
         action_controls.append(favorite_btn)
 
-    actions_row = ft.Row(action_controls, spacing=4)
-
     # Links: Infos (Bild, Beschreibung, Metadaten) | Rechts: Kommentare
     post_id = str(item.get("id") or "")
     details_column = ft.Column(
         [
-            ft.Container(visual, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+            ft.Container(
+                visual,
+                border_radius=16,
+                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                alignment=ft.alignment.center,
+            ),
             ft.Container(height=2),
             ft.Row(
                 [
-                    ft.CircleAvatar(
-                        foreground_image_src=(data.get("user_profile_image") or "").strip() or None,
-                        content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
-                        if (data.get("user_profile_image") or "").strip().lower() in {"", "null", "none", "undefined"}
-                        else None,
-                        bgcolor=PRIMARY_COLOR,
-                        radius=18,
+                    ft.Row(
+                        [
+                            ft.CircleAvatar(
+                                foreground_image_src=(data.get("user_profile_image") or "").strip() or None,
+                                content=ft.Icon(ft.Icons.PERSON, color=ft.Colors.WHITE, size=18)
+                                if (data.get("user_profile_image") or "").strip().lower() in {"", "null", "none", "undefined"}
+                                else None,
+                                bgcolor=PRIMARY_COLOR,
+                                radius=18,
+                            ),
+                            ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+                        ],
+                        spacing=10,
                     ),
-                    ft.Text(data["username"], color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Row(action_controls, spacing=4),
                 ],
-                spacing=10,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             ft.Container(height=10),
             ft.Text(
@@ -422,15 +442,6 @@ def show_detail_dialog(
     else:
         dialog_content = details_column
 
-    actions_bar = ft.Row(
-        [
-            *action_controls,
-            ft.Container(expand=True),
-            ft.TextButton("Schließen", on_click=lambda _: page.close(dlg)),
-        ],
-        spacing=4,
-    )
-
     if is_mobile:
         dialog_content = ft.Column(
             [dialog_content],
@@ -440,16 +451,15 @@ def show_detail_dialog(
 
     dlg = ft.AlertDialog(
         title=title_row,
-        title_padding=ft.padding.only(left=30, right=30, top=30, bottom=8),
+        title_padding=ft.padding.only(left=24, right=8, top=8, bottom=0),
         content=ft.Container(
             content=dialog_content,
             width=None if is_mobile else 1080,
             height=None if is_mobile else 600,
         ),
-        content_padding=ft.padding.symmetric(horizontal=30),
-        actions=[actions_bar],
-        actions_padding=ft.padding.only(left=30, right=30, top=8, bottom=30),
+        content_padding=ft.padding.only(left=24, right=24, bottom=8),
     )
+    close_btn.on_click = lambda _: page.close(dlg)
     page.open(dlg)
     # Kommentare nach Öffnen laden (Dialog muss bereits in der Page sein)
     if supabase and post_id and profile_service is not None:

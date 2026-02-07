@@ -12,7 +12,8 @@ from ui.shared_components import loading_indicator, show_success_dialog, show_er
 from services.posts import PostService
 from services.posts.references import ReferenceService
 from utils.logging_config import get_logger
-from ..components.my_posts_components import create_post_details_dialog, build_my_post_card
+from ..components.my_posts_components import build_my_post_card
+from ui.discover.components.post_card_components import show_detail_dialog
 from ..components.edit_post_components import EditPostDialog
 
 logger = get_logger(__name__)
@@ -25,8 +26,7 @@ def show_post_details(page: ft.Page, post: dict) -> None:
         page: Flet Page-Instanz
         post: Post-Dictionary
     """
-    dialog = create_post_details_dialog(page=page, post=post)
-    page.open(dialog)
+    show_detail_dialog(page=page, item=post)
 
 
 # build_my_post_card wird aus components.post_components importiert
@@ -82,45 +82,57 @@ def handle_mark_reunited(
 
 
 def render_my_posts_list(
-    posts_list: ft.Column,
+    posts_list: ft.ResponsiveRow,
     posts_items: List[dict],
     page: ft.Page,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
     on_mark_reunited: Optional[Callable[[dict], None]] = None,
     not_logged_in: bool = False,
+    supabase=None,
+    profile_service=None,
 ):
     """Rendert die Liste der eigenen Meldungen.
     
     Args:
-        posts_list: Column-Container für die Liste
+        posts_list: ResponsiveRow-Container für die Liste
         posts_items: Liste der Post-Dictionaries
         page: Flet Page-Instanz
         on_edit: Optionaler Callback zum Bearbeiten
         on_delete: Optionaler Callback zum Löschen
         on_mark_reunited: Optionaler Callback zum Als-wiedervereint-markieren
         not_logged_in: Ob der Benutzer nicht eingeloggt ist
+        supabase: Supabase-Client (für Kommentare im Detail-Dialog)
+        profile_service: ProfileService (für Kommentare im Detail-Dialog)
     """
     posts_list.controls.clear()
     
     if not_logged_in:
         posts_list.controls.append(
-            ft.Text("Bitte einloggen um Ihre Meldungen zu sehen.", color=ft.Colors.GREY_600)
+            ft.Container(
+                content=ft.Text("Bitte einloggen um Ihre Meldungen zu sehen.", color=ft.Colors.GREY_600),
+                col=12,
+            )
         )
     elif not posts_items:
         posts_list.controls.append(
-            ft.Column(
-                [
-                    ft.Icon(ft.Icons.ARTICLE_OUTLINED, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Sie haben noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
-                    ft.Text(
-                        "Erstellen Sie eine Meldung über den 'Melden'-Tab.",
-                        size=12,
-                        color=ft.Colors.GREY_500,
-                    ),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=8,
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.ARTICLE_OUTLINED, size=48, color=ft.Colors.GREY_400),
+                        ft.Text("Sie haben noch keine Meldungen erstellt.", color=ft.Colors.GREY_600),
+                        ft.Text(
+                            "Erstellen Sie eine Meldung über den 'Melden'-Tab.",
+                            size=12,
+                            color=ft.Colors.GREY_500,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=8,
+                ),
+                col=12,
+                alignment=ft.alignment.center,
+                padding=ft.padding.symmetric(vertical=32),
             )
         )
     else:
@@ -132,12 +144,14 @@ def render_my_posts_list(
                     on_edit=on_edit,
                     on_delete=on_delete,
                     on_mark_reunited=on_mark_reunited,
+                    supabase=supabase,
+                    profile_service=profile_service,
                 )
             )
 
 
 async def load_my_posts(
-    my_posts_list: ft.Column,
+    my_posts_list: ft.ResponsiveRow,
     my_posts_items: List[dict],
     page: ft.Page,
     sb,
@@ -149,7 +163,7 @@ async def load_my_posts(
     """Lädt alle eigenen Meldungen des aktuellen Benutzers.
     
     Args:
-        my_posts_list: Column-Container für die Liste
+        my_posts_list: ResponsiveRow-Container für die Liste
         my_posts_items: Liste der Posts (wird aktualisiert)
         page: Flet Page-Instanz
         sb: Supabase Client
@@ -161,7 +175,7 @@ async def load_my_posts(
         Liste der geladenen Posts
     """
     try:
-        my_posts_list.controls = [loading_indicator("Meldungen werden geladen...")]
+        my_posts_list.controls = [ft.Container(content=loading_indicator("Meldungen werden geladen..."), col=12)]
         page.update()
 
         from services.account import ProfileService
@@ -185,7 +199,16 @@ async def load_my_posts(
         # PostService nutzen
         post_service = PostService(sb)
         my_posts_items.clear()
-        my_posts_items.extend(post_service.get_my_posts(user_id))
+        posts = post_service.get_my_posts(user_id)
+
+        # Eigene Profildaten an Posts anhängen (für Detail-Dialog)
+        display_name = profile_service.get_display_name()
+        profile_image_url = profile_service.get_profile_image_url()
+        for p in posts:
+            p["user_display_name"] = display_name
+            p["user_profile_image"] = profile_image_url
+
+        my_posts_items.extend(posts)
         render_my_posts_list(
             my_posts_list,
             my_posts_items,
@@ -193,6 +216,8 @@ async def load_my_posts(
             on_edit=on_edit,
             on_delete=on_delete,
             on_mark_reunited=on_mark_reunited,
+            supabase=sb,
+            profile_service=profile_service,
         )
         page.update()
         return my_posts_items
@@ -277,25 +302,27 @@ def confirm_delete_post(
 def handle_delete_post(
     post_id: int,
     my_posts_items: List[dict],
-    my_posts_list: ft.Column,
+    my_posts_list: ft.ResponsiveRow,
     page: ft.Page,
     sb,
     on_posts_changed: Optional[Callable] = None,
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
     on_mark_reunited: Optional[Callable[[dict], None]] = None,
+    profile_service=None,
 ) -> None:
     """Löscht einen Post und aktualisiert die UI.
     
     Args:
         post_id: ID des Posts
         my_posts_items: Liste der Posts (wird aktualisiert)
-        my_posts_list: Column-Container für die Liste
+        my_posts_list: ResponsiveRow-Container für die Liste
         page: Flet Page-Instanz
         sb: Supabase Client
         on_posts_changed: Optionaler Callback wenn Posts geändert wurden
         on_edit: Optionaler Callback zum Bearbeiten
         on_delete: Optionaler Callback zum Löschen
+        profile_service: ProfileService (für Kommentare im Detail-Dialog)
     """
     try:
         if delete_post(sb, post_id):
@@ -310,6 +337,8 @@ def handle_delete_post(
                 on_edit=on_edit,
                 on_delete=on_delete,
                 on_mark_reunited=on_mark_reunited,
+                supabase=sb,
+                profile_service=profile_service,
             )
             show_success_dialog(page, "Meldung gelöscht", "Die Meldung wurde erfolgreich gelöscht.")
             page.update()

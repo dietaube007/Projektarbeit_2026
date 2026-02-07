@@ -91,6 +91,7 @@ class CommentSection(ft.Container):
         self.comment_input = ft.TextField(
             hint_text="Schreibe einen Kommentar...",
             multiline=True,
+            shift_enter=True,
             min_lines=1,
             max_lines=4,
             expand=True,
@@ -126,8 +127,6 @@ class CommentSection(ft.Container):
         super().__init__(
             bgcolor=None,  # Transparent 
             content=ft.Column([
-                ft.Divider(height=1, color=get_theme_color("text_secondary", self.is_dark)),
-                
                 # Header
                 ft.Container(
                     content=ft.Row([
@@ -165,7 +164,6 @@ class CommentSection(ft.Container):
                         self.send_button
                     ], spacing=10),
                     padding=10,
-                    border=ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", self.is_dark))),
                     bgcolor=None  # Transparent
                 )
             ], spacing=0),
@@ -195,23 +193,19 @@ class CommentSection(ft.Container):
         # Column mit allen Controls
         col = self.content
         
-        # Divider (Index 0)
-        col.controls[0].color = get_theme_color("text_secondary", is_dark)
+        # Header Container (Index 0) -> Row -> Text (Index 1)
+        col.controls[0].content.controls[1].color = get_theme_color("text_primary", is_dark)
         
-        # Header Container (Index 1) -> Row -> Text (Index 1)
-        col.controls[1].content.controls[1].color = get_theme_color("text_primary", is_dark)
+        # Kommentare Container (Index 1) - transparent
+        col.controls[1].bgcolor = None
         
-        # Kommentare Container (Index 2) - transparent
-        col.controls[2].bgcolor = None
-        
-        # Antwort-Banner Container (Index 3) -> reply_banner - transparent
+        # Antwort-Banner Container (Index 2) -> reply_banner - transparent
         self.reply_banner.bgcolor = None
         # Reply-Banner Row: IconButton Close (Index 4)
         self.reply_banner.content.controls[4].icon_color = get_theme_color("text_secondary", is_dark)
         
-        # Eingabe-Bereich Container (Index 4) - transparent
-        col.controls[4].bgcolor = None
-        col.controls[4].border = ft.border.only(top=ft.BorderSide(1, get_theme_color("text_secondary", is_dark)))
+        # Eingabe-Bereich Container (Index 3) - transparent
+        col.controls[3].bgcolor = None
         
         # Kommentar-TextField - transparent
         self.comment_input.border_color = get_theme_color("text_secondary", is_dark)
@@ -407,16 +401,19 @@ class CommentSection(ft.Container):
                     ft.TextButton(
                         "Abbrechen",
                         on_click=lambda e: self._cancel_delete_confirm(),
+                        style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=6, vertical=2)),
                     ),
                     ft.FilledButton(
                         "Löschen",
                         on_click=lambda e, cid=cid: self._do_delete_comment(cid),
+                        style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=8, vertical=2)),
                     ),
                 ]
             )
             return ft.Row(
                 controls,
-                spacing=8,
+                spacing=4,
+                wrap=True,
             )
         if is_author:
             controls = []
@@ -436,6 +433,34 @@ class CommentSection(ft.Container):
                 spacing=0,
             )
         return ft.Row([reply_button] if reply_button else [], spacing=0)
+
+    def _build_actions_and_reactions_row(
+        self,
+        comment,
+        is_reply: bool,
+        is_author: bool,
+        is_dark: bool,
+        reply_button: Optional[ft.IconButton],
+    ) -> ft.Row:
+        """Baut eine Zeile: Links Aktionen (Antworten, Löschen), rechts Reaktionen."""
+        actions = self._build_comment_actions_row(
+            comment=comment,
+            is_reply=is_reply,
+            is_author=is_author,
+            is_dark=is_dark,
+            reply_button=reply_button,
+        )
+        reactions = self._build_reactions_row(comment)
+
+        return ft.Row(
+            [
+                actions,
+                reactions,
+            ],
+            spacing=4,
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
 
     def _build_reactions_row(self, comment: dict) -> ft.Row:
         counts = comment.get("reactions", {}) or {}
@@ -536,16 +561,15 @@ class CommentSection(ft.Container):
             if profile_image.lower() in {"", "null", "none", "undefined"}:
                 profile_image = None
         
-        # Antwort-Button (nur für Top-Level-Kommentare)
-        reply_button = None
-        if not is_reply:
-            reply_button = ft.IconButton(
-                icon=ft.Icons.REPLY,
-                icon_size=16,
-                icon_color=PRIMARY_COLOR,
-                tooltip="Antworten",
-                on_click=lambda e, c=comment: self.start_reply(c),
-            )
+        # Antwort-Button
+        reply_button = ft.IconButton(
+            icon=ft.Icons.REPLY,
+            icon_size=16,
+            icon_color=PRIMARY_COLOR,
+            tooltip="Antworten",
+            on_click=lambda e, c=comment: self.start_reply(c),
+            style=ft.ButtonStyle(padding=2),
+        )
         
         card_content = ft.Row([
             # Profilbild
@@ -587,11 +611,8 @@ class CommentSection(ft.Container):
                     color=get_theme_color("text_primary", is_dark),
                 ),
 
-                # Reaktionen (eigene Zeile)
-                self._build_reactions_row(comment),
-
-                # Aktionen (Antworten, Löschen oder Inline-Bestätigung)
-                self._build_comment_actions_row(
+                # Aktionen + Reaktionen (eine Zeile)
+                self._build_actions_and_reactions_row(
                     comment=comment,
                     is_reply=is_reply,
                     is_author=is_author,
@@ -599,9 +620,9 @@ class CommentSection(ft.Container):
                     reply_button=reply_button,
                 ),
 
-            ], spacing=4, expand=True),
+            ], spacing=2, expand=True),
             
-        ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.START)
+        ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.START)
         
         # Container mit Einrückung für Antworten
         # Hintergrundfarbe: heller als Umgebung (beide Modi)
@@ -626,7 +647,8 @@ class CommentSection(ft.Container):
             if self.on_login_required:
                 self.on_login_required()
             return
-        self.replying_to = comment['id']
+        # Bei Unterkommentaren auf den Parent-Kommentar antworten
+        self.replying_to = comment.get('parent_id') or comment['id']
         
         # Username extrahieren (Schema: user-Tabelle hat display_name)
         user_data = comment.get('user', {})
