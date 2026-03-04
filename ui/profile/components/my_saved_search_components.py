@@ -233,48 +233,66 @@ def build_saved_searches_list(
     Returns:
         Column mit der Suchaufträge-Liste
     """
-    searches_container = ft.Column(spacing=12)
+    searches_container = ft.ResponsiveRow(spacing=14, run_spacing=14)
     ref_service = ReferenceService(saved_search_service.sb)
+
+    is_dark = page.theme_mode == ft.ThemeMode.DARK if page else False
+    c_secondary = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_600
+    count_text = ft.Text("", size=12, color=c_secondary)
 
     def load_searches():
         """Lädt die gespeicherten Suchen."""
         searches = saved_search_service.get_saved_searches()
         searches_container.controls.clear()
 
+        count_text.value = f"{len(searches)} Suchauftrag(e)" if searches else ""
+
         if not searches:
             searches_container.controls.append(
-                soft_card(
-                    ft.Column([
-                        ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
-                        ft.Text("Keine gespeicherten Suchaufträge", weight=ft.FontWeight.W_600),
-                        ft.Text(
-                            "Speichern Sie Ihre Suchfilter auf der Startseite,\num sie hier wiederzufinden.",
-                            color=ft.Colors.GREY_600,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
-                    pad=24,
-                    elev=1,
+                ft.Container(
+                    content=soft_card(
+                        ft.Column([
+                            ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=ft.Colors.GREY_400),
+                            ft.Text("Keine gespeicherten Suchaufträge", weight=ft.FontWeight.W_600),
+                            ft.Text(
+                                "Speichern Sie Ihre Suchfilter auf der Startseite,\num sie hier wiederzufinden.",
+                                color=ft.Colors.GREY_600,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
+                        pad=24,
+                        elev=1,
+                    ),
+                    col=12,
+                    alignment=ft.alignment.center,
+                    padding=ft.padding.symmetric(vertical=32),
                 )
             )
         else:
             for search in searches:
                 searches_container.controls.append(
-                    build_search_card(
-                        page,
-                        search,
-                        saved_search_service,
-                        ref_service,
-                        on_apply_search,
-                        load_searches,
+                    ft.Container(
+                        content=build_search_card(
+                            page,
+                            search,
+                            saved_search_service,
+                            ref_service,
+                            on_apply_search,
+                            load_searches,
+                        ),
+                        col={"xs": 12, "md": 6},
                     )
                 )
 
         page.update()
 
     header = ft.Container(
-        content=ft.Text("Gespeicherte Suchaufträge", size=18, weight=ft.FontWeight.BOLD),
-        padding=ft.padding.only(bottom=8),
+        content=ft.Row([
+            ft.Text("Gespeicherte Suchaufträge", size=18, weight=ft.FontWeight.W_600),
+            ft.Container(expand=True),
+            count_text,
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        padding=ft.padding.symmetric(horizontal=16, vertical=8),
     )
 
     # Initial laden
@@ -283,4 +301,4 @@ def build_saved_searches_list(
     return ft.Column([
         header,
         searches_container,
-    ], spacing=12, expand=True)
+    ], spacing=0, expand=True)

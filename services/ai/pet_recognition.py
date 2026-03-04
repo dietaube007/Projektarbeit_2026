@@ -83,6 +83,55 @@ class PetRecognitionService:
         # Normalisiere Label für robustere Erkennung
         label_norm = predicted_label.replace('-', ' ').replace('_', ' ')
         label_lower = label_norm.lower()
+
+        translations = {
+            "french bulldog": "Französische Bulldogge",
+            "german shepherd": "Deutscher Schäferhund",
+            "german shepherd dog": "Deutscher Schäferhund",
+            "golden retriever": "Golden Retriever",
+            "labrador retriever": "Labrador Retriever",
+            "beagle": "Beagle",
+            "boxer": "Boxer",
+            "rottweiler": "Rottweiler",
+            "poodle": "Pudel",
+            "standard poodle": "Pudel",
+            "miniature poodle": "Zwergpudel",
+            "toy poodle": "Toypudel",
+            "dachshund": "Dackel",
+            "chihuahua": "Chihuahua",
+            "pomeranian": "Zwergspitz",
+            "pug": "Mops",
+            "bulldog": "Englische Bulldogge",
+            "english bulldog": "Englische Bulldogge",
+            "boston bull": "Boston Terrier",
+            "saint bernard": "Bernhardiner",
+            "basset": "Basset",
+            "great dane": "Deutsche Dogge",
+            "doberman": "Dobermann",
+            "siberian husky": "Sibirischer Husky",
+            "samoyed": "Samojede",
+            "collie": "Collie",
+            "border collie": "Border Collie",
+            "sheltie": "Shetland Sheepdog",
+            "papillon": "Papillon",
+            "maltese dog": "Malteser",
+            "yorkshire terrier": "Yorkshire Terrier",
+            "west highland white terrier": "West Highland Terrier",
+            "scottish terrier": "Schottischer Terrier",
+            "irish setter": "Irischer Setter",
+            "weimaraner": "Weimaraner",
+            "cocker spaniel": "Cocker Spaniel",
+            "english cocker spaniel": "Cocker Spaniel",
+            "tabby": "Getigerte Katze",
+            "tiger cat": "Tigerkatze",
+            "persian cat": "Perser",
+            "siamese cat": "Siamkatze",
+            "egyptian cat": "Ägyptische Mau",
+        }
+
+        def translate(label: str) -> str:
+            key = label.lower().strip()
+            return translations.get(key, label)
         
         # ImageNet Katzen-Labels
         cat_labels = [
@@ -102,7 +151,7 @@ class PetRecognitionService:
         # Prüfe auf Katze
         for cat_label in cat_labels:
             if cat_label in label_lower or ' cat' in label_lower or label_lower.startswith('cat'):
-                breed_name = label_norm.title()
+                breed_name = translate(label_norm).title()
                 # Wenn es eine Wildkatze ist, gib generischen Namen
                 if any(wild in label_lower for wild in ['cougar', 'lynx', 'leopard', 'lion', 'tiger', 'cheetah', 'jaguar', 'wildcat']):
                     return ("Katze", "Hauskatze (ähnlich zu " + breed_name + ")")
@@ -111,12 +160,12 @@ class PetRecognitionService:
         # Prüfe auf Hund
         for dog_indicator in dog_indicators:
             if dog_indicator in label_lower:
-                breed_name = label_norm.title()
+                breed_name = translate(label_norm).title()
                 return ("Hund", breed_name)
         
         # Fallback: Wenn nicht eindeutig, gib zurück was erkannt wurde
         # mit Hinweis auf Unsicherheit
-        breed_name = label_norm.title()
+        breed_name = translate(label_norm).title()
         return (None, breed_name)
     
     def recognize_pet(

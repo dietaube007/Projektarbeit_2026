@@ -8,7 +8,7 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from ui.shared_components import loading_indicator, show_confirm_dialog
-from ..components.my_favorites_components import build_favorite_card
+from ui.discover.components.post_card_components import build_big_card, show_detail_dialog
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -18,9 +18,12 @@ logger = get_logger(__name__)
 
 
 def render_favorites_list(
-    favorites_list: ft.Column,
+    favorites_list: ft.ResponsiveRow,
     favorites_items: List[dict],
     on_remove: Callable[[int], None],
+    page: ft.Page,
+    sb,
+    profile_service,
     not_logged_in: bool = False,
 ):
     """Rendert die Favoriten-Liste in den Container.
@@ -35,28 +38,60 @@ def render_favorites_list(
     
     if not_logged_in:
         favorites_list.controls.append(
-            ft.Text("Bitte einloggen um Favoriten zu sehen.", color=ft.Colors.GREY_600)
+            ft.Container(
+                content=ft.Text("Bitte einloggen um Favoriten zu sehen.", color=ft.Colors.GREY_600),
+                col=12,
+            )
         )
     elif not favorites_items:
         favorites_list.controls.append(
-            ft.Column(
-                [
-                    ft.Icon(ft.Icons.FAVORITE_BORDER, size=48, color=ft.Colors.GREY_400),
-                    ft.Text("Sie haben noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600),
-                    ft.Text("Klicken Sie auf das Herz-Symbol bei einer Meldung, um sie hier zu speichern.",
-                           size=12, color=ft.Colors.GREY_500),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=8,
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.FAVORITE_BORDER, size=48, color=ft.Colors.GREY_400),
+                        ft.Text("Sie haben noch keine Meldungen favorisiert.", color=ft.Colors.GREY_600),
+                        ft.Text(
+                            "Klicken Sie auf das Herz-Symbol bei einer Meldung, um sie hier zu speichern.",
+                            size=12,
+                            color=ft.Colors.GREY_500,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=8,
+                ),
+                col=12,
+                alignment=ft.alignment.center,
+                padding=ft.padding.symmetric(vertical=32),
             )
         )
     else:
-        for post in favorites_items:
-            favorites_list.controls.append(build_favorite_card(post, on_remove))
+        def on_favorite_click(item: dict, _control: ft.Control) -> None:
+            on_remove(item.get("id"))
+
+        def on_card_click(item: dict) -> None:
+            show_detail_dialog(
+                page=page,
+                item=item,
+                supabase=sb,
+                profile_service=profile_service,
+            )
+
+        favorites_list.controls = [
+            build_big_card(
+                item=post,
+                page=page,
+                on_favorite_click=on_favorite_click,
+                on_card_click=on_card_click,
+                on_contact_click=None,
+                supabase=sb,
+                profile_service=profile_service,
+            )
+            for post in favorites_items
+        ]
 
 
 async def load_favorites(
-    favorites_list: ft.Column,
+    favorites_list: ft.ResponsiveRow,
     favorites_items: List[dict],
     page: ft.Page,
     sb,
@@ -95,6 +130,9 @@ async def load_favorites(
                     sb=sb,
                     on_favorites_changed=on_favorites_changed,
                 ),
+                page=page,
+                sb=sb,
+                profile_service=profile_service,
                 not_logged_in=True,
             )
             page.update()
@@ -116,6 +154,9 @@ async def load_favorites(
                 sb=sb,
                 on_favorites_changed=on_favorites_changed,
             ),
+            page=page,
+            sb=sb,
+            profile_service=profile_service,
         )
         page.update()
         return favorites_items
@@ -134,6 +175,9 @@ async def load_favorites(
                 sb=sb,
                 on_favorites_changed=on_favorites_changed,
             ),
+            page=page,
+            sb=sb,
+            profile_service=profile_service,
         )
         page.update()
         return favorites_items

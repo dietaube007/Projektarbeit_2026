@@ -67,12 +67,6 @@ class AuthFlow:
                             color=get_theme_color("text_primary", is_dark),
                             text_align=ft.TextAlign.CENTER,
                         ),
-                        ft.Container(height=12),
-                        ft.ProgressBar(
-                            width=200,
-                            color=PRIMARY_COLOR,
-                            bgcolor=ft.Colors.with_opacity(0.2, PRIMARY_COLOR),
-                        ),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,

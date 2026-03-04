@@ -17,6 +17,8 @@ from __future__ import annotations
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from supabase.lib.client_options import SyncClientOptions
+from httpx import Client as HttpxClient
 
 from utils.logging_config import get_logger
 
@@ -56,7 +58,9 @@ def get_client() -> Client:
 
     try:
         logger.debug("Initialisiere Supabase Client...")
-        client = create_client(url, key)
+        http_client = HttpxClient(http2=False)
+        options = SyncClientOptions(httpx_client=http_client)
+        client = create_client(url, key, options)
         logger.info("Supabase Client erfolgreich initialisiert")
         return client
     except Exception as e:  # noqa: BLE001

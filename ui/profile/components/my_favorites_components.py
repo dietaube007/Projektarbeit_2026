@@ -153,23 +153,30 @@ def build_favorite_card(
 
 
 def create_favorites_view(
-    favorites_list: ft.Column,
+    favorites_list: ft.ResponsiveRow,
+    favorites_items: list[dict],
+    page: Optional[ft.Page] = None,
 ) -> list[ft.Control]:
     """Erstellt die Favoriten-Ansicht.
     
     Args:
-        favorites_list: Column-Container für die Favoriten-Liste
+        favorites_list: ResponsiveRow-Container für die Favoriten-Liste
+        favorites_items: Liste der Favoriten-Posts
+        page: Flet Page-Instanz (für Dark-Mode)
     Returns:
         Liste von Controls für Favoriten-View
     """
-    favorites_card = soft_card(
-        ft.Column([
+    is_dark = page.theme_mode == ft.ThemeMode.DARK if page else False
+    c_secondary = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_600
+    count_text = f"{len(favorites_items)} Meldung(en)" if favorites_items else ""
+
+    header = ft.Container(
+        content=ft.Row([
             ft.Text("Favorisierte Meldungen", size=18, weight=ft.FontWeight.W_600),
-            ft.Container(height=8),
-            favorites_list,
-        ], spacing=12),
-        pad=SECTION_PADDING,
-        elev=CARD_ELEVATION,
+            ft.Container(expand=True),
+            ft.Text(count_text, size=12, color=c_secondary),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        padding=ft.padding.symmetric(horizontal=16, vertical=8),
     )
 
-    return [favorites_card]
+    return [header, favorites_list]

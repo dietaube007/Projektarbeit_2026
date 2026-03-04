@@ -6,12 +6,18 @@ Enthält: Laden, Rendern, Löschen, Bearbeiten.
 from __future__ import annotations
 
 from typing import Callable, List, Optional
+from pathlib import Path
+from urllib.parse import urlparse
+import time
+import uuid
 import flet as ft
 
 from ui.shared_components import loading_indicator, show_success_dialog, show_error_dialog
-from services.posts import PostService
+from services.posts import PostService, PostStorageService
 from services.posts.references import ReferenceService
 from utils.logging_config import get_logger
+from utils.validators import validate_email
+from utils.pdf_generator import create_post_pdf, create_post_pdf_bytes
 from ..components.my_posts_components import build_my_post_card
 from ui.discover.components.post_card_components import show_detail_dialog
 from ..components.edit_post_components import EditPostDialog
@@ -88,6 +94,7 @@ def render_my_posts_list(
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
     on_mark_reunited: Optional[Callable[[dict], None]] = None,
+    on_export_pdf: Optional[Callable[[dict], None]] = None,
     not_logged_in: bool = False,
     supabase=None,
     profile_service=None,
@@ -144,6 +151,7 @@ def render_my_posts_list(
                     on_edit=on_edit,
                     on_delete=on_delete,
                     on_mark_reunited=on_mark_reunited,
+                    on_export_pdf=on_export_pdf,
                     supabase=supabase,
                     profile_service=profile_service,
                 )
@@ -159,6 +167,7 @@ async def load_my_posts(
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
     on_mark_reunited: Optional[Callable[[dict], None]] = None,
+    on_export_pdf: Optional[Callable[[dict], None]] = None,
 ) -> List[dict]:
     """Lädt alle eigenen Meldungen des aktuellen Benutzers.
     
@@ -216,6 +225,7 @@ async def load_my_posts(
             on_edit=on_edit,
             on_delete=on_delete,
             on_mark_reunited=on_mark_reunited,
+            on_export_pdf=on_export_pdf,
             supabase=sb,
             profile_service=profile_service,
         )
@@ -232,9 +242,190 @@ async def load_my_posts(
             on_edit=on_edit,
             on_delete=on_delete,
             on_mark_reunited=on_mark_reunited,
+            on_export_pdf=on_export_pdf,
         )
         page.update()
         return my_posts_items
+
+
+def _normalize_contact(value: Optional[str]) -> Optional[str]:
+    if not value or not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _get_post_contact(post: dict) -> tuple[Optional[str], Optional[str]]:
+    email = _normalize_contact(post.get("contact_email"))
+    phone = _normalize_contact(post.get("contact_phone"))
+    return email, phone
+
+
+def handle_export_pdf_request(
+    page: ft.Page,
+    post: dict,
+    profile_service,
+    on_confirm: Callable[[dict, Optional[str], Optional[str], Optional[str]], None],
+) -> None:
+    """Startet den PDF-Export und fragt Kontaktmethode nur bei Bedarf ab."""
+    post_email, post_phone = _get_post_contact(post)
+    email = post_email or _normalize_contact(profile_service.get_email())
+    phone = post_phone
+
+    email_tf = ft.TextField(
+        label="E-Mail",
+        keyboard_type=ft.KeyboardType.EMAIL,
+        value=email or "",
+    )
+    phone_tf = ft.TextField(
+        label="Telefonnummer",
+        keyboard_type=ft.KeyboardType.PHONE,
+        input_filter=ft.NumbersOnlyInputFilter(),
+        helper_text="Nur Zahlen eingeben",
+        value=phone or "",
+    )
+    additions_tf = ft.TextField(
+        label="Ergänzungen",
+        hint_text="Weitere Hinweise oder Zusatzinfos",
+        multiline=True,
+        min_lines=2,
+        max_lines=4,
+    )
+    error_text = ft.Text("", color=ft.Colors.RED_600, size=12)
+
+    def on_cancel(_):
+        page.close(dialog)
+
+    def on_continue(_):
+        entered_email = _normalize_contact(email_tf.value)
+        entered_phone = _normalize_contact(phone_tf.value)
+        additions = _normalize_contact(additions_tf.value)
+
+        if not entered_email and not entered_phone:
+            error_text.value = "Bitte E-Mail oder Telefonnummer angeben."
+            page.update()
+            return
+
+        if entered_email:
+            valid, msg = validate_email(entered_email)
+            if not valid:
+                error_text.value = msg or "Ungültige E-Mail-Adresse."
+                page.update()
+                return
+
+        page.close(dialog)
+        on_confirm(post, entered_email, entered_phone, additions)
+
+    dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Kontakt angeben"),
+        content=ft.Column(
+            [
+                ft.Text(
+                    "Bitte gib mindestens eine Kontaktmethode an, "
+                    "die in der PDF erscheinen soll."
+                ),
+                email_tf,
+                phone_tf,
+                additions_tf,
+                error_text,
+            ],
+            tight=True,
+            spacing=8,
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=on_cancel),
+            ft.ElevatedButton("Weiter", on_click=on_continue),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+    page.open(dialog)
+
+
+def generate_post_pdf(
+    page: ft.Page,
+    sb,
+    post: dict,
+    output_path: Optional[str],
+    contact_email: Optional[str],
+    contact_phone: Optional[str],
+    additions: Optional[str],
+) -> None:
+    """Erstellt die PDF-Datei fuer eine Meldung und speichert sie lokal."""
+    try:
+        image_bytes = None
+        post_images = post.get("post_image") or []
+        image_url = post_images[0].get("url") if post_images else None
+        if isinstance(image_url, str) and image_url.strip():
+            storage_service = PostStorageService(sb)
+            storage_path = storage_service.extract_storage_path_from_url(image_url)
+            if storage_path:
+                image_bytes = storage_service.download_post_image(storage_path)
+
+        if page.web:
+            pdf_bytes = create_post_pdf_bytes(
+                post=post,
+                image_bytes=image_bytes,
+                contact_email=contact_email,
+                contact_phone=contact_phone,
+                additions=additions,
+            )
+            root_dir = Path(__file__).resolve().parents[3]
+            export_dir = root_dir / "assets" / "pdf_exports"
+            export_dir.mkdir(parents=True, exist_ok=True)
+            post_id = post.get("id") or "meldung"
+            safe_id = str(post_id).replace(" ", "_")
+            filename = f"{safe_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.pdf"
+            export_path = export_dir / filename
+            export_path.write_bytes(pdf_bytes)
+            download_path = f"/download/{filename}"
+            raw_url = (page.url or "").strip()
+            base_url = ""
+            if raw_url:
+                parsed = urlparse(raw_url)
+                scheme = parsed.scheme
+                if scheme == "ws":
+                    scheme = "http"
+                elif scheme == "wss":
+                    scheme = "https"
+                if parsed.netloc:
+                    base_url = f"{scheme}://{parsed.netloc}"
+            full_url = f"{base_url}{download_path}" if base_url else download_path
+
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("PDF bereit"),
+                content=ft.Text("Die PDF wird heruntergeladen."),
+                actions=[
+                    ft.TextButton("Abbrechen", on_click=lambda e: page.close(dialog)),
+                    ft.ElevatedButton(
+                        "Download starten",
+                        url=full_url,
+                        url_target=ft.UrlTarget.BLANK,
+                        on_click=lambda e: page.close(dialog),
+                    ),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            page.open(dialog)
+            return
+
+        if not output_path:
+            show_error_dialog(page, "Fehler", "Kein Speicherpfad ausgewaehlt.")
+            return
+
+        create_post_pdf(
+            post=post,
+            output_path=output_path,
+            image_bytes=image_bytes,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            additions=additions,
+        )
+        show_success_dialog(page, "PDF erstellt", "Die PDF wurde erfolgreich gespeichert.")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Fehler beim PDF-Export: {e}", exc_info=True)
+        show_error_dialog(page, "Fehler", "Die PDF konnte nicht erstellt werden.")
 
 
 def edit_post(

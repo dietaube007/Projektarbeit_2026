@@ -24,6 +24,7 @@ def build_my_post_card(
     on_edit: Optional[Callable[[dict], None]] = None,
     on_delete: Optional[Callable[[int], None]] = None,
     on_mark_reunited: Optional[Callable[[dict], None]] = None,
+    on_export_pdf: Optional[Callable[[dict], None]] = None,
     supabase=None,
     profile_service=None,
 ) -> ft.Control:
@@ -136,6 +137,16 @@ def build_my_post_card(
                 style=ft.ButtonStyle(padding=4),
             )
         )
+    action_controls.append(
+        ft.IconButton(
+            icon=ft.Icons.PICTURE_AS_PDF,
+            icon_size=18,
+            icon_color=ft.Colors.RED_700,
+            tooltip="PDF erstellen",
+            on_click=lambda e, p=post: on_export_pdf(p) if on_export_pdf else None,
+            style=ft.ButtonStyle(padding=4),
+        )
+    )
     action_controls.extend([
         ft.IconButton(
             icon=ft.Icons.EDIT_OUTLINED,

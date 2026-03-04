@@ -35,6 +35,8 @@ from .handlers.my_posts_handler import (
     confirm_delete_post,
     handle_delete_post,
     handle_mark_reunited,
+    handle_export_pdf_request,
+    generate_post_pdf,
 )
 from .handlers.edit_profile_handler import (
     handle_change_password,
@@ -86,6 +88,7 @@ class ProfileView:
 
         self.user_data = None
         self.current_view = self.VIEW_EDIT_PROFILE
+        self._pending_pdf_export = None
 
         self.main_container = ft.Column(
             spacing=16,
@@ -94,7 +97,7 @@ class ProfileView:
         )
 
         # Favoriten
-        self.favorites_list = ft.Column(spacing=14)
+        self.favorites_list = ft.ResponsiveRow(spacing=14, run_spacing=14)
         self.favorites_items: List[dict] = []
 
         # Meine Meldungen
@@ -107,6 +110,8 @@ class ProfileView:
         # FilePicker zum Overlay hinzufügen
         if self.profile_image_picker not in self.page.overlay:
             self.page.overlay.append(self.profile_image_picker)
+        if self.pdf_save_picker not in self.page.overlay:
+            self.page.overlay.append(self.pdf_save_picker)
 
         # Daten laden
         self.page.run_task(self._load_user_data)
@@ -125,6 +130,9 @@ class ProfileView:
 
         self.profile_image_picker = ft.FilePicker(
             on_result=lambda e: self.page.run_task(self._handle_profile_image_upload, e),
+        )
+        self.pdf_save_picker = ft.FilePicker(
+            on_result=lambda e: self.page.run_task(self._handle_pdf_save_result, e),
         )
 
         self.display_name = ft.Text("Lädt...", size=24, weight=ft.FontWeight.W_600)
@@ -216,6 +224,7 @@ class ProfileView:
                 on_edit=self._edit_post,
                 on_delete=self._confirm_delete_post,
                 on_mark_reunited=self._mark_reunited,
+                on_export_pdf=self._export_post_pdf,
                 supabase=self.sb,
                 profile_service=self.profile_service,
             )
@@ -322,6 +331,7 @@ class ProfileView:
             on_edit=self._edit_post,
             on_delete=self._confirm_delete_post,
             on_mark_reunited=self._mark_reunited,
+            on_export_pdf=self._export_post_pdf,
         )
 
     def _edit_post(self, post: dict):
@@ -373,6 +383,68 @@ class ProfileView:
         )
         # Liste neu laden, damit Status-Badge aktualisiert wird
         self.page.run_task(self._load_my_posts)
+
+    def _export_post_pdf(self, post: dict) -> None:
+        """Startet den PDF-Export fuer eine Meldung."""
+        handle_export_pdf_request(
+            page=self.page,
+            post=post,
+            profile_service=self.profile_service,
+            on_confirm=self._request_pdf_save,
+        )
+
+    def _request_pdf_save(
+        self,
+        post: dict,
+        contact_email: Optional[str],
+        contact_phone: Optional[str],
+        additions: Optional[str],
+    ) -> None:
+        """Oeffnet den Speichern-Dialog und merkt sich Exportdaten."""
+        if self.page.web:
+            generate_post_pdf(
+                page=self.page,
+                sb=self.sb,
+                post=post,
+                output_path=None,
+                contact_email=contact_email,
+                contact_phone=contact_phone,
+                additions=additions,
+            )
+            return
+        post_id = post.get("id") or "meldung"
+        status = str((post.get("post_status") or {}).get("name") or "meldung").lower()
+        filename = f"{status}_{post_id}.pdf"
+        self._pending_pdf_export = {
+            "post": post,
+            "contact_email": contact_email,
+            "contact_phone": contact_phone,
+            "additions": additions,
+        }
+        self.pdf_save_picker.save_file(
+            dialog_title="PDF speichern",
+            file_name=filename,
+            allowed_extensions=["pdf"],
+        )
+
+    async def _handle_pdf_save_result(self, e: ft.FilePickerResultEvent) -> None:
+        """Erstellt die PDF nachdem der Zielpfad gewaehlt wurde."""
+        if not e.path:
+            self._pending_pdf_export = None
+            return
+        payload = self._pending_pdf_export
+        self._pending_pdf_export = None
+        if not payload:
+            return
+        generate_post_pdf(
+            page=self.page,
+            sb=self.sb,
+            post=payload["post"],
+            output_path=e.path,
+            contact_email=payload.get("contact_email"),
+            contact_phone=payload.get("contact_phone"),
+            additions=payload.get("additions"),
+        )
 
     def _confirm_delete_account(self):
         """Zeigt Bestätigungsdialog zum Löschen des Kontos."""
@@ -433,6 +505,8 @@ class ProfileView:
         """Baut die Favoriten-Ansicht."""
         return create_favorites_view(
             favorites_list=self.favorites_list,
+            favorites_items=self.favorites_items,
+            page=self.page,
         )
 
     def _build_my_posts(self) -> list:
