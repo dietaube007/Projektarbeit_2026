@@ -40,7 +40,7 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8551))
+    port = int(os.getenv("PORT", 8080))
 
     # Absoluten Upload-Pfad festlegen und Verzeichnis sicherstellen
     base_dir = os.path.dirname(os.path.abspath(__file__))

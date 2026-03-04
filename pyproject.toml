@@ -5,6 +5,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "flet>=0.28.0",
+    "flet-web>=0.28.3",
     "pillow>=10.0.0",
     "python-dotenv>=1.0.0",
     "supabase>=2.0.0",
