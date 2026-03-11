@@ -643,6 +643,10 @@ class DiscoverView:
         self._all_loaded_posts = items
         # Markiere Karte als nicht geladen damit sie neu gerendert wird bei Filter-Änderung
         self._map_loaded = False
+
+        # Wenn Karte aktuell sichtbar ist, direkt mit gefilterten Daten neu rendern
+        if self._current_tab_index == 1 and self._map_container is not None:
+            self.page.run_task(self._load_and_render_map)
         
         handle_view_render_items(
             items=items,

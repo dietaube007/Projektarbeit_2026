@@ -56,15 +56,17 @@ def validate_edit_form(
         (species_value, "Tierart"),
         (selected_farben, "Mindestens eine Farbe"),
         (description_value, "Beschreibung"),
-        (location_value, "Ort"),
         (date_value, "Datum"),
     ]
     for value, name in checks:
         if not value or (isinstance(value, str) and not value.strip()):
             errors.append(f"• {name}")
 
-    # Ort muss aus Vorschlagsliste gewaehlt sein (wenn geaendert)
-    if location_changed:
+    # Ort separat pruefen, damit die Fehlermeldung nicht doppelt erscheint
+    location_text = (location_value or "").strip()
+    if not location_text:
+        errors.append("• Ort")
+    elif location_changed:
         has_coords = (
             location_selected
             and location_selected.get("lat") is not None

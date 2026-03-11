@@ -3,7 +3,7 @@ Karten-Generator: Erstellt interaktive HTML-Karten mit Folium + OpenStreetMap.
 
 Features:
 - Marker mit runden Bild-Thumbnails (50x50px)
-- Farbkodierung: Grün = Fundtiere, Rot = Vermisste
+- Farbkodierung: Rot = Vermisst, Orange = Gefunden/Fundtier, Gruen = Wiedervereint
 - Marker-Clustering bei vielen Posts
 - Click-Handler für Detail-Ansicht
 - Zoom + Pan Funktionalität
@@ -24,10 +24,21 @@ logger = get_logger(__name__)
 
 # Farb-Schema für Meldungstypen
 COLORS = {
-    "fund": "#10B981",      # Grün (Tailwind Emerald-500)
-    "vermisst": "#EF4444",  # Rot (Tailwind Red-500)
+    "vermisst": "#EF4444",      # Rot (Tailwind Red-500)
+    "gefunden": "#F59E0B",      # Orange (Tailwind Amber-500)
+    "wiedervereint": "#22C55E", # Gruen (Tailwind Green-500)
 }
 DEFAULT_COLOR = "#3B82F6"  # Blau als Fallback
+
+
+def _normalize_status_key(status_name: str) -> str:
+    """Normalisiert Statusnamen auf interne Marker-Farbkeys."""
+    status_lower = (status_name or "").strip().lower()
+    if "wiedervereint" in status_lower:
+        return "wiedervereint"
+    if "fundtier" in status_lower or "gefunden" in status_lower or "zugelaufen" in status_lower:
+        return "gefunden"
+    return "vermisst"
 
 
 def create_marker_icon_html(
@@ -40,7 +51,7 @@ def create_marker_icon_html(
 
     Args:
         image_url: URL zum Post-Bild (oder None)
-        post_type: "fund" oder "vermisst"
+        post_type: "vermisst", "gefunden" oder "wiedervereint"
         species_emoji: Fallback-Emoji wenn kein Bild
         size: Größe in Pixeln
 
@@ -128,7 +139,13 @@ def create_popup_html(post: Dict[str, Any], image_url: Optional[str], post_id: s
     # Typ bestimmen
     post_status = post.get("post_status") or {}
     status_name = post_status.get("name", "") if isinstance(post_status, dict) else ""
-    post_type = "Fundtier" if status_name == "Fundtier" else "Vermisst"
+    status_key = _normalize_status_key(status_name)
+    if status_key == "wiedervereint":
+        post_type = "Wiedervereint"
+    elif status_key == "gefunden":
+        post_type = "Gefunden"
+    else:
+        post_type = "Vermisst"
     
     # Datum formatieren
     created_at = post.get("created_at", "")
@@ -280,7 +297,7 @@ def generate_map_html(
         # Typ bestimmen
         post_status = post.get("post_status") or {}
         status_name = post_status.get("name", "") if isinstance(post_status, dict) else ""
-        post_type = "fund" if status_name == "Fundtier" else "vermisst"
+        post_type = _normalize_status_key(status_name)
         
         # Species extrahieren
         species = post.get("species") or {}
@@ -312,8 +329,9 @@ def generate_map_html(
         </div>
         """
 
-        # Tooltip (beim Hover)
-        tooltip_text = f"{post.get('headline', 'Post')} ({post_type})"
+        # Tooltip (beim Hover): nur Meldungstitel 
+        
+        tooltip_text = post.get("headline", "Post")
 
         # Marker erstellen
         folium.Marker(
