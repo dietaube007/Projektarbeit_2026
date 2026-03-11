@@ -58,7 +58,11 @@ def create_app_bar(
     else:
         bgcolor = get_theme_color("background", is_dark=False)
     
-    title_content = ft.Text("PetBuddy", size=20, weight=ft.FontWeight.W_600)
+    title_content = ft.Image(
+        src="petbuddy_logo.png",
+        height=50,
+        fit=ft.ImageFit.CONTAIN,
+    )
     if on_title_click is not None:
         title_content = ft.GestureDetector(
             content=title_content,

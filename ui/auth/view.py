@@ -70,8 +70,6 @@ class AuthView:
         self._reg_modal_bg: Optional[ft.Container] = None
         self._background: Optional[ft.Container] = None
         self._theme_icon: Optional[ft.IconButton] = None
-        self._welcome_text: Optional[ft.Text] = None
-        self._title_text: Optional[ft.Text] = None
         # Button-Referenzen für Deaktivierung beim Modal-Öffnen
         self._login_btn: Optional[ft.ElevatedButton] = None
         self._register_btn: Optional[ft.TextButton] = None
@@ -278,11 +276,6 @@ class AuthView:
         if self._reg_modal_card:
             self._reg_modal_card.bgcolor = get_theme_color("card", is_dark)
 
-        # Überschriften-Farben aktualisieren
-        if self._welcome_text:
-            self._welcome_text.color = get_theme_color("text_secondary", is_dark)
-        if self._title_text:
-            self._title_text.color = get_theme_color("text_primary", is_dark)
     
     def _open_modal(self, e=None):
         """Öffnet das Registrierungs-Modal."""
@@ -472,36 +465,20 @@ class AuthView:
             is_dark=is_dark,
         )
         
-        # Pfote-Icon
-        paw_icon = ft.Container(
-            content=ft.Icon(ft.Icons.PETS, size=40, color=PRIMARY_COLOR),
-            bgcolor=ft.Colors.with_opacity(0.1, PRIMARY_COLOR),
-            padding=16,
-            border_radius=50,
+        # Logo
+        logo = ft.Image(
+            src="petbuddy_logo_slogan.png",
+            height=200,
+            fit=ft.ImageFit.CONTAIN,
         )
-        
-        # Überschriften-Texte
-        self._welcome_text = ft.Text(
-            "Willkommen bei",
-            size=16,
-            color=get_theme_color("text_secondary", is_dark),
-        )
-        self._title_text = ft.Text(
-            "PetBuddy",
-            size=32,
-            weight=ft.FontWeight.BOLD,
-            color=get_theme_color("text_primary", is_dark),
-        )
+
         # Haupt-Layout
         self._background = ft.Container(
             content=ft.Stack([
                 ft.Column([
                     ft.Container(height=40),
                     ft.Column([
-                        paw_icon,
-                        ft.Container(height=16),
-                        self._welcome_text,
-                        self._title_text,
+                        logo,
                         ft.Container(height=24),
                         self._form_card,
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),

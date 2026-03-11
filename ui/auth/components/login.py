@@ -39,7 +39,7 @@ def create_login_button(on_click: Callable[[ft.ControlEvent], None]) -> ft.Eleva
     return ft.ElevatedButton(
         "Einloggen",
         on_click=on_click,
-        expand=True,
+        width=220,
         height=48,
         bgcolor=PRIMARY_COLOR,
         color=ft.Colors.WHITE,
@@ -103,8 +103,21 @@ def create_login_card(
     else:
         # Nicht eingeloggt: Login-Formular anzeigen
         card_content = [
+            ft.Row(
+                [
+                    ft.Text(
+                        "Login",
+                        size=30,
+                        weight=ft.FontWeight.BOLD,
+                        color=get_theme_color("text_primary", is_dark),
+                        text_align=ft.TextAlign.CENTER,
+                    )
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            ft.Container(height=20),
             email_field,
-            ft.Container(height=16),
+            ft.Container(height=14),
             password_field,
         ]
         
@@ -112,15 +125,15 @@ def create_login_card(
             card_content.append(
                 ft.Row([forgot_password_btn], alignment=ft.MainAxisAlignment.END)
             )
-            card_content.append(ft.Container(height=8))
+            card_content.append(ft.Container(height=18))
         else:
-            card_content.append(ft.Container(height=24))
+            card_content.append(ft.Container(height=18))
         
         card_content.extend([
-            login_btn,
-            ft.Container(height=16),
-            info_text,
+            ft.Row([login_btn], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=8),
+            info_text,
+            ft.Container(height=12),
             ft.Row(
                 [ft.Text("Noch kein Konto?", color=TEXT_SECONDARY), register_btn], 
                 spacing=0,
@@ -132,7 +145,7 @@ def create_login_card(
     
     return ft.Container(
         content=ft.Column(card_content, tight=True, spacing=0),
-        padding=40,
+        padding=ft.padding.only(left=40, right=40, top=24, bottom=48),
         border_radius=20,
         bgcolor=get_theme_color("card", is_dark),
         width=420,
