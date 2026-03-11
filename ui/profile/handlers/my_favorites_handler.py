@@ -8,7 +8,7 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from ui.shared_components import loading_indicator, show_confirm_dialog
-from ui.discover.components.post_card_components import build_big_card, show_detail_dialog
+from ui.discover.components.post_card_components import build_big_card, show_detail_dialog, show_contact_form_dialog
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -68,10 +68,18 @@ def render_favorites_list(
         def on_favorite_click(item: dict, _control: ft.Control) -> None:
             on_remove(item.get("id"))
 
+        def on_contact_click(item: dict) -> None:
+            from services.account import ProfileService
+            ps = ProfileService(sb)
+            if not ps.get_user_id():
+                return
+            show_contact_form_dialog(page=page, item=item, profile_service=ps)
+
         def on_card_click(item: dict) -> None:
             show_detail_dialog(
                 page=page,
                 item=item,
+                on_contact_click=on_contact_click,
                 supabase=sb,
                 profile_service=profile_service,
             )
@@ -82,7 +90,7 @@ def render_favorites_list(
                 page=page,
                 on_favorite_click=on_favorite_click,
                 on_card_click=on_card_click,
-                on_contact_click=None,
+                on_contact_click=on_contact_click,
                 supabase=sb,
                 profile_service=profile_service,
             )
@@ -128,6 +136,7 @@ async def load_favorites(
                     favorites_list=favorites_list,
                     page=page,
                     sb=sb,
+                    profile_service=profile_service,
                     on_favorites_changed=on_favorites_changed,
                 ),
                 page=page,
@@ -152,6 +161,7 @@ async def load_favorites(
                 favorites_list=favorites_list,
                 page=page,
                 sb=sb,
+                profile_service=profile_service,
                 on_favorites_changed=on_favorites_changed,
             ),
             page=page,
@@ -173,6 +183,7 @@ async def load_favorites(
                 favorites_list=favorites_list,
                 page=page,
                 sb=sb,
+                profile_service=profile_service,
                 on_favorites_changed=on_favorites_changed,
             ),
             page=page,
@@ -189,6 +200,7 @@ def remove_favorite(
     favorites_list: ft.Column,
     page: ft.Page,
     sb,
+    profile_service=None,
     on_favorites_changed: Optional[Callable] = None,
 ) -> None:
     """Entfernt einen Post aus den Favoriten.
@@ -212,6 +224,11 @@ def remove_favorite(
                 favorites_items[:] = [
                     p for p in favorites_items if p.get("id") != post_id
                 ]
+                current_profile_service = profile_service
+                if current_profile_service is None:
+                    from services.account import ProfileService
+                    current_profile_service = ProfileService(sb)
+
                 render_favorites_list(
                     favorites_list,
                     favorites_items,
@@ -221,8 +238,12 @@ def remove_favorite(
                         favorites_list=favorites_list,
                         page=page,
                         sb=sb,
+                        profile_service=current_profile_service,
                         on_favorites_changed=on_favorites_changed,
                     ),
+                    page=page,
+                    sb=sb,
+                    profile_service=current_profile_service,
                 )
                 page.update()
 

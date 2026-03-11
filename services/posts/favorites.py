@@ -71,7 +71,10 @@ class FavoritesService:
                 .execute()
             )
 
-            return posts_res.data or []
+            posts = posts_res.data or []
+            for post in posts:
+                post["is_favorite"] = True
+            return posts
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"Fehler beim Laden der Favoriten: {e}", exc_info=True)

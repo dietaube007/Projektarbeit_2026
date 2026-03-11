@@ -149,6 +149,9 @@ def build_big_card(
     """
     data = extract_item_data(item)
     is_dark = page.theme_mode == ft.ThemeMode.DARK
+    current_user_id = profile_service.get_user_id() if profile_service else None
+    is_own_post = bool(current_user_id and str(item.get("user_id") or "") == str(current_user_id))
+    can_contact = bool(on_contact_click and not is_own_post)
 
     # --- Bild ---
     visual_content = (
@@ -215,8 +218,13 @@ def build_big_card(
             ft.FilledButton(
                 "Kontakt",
                 icon=ft.Icons.EMAIL,
-                on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
-                style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
+                disabled=not can_contact,
+                on_click=(lambda e, it=item: on_contact_click(it)) if can_contact else None,
+                style=ft.ButtonStyle(
+                    bgcolor=PRIMARY_COLOR if can_contact else ft.Colors.GREY_300,
+                    color=ft.Colors.WHITE if can_contact else ft.Colors.GREY_700,
+                    icon_color=ft.Colors.WHITE if can_contact else ft.Colors.GREY_700,
+                ),
             ),
             favorite_btn,
         ],
@@ -266,6 +274,9 @@ def show_detail_dialog(
 ) -> None:
     """Zeigt den Detail-Dialog für eine Meldung inkl. Kommentarbereich."""
     data = extract_item_data(item)
+    current_user_id = profile_service.get_user_id() if profile_service else None
+    is_own_post = bool(current_user_id and str(item.get("user_id") or "") == str(current_user_id))
+    can_contact = bool(on_contact_click and not is_own_post)
 
     sex = item.get("sex") or {}
     geschlecht = sex.get("name", "Keine Angabe") if isinstance(sex, dict) else "Keine Angabe"
@@ -322,8 +333,13 @@ def show_detail_dialog(
         ft.FilledButton(
             "Kontakt",
             icon=ft.Icons.EMAIL,
-            on_click=lambda e, it=item: on_contact_click(it) if on_contact_click else None,
-            style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
+            disabled=not can_contact,
+            on_click=(lambda e, it=item: on_contact_click(it)) if can_contact else None,
+            style=ft.ButtonStyle(
+                bgcolor=PRIMARY_COLOR if can_contact else ft.Colors.GREY_300,
+                color=ft.Colors.WHITE if can_contact else ft.Colors.GREY_700,
+                icon_color=ft.Colors.WHITE if can_contact else ft.Colors.GREY_700,
+            ),
         )
     )
     if favorite_btn:
@@ -465,3 +481,124 @@ def show_detail_dialog(
     if supabase and post_id and profile_service is not None:
         comment_section.load_comments()
         page.update()
+
+
+def show_contact_form_dialog(
+    page: ft.Page,
+    item: Dict[str, Any],
+    profile_service,
+    on_submit_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+) -> None:
+    """Zeigt das Kontaktformular für eine Meldung als Dialog.
+
+    Args:
+        page: Flet Page-Instanz
+        item: Post-Dictionary
+        profile_service: ProfileService-Instanz (zum Laden von Nutzerdaten)
+        on_submit_callback: Optionaler Callback nach dem Absenden (erhält contact_payload)
+    """
+    from utils.logging_config import get_logger
+    _logger = get_logger(__name__)
+
+    current_user = profile_service.get_current_user()
+    email_value = (profile_service.get_email() or "").strip()
+    user_meta = getattr(current_user, "user_metadata", {}) or {}
+    first_name_value = user_meta.get("first_name") or user_meta.get("firstname") or ""
+    last_name_value = user_meta.get("last_name") or user_meta.get("lastname") or ""
+
+    email_field = ft.TextField(label="E-Mail", value=email_value, read_only=True, border_radius=10, expand=True)
+    phone_field = ft.TextField(label="Telefon (optional)", hint_text="z. B. 0911/123456", border_radius=10, expand=True)
+    first_name_field = ft.TextField(label="Vorname", value=str(first_name_value or ""), border_radius=10, expand=True)
+    last_name_field = ft.TextField(label="Nachname", value=str(last_name_value or ""), border_radius=10, expand=True)
+    subject_field = ft.TextField(label="Betreff", border_radius=10, max_length=120, counter_text="", expand=True)
+    message_field = ft.TextField(
+        label="Mitteilung",
+        multiline=True,
+        min_lines=6,
+        max_lines=8,
+        border_radius=10,
+        max_length=2000,
+        hint_text="Textlänge (maximal 2000)",
+        expand=True,
+    )
+
+    post_title = str(item.get("headline") or item.get("title") or "Meldung")
+
+    def close_dialog(_e=None) -> None:
+        page.close(contact_dialog)
+
+    def submit_contact(_e) -> None:
+        subject = (subject_field.value or "").strip()
+        message = (message_field.value or "").strip()
+
+        if not subject:
+            subject_field.error_text = "Bitte Betreff eingeben."
+            page.update()
+            return
+        subject_field.error_text = None
+
+        if not message:
+            message_field.error_text = "Bitte Mitteilung eingeben."
+            page.update()
+            return
+        message_field.error_text = None
+
+        contact_payload = {
+            "post_id": item.get("id"),
+            "post_title": post_title,
+            "email": email_field.value,
+            "phone": (phone_field.value or "").strip() or None,
+            "first_name": (first_name_field.value or "").strip() or None,
+            "last_name": (last_name_field.value or "").strip() or None,
+            "subject": subject,
+            "message": message,
+        }
+        _logger.info("Kontaktanfrage erstellt für Post %s", contact_payload.get("post_id"))
+
+        if on_submit_callback:
+            try:
+                on_submit_callback(contact_payload)
+            except Exception as ex:
+                _logger.warning(f"Kontakt-Callback fehlgeschlagen: {ex}")
+
+        page.close(contact_dialog)
+        page.snack_bar = ft.SnackBar(ft.Text("Kontaktanfrage vorbereitet."), bgcolor=PRIMARY_COLOR)
+        page.snack_bar.open = True
+        page.update()
+
+    contact_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Kontaktformular", weight=ft.FontWeight.W_600),
+        content=ft.Container(
+            width=760,
+            content=ft.Column(
+                [
+                    ft.Text(f"Ihre Nachricht zu: {post_title}", size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.ResponsiveRow(
+                        [ft.Container(first_name_field, col={"xs": 12, "md": 6}), ft.Container(last_name_field, col={"xs": 12, "md": 6})],
+                        spacing=12, run_spacing=8,
+                    ),
+                    ft.ResponsiveRow(
+                        [ft.Container(email_field, col={"xs": 12, "md": 6}), ft.Container(phone_field, col={"xs": 12, "md": 6})],
+                        spacing=12, run_spacing=8,
+                    ),
+                    subject_field,
+                    message_field,
+                ],
+                tight=True,
+                spacing=10,
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=ft.padding.only(top=4),
+        ),
+        actions=[
+            ft.TextButton("Abbrechen", on_click=close_dialog),
+            ft.ElevatedButton(
+                "Senden",
+                on_click=submit_contact,
+                style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE),
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+    page.open(contact_dialog)

@@ -66,6 +66,7 @@ class DiscoverView:
         on_contact_click: Optional[Callable[[Dict[str, Any]], None]] = None,
         on_melden_click: Optional[Callable[[], None]] = None,
         on_login_required: Optional[Callable[[], None]] = None,
+        on_contact_login_required: Optional[Callable[[], None]] = None,
         on_save_search_login_required: Optional[Callable[[], None]] = None,
         on_comment_login_required: Optional[Callable[[], None]] = None,
     ) -> None:
@@ -75,6 +76,7 @@ class DiscoverView:
         self.on_contact_click = on_contact_click
         self.on_melden_click = on_melden_click
         self.on_login_required = on_login_required
+        self.on_contact_login_required = on_contact_login_required
         self.on_save_search_login_required = on_save_search_login_required
         self.on_comment_login_required = on_comment_login_required
 
@@ -672,174 +674,33 @@ class DiscoverView:
         """Verarbeitet Kontakt-Klick: Login prüfen und Kontaktformular anzeigen."""
         self.refresh_user()
         if not self.current_user_id:
-            if self.on_login_required:
+            if self.on_contact_login_required:
+                self.on_contact_login_required()
+            elif self.on_login_required:
                 self.on_login_required()
             return
 
         self._show_contact_form_dialog(item)
 
     def _show_contact_form_dialog(self, item: Dict[str, Any]) -> None:
-        """Zeigt ein an das App-Design angepasstes Kontaktformular als Popup."""
-        current_user = self.profile_service.get_current_user()
-        email_value = (self.profile_service.get_email() or "").strip()
+        """Zeigt das Kontaktformular als Dialog."""
+        from ui.discover.components.post_card_components import show_contact_form_dialog
 
-        user_meta = getattr(current_user, "user_metadata", {}) or {}
-        first_name_value = (
-            user_meta.get("first_name")
-            or user_meta.get("firstname")
-            or ""
-        )
-        last_name_value = (
-            user_meta.get("last_name")
-            or user_meta.get("lastname")
-            or ""
-        )
-
-        email_field = ft.TextField(
-            label="E-Mail",
-            value=email_value,
-            read_only=True,
-            border_radius=10,
-            expand=True,
-        )
-        phone_field = ft.TextField(
-            label="Telefon (optional)",
-            hint_text="z. B. 0911/123456",
-            border_radius=10,
-            expand=True,
-        )
-        first_name_field = ft.TextField(
-            label="Vorname",
-            value=str(first_name_value or ""),
-            border_radius=10,
-            expand=True,
-        )
-        last_name_field = ft.TextField(
-            label="Nachname",
-            value=str(last_name_value or ""),
-            border_radius=10,
-            expand=True,
-        )
-        subject_field = ft.TextField(
-            label="Betreff",
-            border_radius=10,
-            max_length=120,
-            counter_text="",
-            expand=True,
-        )
-        message_field = ft.TextField(
-            label="Mitteilung",
-            multiline=True,
-            min_lines=6,
-            max_lines=8,
-            border_radius=10,
-            max_length=2000,
-            hint_text="Textlänge (maximal 2000)",
-            expand=True,
-        )
-
-        post_title = str(item.get("headline") or item.get("title") or "Meldung")
-
-        def close_dialog(_e: Optional[ft.ControlEvent] = None) -> None:
-            self.page.close(contact_dialog)
-
-        def submit_contact(_e: ft.ControlEvent) -> None:
-            subject = (subject_field.value or "").strip()
-            message = (message_field.value or "").strip()
-
-            if not subject:
-                subject_field.error_text = "Bitte Betreff eingeben."
-                self.page.update()
-                return
-            subject_field.error_text = None
-
-            if not message:
-                message_field.error_text = "Bitte Mitteilung eingeben."
-                self.page.update()
-                return
-            message_field.error_text = None
-
-            contact_payload = {
-                "post_id": item.get("id"),
-                "post_title": post_title,
-                "email": email_field.value,
-                "phone": (phone_field.value or "").strip() or None,
-                "first_name": (first_name_field.value or "").strip() or None,
-                "last_name": (last_name_field.value or "").strip() or None,
-                "subject": subject,
-                "message": message,
-            }
-
-            logger.info("Kontaktanfrage erstellt für Post %s", contact_payload.get("post_id"))
-
+        def on_submit(payload: Dict[str, Any]) -> None:
             if self.on_contact_click:
                 try:
                     callback_payload = dict(item)
-                    callback_payload["contact_request"] = contact_payload
+                    callback_payload["contact_request"] = payload
                     self.on_contact_click(callback_payload)
                 except Exception as ex:
                     logger.warning(f"Externer Kontakt-Callback fehlgeschlagen: {ex}")
 
-            self.page.close(contact_dialog)
-            self.page.snack_bar = ft.SnackBar(
-                ft.Text("Kontaktanfrage vorbereitet."),
-                bgcolor=PRIMARY_COLOR,
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-
-        contact_dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Kontaktformular", weight=ft.FontWeight.W_600),
-            content=ft.Container(
-                width=760,
-                content=ft.Column(
-                    [
-                        ft.Text(
-                            f"Ihre Nachricht zu: {post_title}",
-                            size=13,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
-                        ft.ResponsiveRow(
-                            [
-                                ft.Container(first_name_field, col={"xs": 12, "md": 6}),
-                                ft.Container(last_name_field, col={"xs": 12, "md": 6}),
-                            ],
-                            spacing=12,
-                            run_spacing=8,
-                        ),
-                        ft.ResponsiveRow(
-                            [
-                                ft.Container(email_field, col={"xs": 12, "md": 6}),
-                                ft.Container(phone_field, col={"xs": 12, "md": 6}),
-                            ],
-                            spacing=12,
-                            run_spacing=8,
-                        ),
-                        subject_field,
-                        message_field,
-                    ],
-                    tight=True,
-                    spacing=10,
-                    scroll=ft.ScrollMode.AUTO,
-                ),
-                padding=ft.padding.only(top=4),
-            ),
-            actions=[
-                ft.TextButton("Abbrechen", on_click=close_dialog),
-                ft.ElevatedButton(
-                    "Senden",
-                    on_click=submit_contact,
-                    style=ft.ButtonStyle(
-                        bgcolor=PRIMARY_COLOR,
-                        color=ft.Colors.WHITE,
-                    ),
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        show_contact_form_dialog(
+            page=self.page,
+            item=item,
+            profile_service=self.profile_service,
+            on_submit_callback=on_submit,
         )
-
-        self.page.open(contact_dialog)
     
     def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
         """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""

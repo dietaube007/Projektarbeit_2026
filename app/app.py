@@ -31,6 +31,7 @@ from ui.constants import (
 
 from app.dialogs import (
     show_comment_login_dialog,
+    show_contact_login_dialog,
     show_favorite_login_dialog,
     show_login_required_dialog,
     show_saved_search_login_dialog,
@@ -511,6 +512,10 @@ class PetBuddyApp:
                     on_contact_click=None,
                     on_melden_click=self.go_to_melden_tab,
                     on_login_required=lambda: show_favorite_login_dialog(
+                        self.page,
+                        on_login=self._open_login,
+                    ),
+                    on_contact_login_required=lambda: show_contact_login_dialog(
                         self.page,
                         on_login=self._open_login,
                     ),

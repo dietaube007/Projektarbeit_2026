@@ -111,6 +111,33 @@ def show_favorite_login_dialog(
     page.open(dialog)
 
 
+def create_contact_login_dialog(
+    page: ft.Page,
+    on_login_click: Callable[[ft.ControlEvent], None],
+    on_cancel_click: Callable[[ft.ControlEvent], None]
+) -> ft.AlertDialog:
+    """Erstellt einen Dialog wenn Gast den Ersteller kontaktieren möchte."""
+    return _create_login_dialog(
+        "Bitte melden Sie sich an, um den Ersteller zu kontaktieren.",
+        on_login_click,
+        on_cancel_click,
+    )
+
+
+def show_contact_login_dialog(
+    page: ft.Page,
+    on_login: Optional[Callable[[], None]] = None,
+    on_cancel: Optional[Callable[[], None]] = None,
+) -> None:
+    """Offnet den Kontakt-Login-Dialog und verdrahtet die Callbacks."""
+    dialog = create_contact_login_dialog(
+        page,
+        lambda _e: _handle_dialog_action(page, dialog, on_login),
+        lambda _e: _handle_dialog_action(page, dialog, on_cancel),
+    )
+    page.open(dialog)
+
+
 def create_saved_search_login_dialog(
     page: ft.Page,
     on_login_click: Callable[[ft.ControlEvent], None],
