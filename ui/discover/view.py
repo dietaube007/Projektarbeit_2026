@@ -239,6 +239,7 @@ class DiscoverView:
         self._radius_dropdown = create_radius_dropdown(
             on_change=on_filter_change
         )
+        self._radius_dropdown.disabled = True
         self._location_suggestions_list = ft.Column(spacing=2)
         self._location_suggestions_box = ft.Container(
             content=self._location_suggestions_list,
@@ -408,6 +409,8 @@ class DiscoverView:
         # Bei leerem Feld: Vorschlaege schliessen und Posts ohne Ort-Filter laden
         if not query or not query.strip():
             self._clear_location_suggestions()
+            self._radius_dropdown.disabled = True
+            self._radius_dropdown.value = "all"
             self.page.update()
             self.page.run_task(self.load_posts)
             return
@@ -460,7 +463,8 @@ class DiscoverView:
 
         self._clear_location_suggestions()
 
-        # Sicherstellen, dass ein Umkreis gewaehlt ist
+        # Umkreis-Dropdown aktivieren da ein Ort gewaehlt wurde
+        self._radius_dropdown.disabled = False
         if not self._radius_dropdown.value:
             self._radius_dropdown.value = "all"
 

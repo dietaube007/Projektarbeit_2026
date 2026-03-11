@@ -55,6 +55,7 @@ def reset_filters(
         location_field.value = ""
     if radius_dropdown is not None:
         radius_dropdown.value = "all"
+        radius_dropdown.disabled = True
     if location_selected is not None:
         location_selected["text"] = None
         location_selected["lat"] = None
@@ -168,6 +169,8 @@ def apply_saved_search_filters(
     if location_field is not None:
         location_field.value = saved_location_text or ""
     if radius_dropdown is not None:
+        has_location = bool(saved_location_lat and saved_location_lon)
+        radius_dropdown.disabled = not has_location
         if saved_radius_km:
             radius_dropdown.value = str(int(saved_radius_km))
         else:
