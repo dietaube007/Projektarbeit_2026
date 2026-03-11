@@ -16,13 +16,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Installiere andere Dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir \
-    flet==0.28.3 \
-    pillow>=10.0.0 \
-    python-dotenv>=1.0.0 \
-    supabase>=2.0.0 \
-    transformers>=4.30.0 \
-    numpy>=1.24.0
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Final-Stage - nur Runtime-Dependencies
 FROM python:3.11-slim
