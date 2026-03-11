@@ -67,6 +67,10 @@ class SavedSearchService:
         breed_id: Optional[Any] = None,
         sex_id: Optional[Any] = None,
         colors: Optional[List[int]] = None,
+        location_text: Optional[str] = None,
+        location_lat: Optional[float] = None,
+        location_lon: Optional[float] = None,
+        radius_km: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Bereitet die Filter für die Speicherung vor.
         
@@ -77,6 +81,10 @@ class SavedSearchService:
             breed_id: Rasse-Filter (kann int oder "keine_angabe" sein)
             sex_id: Geschlechts-Filter (kann int oder "keine_angabe" sein)
             colors: Liste der Farb-IDs
+            location_text: Ortsname (Freitext)
+            location_lat: Breitengrad des Ortes
+            location_lon: Längengrad des Ortes
+            radius_km: Umkreis in km
         
         Returns:
             Dictionary mit bereinigten Filterwerten
@@ -95,6 +103,14 @@ class SavedSearchService:
             filters["geschlecht"] = "keine_angabe"
         if breed_id == "keine_angabe":
             filters["rasse"] = "keine_angabe"
+
+        # Ort/Umkreis speichern
+        if location_lat is not None and location_lon is not None:
+            filters["location_text"] = location_text
+            filters["location_lat"] = location_lat
+            filters["location_lon"] = location_lon
+            if radius_km is not None:
+                filters["radius_km"] = radius_km
         
         # None-Werte aus dem JSON entfernen, um es schlank zu halten
         return {k: v for k, v in filters.items() if v not in (None, [], "")}
@@ -150,6 +166,10 @@ class SavedSearchService:
         breed_id: Optional[Any] = None,  # Kann int oder "keine_angabe" sein
         sex_id: Optional[Any] = None,  # Kann int oder "keine_angabe" sein
         colors: Optional[List[int]] = None,
+        location_text: Optional[str] = None,
+        location_lat: Optional[float] = None,
+        location_lon: Optional[float] = None,
+        radius_km: Optional[float] = None,
     ) -> Tuple[bool, str]:
         """Speichert einen neuen Suchauftrag.
 
@@ -161,6 +181,10 @@ class SavedSearchService:
             breed_id: Rasse-Filter
             sex_id: Geschlechts-Filter
             colors: Liste der Farb-IDs
+            location_text: Ortsname
+            location_lat: Breitengrad
+            location_lon: Längengrad
+            radius_km: Umkreis in km
 
         Returns:
             Tuple (Erfolg, Fehlermeldung oder leerer String)
@@ -200,6 +224,10 @@ class SavedSearchService:
                 breed_id=breed_id,
                 sex_id=sex_id,
                 colors=colors,
+                location_text=location_text,
+                location_lat=location_lat,
+                location_lon=location_lon,
+                radius_km=radius_km,
             )
 
             # Daten vorbereiten

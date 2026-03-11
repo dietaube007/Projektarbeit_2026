@@ -117,6 +117,15 @@ def build_search_card(
     if colors and len(colors) > 0:
         filter_chips.append(filter_chip(f"{len(colors)} Farben"))
 
+    # Ort / Umkreis
+    loc_text = filters.get("location_text")
+    loc_lat = filters.get("location_lat")
+    loc_lon = filters.get("location_lon")
+    radius_km = filters.get("radius_km")
+    if loc_text and loc_lat is not None and loc_lon is not None:
+        radius_label = f"{int(radius_km)} km" if radius_km else "Ganzer Ort"
+        filter_chips.append(filter_chip(f"Ort: {loc_text} ({radius_label})"))
+
     # Falls keine Filter aktiv
     if not filter_chips:
         filter_chips.append(filter_chip("Alle Meldungen", ft.Colors.GREY_400))
@@ -280,7 +289,7 @@ def build_saved_searches_list(
                             on_apply_search,
                             load_searches,
                         ),
-                        col={"xs": 12, "md": 6},
+                        col=12,
                     )
                 )
 

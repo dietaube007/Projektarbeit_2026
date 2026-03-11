@@ -54,6 +54,13 @@ def show_save_search_dialog(
     colors = current_filters.get("colors", [])
     if colors:
         active_filters.append(f"{len(colors)} Farben")
+    loc_text = current_filters.get("location_text")
+    loc_lat = current_filters.get("location_lat")
+    loc_lon = current_filters.get("location_lon")
+    radius_km = current_filters.get("radius_km")
+    if loc_text and loc_lat is not None and loc_lon is not None:
+        radius_label = f"{int(radius_km)} km" if radius_km else "Ganzer Ort"
+        active_filters.append(f"Ort: {loc_text} ({radius_label})")
 
     filter_preview = ft.Text(
         ", ".join(active_filters) if active_filters else "Alle Meldungen (keine Filter aktiv)",
@@ -88,6 +95,10 @@ def show_save_search_dialog(
             breed_id=breed_id,
             sex_id=sex_id,
             colors=current_filters.get("colors"),
+            location_text=current_filters.get("location_text"),
+            location_lat=current_filters.get("location_lat"),
+            location_lon=current_filters.get("location_lon"),
+            radius_km=current_filters.get("radius_km"),
         )
 
         if success:
