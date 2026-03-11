@@ -141,7 +141,7 @@ async def perform_ai_recognition(
                 page.close(progress_dlg)
                 return
         except Exception as ex:
-            show_error_dialog(page, "Fehler", f"Fehler beim Laden des Bildes: {ex}")
+            show_error_dialog(page, "Fehler beim Laden des Bildes", f"Details: {str(ex)}")
             page.close(progress_dlg)
             return
         
@@ -164,8 +164,14 @@ async def perform_ai_recognition(
                 return
         
         # Hole das Ergebnis
-        result = future.result()
-        executor.shutdown(wait=False)
+        try:
+            result = future.result()
+        except Exception as ex:
+            page.close(progress_dlg)
+            show_error_dialog(page, "KI-Fehler", f"Die KI konnte das Bild nicht verarbeiten:\n\n{str(ex)}")
+            return
+        finally:
+            executor.shutdown(wait=False)
         
         # Finale Abbruch-Prüfung nach der Erkennung
         if ai_recognition_cancelled_ref.get("cancelled"):
@@ -194,7 +200,7 @@ async def perform_ai_recognition(
             show_error_dialog(page, "KI-Erkennung", message)
                 
     except Exception as ex:
-        show_error_dialog(page, "Fehler", f"Fehler: {ex}")
+        show_error_dialog(page, "Fehler", f"Fehler: {str(ex)}")
         if 'progress_dlg' in locals():
             try:
                 page.close(progress_dlg)

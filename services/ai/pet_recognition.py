@@ -27,7 +27,22 @@ class PetRecognitionService:
             return
         
         try:
-            from transformers import AutoImageProcessor, AutoModelForImageClassification
+            logger.info("=" * 60)
+            logger.info("STARTE MODELL-LADEN")
+            logger.info("=" * 60)
+            
+            from transformers import AutoModelForImageClassification
+            logger.info("AutoModelForImageClassification importiert")
+
+            try:
+                # Neuere transformers-Versionen
+                from transformers import AutoImageProcessor as ProcessorClass
+                logger.info("AutoImageProcessor (neuere Version) importiert")
+            except Exception as import_ex:
+                logger.warning(f"AutoImageProcessor konnte nicht importiert werden: {import_ex}")
+                # Fallback für ältere transformers-Versionen
+                from transformers import AutoFeatureExtractor as ProcessorClass
+                logger.info("AutoFeatureExtractor (Fallback) importiert")
             
             # Verwende ein stabiles, bewährtes Modell für Bildklassifikation
             # Dieses Modell ist nicht speziell für Haustiere, aber funktioniert zuverlässig
@@ -38,19 +53,34 @@ class PetRecognitionService:
             logger.info("Dies kann beim ersten Start einige Minuten dauern...")
             logger.info("Hinweis: Dies ist ein allgemeines Bilderkennungsmodell (ImageNet-basiert)")
             
-            self.processor = AutoImageProcessor.from_pretrained(model_name)
+            logger.info(f"Lade Processor ({ProcessorClass.__name__})...")
+            self.processor = ProcessorClass.from_pretrained(model_name)
+            logger.info(f"Processor geladen: {type(self.processor).__name__}")
+            
+            logger.info("Lade Modell...")
             self.model = AutoModelForImageClassification.from_pretrained(model_name)
+            logger.info(f"Modell geladen: {type(self.model).__name__}")
             
             self.labels = self.model.config.id2label
             self._model_loaded = True
-            logger.info("Modell erfolgreich geladen!")
+            logger.info(f"Labels geladen: {len(self.labels)} Klassen")
+            logger.info("=" * 60)
+            logger.info("MODELL-LADEN ERFOLGREICH")
+            logger.info("=" * 60)
             
         except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler beim Laden des Modells: {e}", exc_info=True)
+            logger.error("=" * 60)
+            logger.error("FEHLER BEIM MODELL-LADEN")
+            logger.error("=" * 60)
+            logger.error(f"Exception: {type(e).__name__}")
+            logger.error(f"Nachricht: {str(e)}")
+            logger.error("Details: ", exc_info=True)
+            logger.error("=" * 60)
             # Setze Flag, dass Modell nicht verfügbar ist
             self._model_loaded = False
             raise RuntimeError(
-                "KI-Modell konnte nicht geladen werden.\n\n"
+                f"KI-Modell konnte nicht geladen werden.\n\n"
+                f"Fehler: {type(e).__name__}: {str(e)}\n\n"
                 "Mögliche Ursachen:\n"
                 "- Keine Internetverbindung beim ersten Start\n"
                 "- Hugging Face ist nicht erreichbar\n"
@@ -189,24 +219,39 @@ class PetRecognitionService:
                 - error: str - Fehlermeldung falls success=False
         """
         try:
+            logger.info("=" * 60)
+            logger.info("STARTE RASSENERKENNUNG")
+            logger.info(f"Bilddaten: {len(image_data)} bytes")
+            logger.info(f"Modell geladen: {self._model_loaded}")
+            logger.info("=" * 60)
+            
             # Lade Modell falls noch nicht geschehen
             if not self._model_loaded:
+                logger.info("Modell ist noch nicht geladen, lade es jetzt...")
                 self._load_model()
+                logger.info("Modell erfolgreich geladen")
             
             # Bild vorbereiten
+            logger.info("Bereite Bild vor...")
             img = self._preprocess_image(image_data)
+            logger.info(f"Bild vorbereitet: {img.size}, Mode: {img.mode}")
             
             # Inference
+            logger.info("Starte Inference...")
             inputs = self.processor(images=img, return_tensors="pt")
+            logger.info("Inputs vorbereitet")
             outputs = self.model(**inputs)
+            logger.info("Modell-Ausgabe erhalten")
             
             # Hole Vorhersage
             import torch
+            logger.info("Berechne Wahrscheinlichkeiten...")
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
             top_prob, top_class = probs[0].topk(1)
             
             confidence = top_prob.item()
             predicted_label = self.labels[top_class.item()]
+            logger.info(f"Erkannte Klasse: '{predicted_label}' mit {confidence:.2%} Konfidenz")
             
             # Bestimme Tierart und formatiere Rasse
             species, breed = self._is_cat_or_dog(predicted_label)
@@ -254,7 +299,13 @@ class PetRecognitionService:
             }
             
         except Exception as e:  # noqa: BLE001
-            logger.error(f"Fehler bei der Erkennung: {e}", exc_info=True)
+            logger.error("=" * 60)
+            logger.error("FEHLER BEI DER RASSENERKENNUNG")
+            logger.error("=" * 60)
+            logger.error(f"Exception: {type(e).__name__}")
+            logger.error(f"Nachricht: {str(e)}")
+            logger.error("Details: ", exc_info=True)
+            logger.error("=" * 60)
             return {
                 "success": False,
                 "error": f"Fehler bei der Erkennung: {str(e)}",

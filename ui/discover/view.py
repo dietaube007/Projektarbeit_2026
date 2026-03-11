@@ -4,17 +4,26 @@ Discover-View mit Listen- und Kartendarstellung.
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, List
 import flet as ft
 from supabase import Client
 
 from services.posts.references import ReferenceService
 from services.posts import SavedSearchService, FavoritesService, SearchService
+from services.posts.map_service import MapDataService
 from services.account import ProfileService
 from ui.theme import get_theme_color, soft_card
+from ui.constants import PRIMARY_COLOR
 from ui.shared_components import (
     create_empty_state_card,
     create_loading_indicator,
+)
+from ui.discover.map import (
+    build_map_container,
+    build_map_loading_indicator,
+    build_map_empty_state,
+    build_map_error,
+    handle_map_marker_click,
 )
 from app.dialogs import create_login_banner
 from utils.logging_config import get_logger
@@ -111,6 +120,13 @@ class DiscoverView:
         self._location_selected: Dict[str, Any] = {"text": None, "lat": None, "lon": None}
         self._location_query_version: int = 0
         self._location_setting_value: bool = False  # Verhindert on_change bei programmatischer Aenderung
+
+        # Karten-State
+        self._map_container: Optional[ft.Container] = None
+        self._map_data_service = MapDataService()
+        self._all_loaded_posts: List[Dict[str, Any]] = []  # Alle Posts für die Karte
+        self._map_loaded = False  # Flag ob Karte bereits gerendert wurde
+        self._current_tab_index = 0  # 0 = Liste, 1 = Karte
 
         self._all_breeds = {"breeds": {}}
 
@@ -617,6 +633,11 @@ class DiscoverView:
     
     def _render_items(self, items: list[dict]) -> None:
         """Rendert die geladenen Items in der Listen-Ansicht."""
+        # Speichere Posts für Karten-Rendering
+        self._all_loaded_posts = items
+        # Markiere Karte als nicht geladen damit sie neu gerendert wird bei Filter-Änderung
+        self._map_loaded = False
+        
         handle_view_render_items(
             items=items,
             current_items=self.current_items,
@@ -625,7 +646,7 @@ class DiscoverView:
             page=self.page,
             on_favorite_click=self._toggle_favorite,
             on_card_click=self._show_detail_dialog,
-            on_contact_click=self.on_contact_click,
+            on_contact_click=self._handle_contact_click,
             supabase=self.sb,
             profile_service=self.profile_service,
             on_comment_login_required=self.on_comment_login_required,
@@ -636,12 +657,185 @@ class DiscoverView:
         handle_view_show_detail_dialog(
             item=item,
             page=self.page,
-            on_contact_click=self.on_contact_click,
+            on_contact_click=self._handle_contact_click,
             on_favorite_click=self._toggle_favorite,
             profile_service=self.profile_service,
             supabase=self.sb,
             on_comment_login_required=self.on_comment_login_required,
         )
+
+    def _handle_contact_click(self, item: Dict[str, Any]) -> None:
+        """Verarbeitet Kontakt-Klick: Login prüfen und Kontaktformular anzeigen."""
+        self.refresh_user()
+        if not self.current_user_id:
+            if self.on_login_required:
+                self.on_login_required()
+            return
+
+        self._show_contact_form_dialog(item)
+
+    def _show_contact_form_dialog(self, item: Dict[str, Any]) -> None:
+        """Zeigt ein an das App-Design angepasstes Kontaktformular als Popup."""
+        current_user = self.profile_service.get_current_user()
+        email_value = (self.profile_service.get_email() or "").strip()
+
+        user_meta = getattr(current_user, "user_metadata", {}) or {}
+        first_name_value = (
+            user_meta.get("first_name")
+            or user_meta.get("firstname")
+            or ""
+        )
+        last_name_value = (
+            user_meta.get("last_name")
+            or user_meta.get("lastname")
+            or ""
+        )
+
+        email_field = ft.TextField(
+            label="E-Mail",
+            value=email_value,
+            read_only=True,
+            border_radius=10,
+            expand=True,
+        )
+        phone_field = ft.TextField(
+            label="Telefon (optional)",
+            hint_text="z. B. 0911/123456",
+            border_radius=10,
+            expand=True,
+        )
+        first_name_field = ft.TextField(
+            label="Vorname",
+            value=str(first_name_value or ""),
+            border_radius=10,
+            expand=True,
+        )
+        last_name_field = ft.TextField(
+            label="Nachname",
+            value=str(last_name_value or ""),
+            border_radius=10,
+            expand=True,
+        )
+        subject_field = ft.TextField(
+            label="Betreff",
+            border_radius=10,
+            max_length=120,
+            counter_text="",
+            expand=True,
+        )
+        message_field = ft.TextField(
+            label="Mitteilung",
+            multiline=True,
+            min_lines=6,
+            max_lines=8,
+            border_radius=10,
+            max_length=2000,
+            hint_text="Textlänge (maximal 2000)",
+            expand=True,
+        )
+
+        post_title = str(item.get("headline") or item.get("title") or "Meldung")
+
+        def close_dialog(_e: Optional[ft.ControlEvent] = None) -> None:
+            self.page.close(contact_dialog)
+
+        def submit_contact(_e: ft.ControlEvent) -> None:
+            subject = (subject_field.value or "").strip()
+            message = (message_field.value or "").strip()
+
+            if not subject:
+                subject_field.error_text = "Bitte Betreff eingeben."
+                self.page.update()
+                return
+            subject_field.error_text = None
+
+            if not message:
+                message_field.error_text = "Bitte Mitteilung eingeben."
+                self.page.update()
+                return
+            message_field.error_text = None
+
+            contact_payload = {
+                "post_id": item.get("id"),
+                "post_title": post_title,
+                "email": email_field.value,
+                "phone": (phone_field.value or "").strip() or None,
+                "first_name": (first_name_field.value or "").strip() or None,
+                "last_name": (last_name_field.value or "").strip() or None,
+                "subject": subject,
+                "message": message,
+            }
+
+            logger.info("Kontaktanfrage erstellt für Post %s", contact_payload.get("post_id"))
+
+            if self.on_contact_click:
+                try:
+                    callback_payload = dict(item)
+                    callback_payload["contact_request"] = contact_payload
+                    self.on_contact_click(callback_payload)
+                except Exception as ex:
+                    logger.warning(f"Externer Kontakt-Callback fehlgeschlagen: {ex}")
+
+            self.page.close(contact_dialog)
+            self.page.snack_bar = ft.SnackBar(
+                ft.Text("Kontaktanfrage vorbereitet."),
+                bgcolor=PRIMARY_COLOR,
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+
+        contact_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Kontaktformular", weight=ft.FontWeight.W_600),
+            content=ft.Container(
+                width=760,
+                content=ft.Column(
+                    [
+                        ft.Text(
+                            f"Ihre Nachricht zu: {post_title}",
+                            size=13,
+                            color=ft.Colors.ON_SURFACE_VARIANT,
+                        ),
+                        ft.ResponsiveRow(
+                            [
+                                ft.Container(first_name_field, col={"xs": 12, "md": 6}),
+                                ft.Container(last_name_field, col={"xs": 12, "md": 6}),
+                            ],
+                            spacing=12,
+                            run_spacing=8,
+                        ),
+                        ft.ResponsiveRow(
+                            [
+                                ft.Container(email_field, col={"xs": 12, "md": 6}),
+                                ft.Container(phone_field, col={"xs": 12, "md": 6}),
+                            ],
+                            spacing=12,
+                            run_spacing=8,
+                        ),
+                        subject_field,
+                        message_field,
+                    ],
+                    tight=True,
+                    spacing=10,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
+                padding=ft.padding.only(top=4),
+            ),
+            actions=[
+                ft.TextButton("Abbrechen", on_click=close_dialog),
+                ft.ElevatedButton(
+                    "Senden",
+                    on_click=submit_contact,
+                    style=ft.ButtonStyle(
+                        bgcolor=PRIMARY_COLOR,
+                        color=ft.Colors.WHITE,
+                    ),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.page.open(contact_dialog)
     
     def _toggle_favorite(self, item: Dict[str, Any], icon_button: ft.IconButton) -> None:
         """Fügt eine Meldung zu Favoriten hinzu oder entfernt sie."""
@@ -654,6 +848,45 @@ class DiscoverView:
             on_login_required=self.on_login_required,
             refresh_user_callback=self.refresh_user,
         )
+
+    def _toggle_favorite_from_map(self, post_id: str) -> None:
+        """Toggelt Favoritenstatus für einen Post aus der Kartenansicht."""
+        # Auth prüfen
+        self.refresh_user()
+        if not self.current_user_id:
+            if self.on_login_required:
+                self.on_login_required()
+            return
+
+        try:
+            post_id = str(post_id)
+            is_favorite = self.favorites_service.is_favorite(post_id)
+
+            success = (
+                self.favorites_service.remove_favorite(post_id)
+                if is_favorite
+                else self.favorites_service.add_favorite(post_id)
+            )
+
+            if not success:
+                self.page.snack_bar = ft.SnackBar(ft.Text("Favorit konnte nicht aktualisiert werden."))
+                self.page.snack_bar.open = True
+                self.page.update()
+                return
+
+            message = "Aus Favoriten entfernt" if is_favorite else "Zu Favoriten hinzugefügt"
+            self.page.snack_bar = ft.SnackBar(ft.Text(message))
+            self.page.snack_bar.open = True
+            self.page.update()
+
+            # Daten neu laden, damit Status in Listen-/Kartensicht konsistent bleibt
+            self.page.run_task(self.load_posts)
+
+        except Exception as ex:
+            logger.error(f"Fehler beim Favorisieren aus Karte: {ex}", exc_info=True)
+            self.page.snack_bar = ft.SnackBar(ft.Text("Fehler beim Favorisieren."))
+            self.page.snack_bar.open = True
+            self.page.update()
     
     def apply_saved_search(self, search: Dict[str, Any]) -> None:
         """Wendet einen gespeicherten Suchauftrag auf die Filter an."""
@@ -778,6 +1011,81 @@ class DiscoverView:
             )
 
     # ─────────────────────────────────────────────────────────────
+    # Map Rendering
+    # ─────────────────────────────────────────────────────────────
+
+    async def _load_and_render_map(self) -> None:
+        """Lädt und rendert die Karte mit aktuellen gefilterten Posts."""
+        if not self._map_container:
+            return
+
+        # Loading-Indikator anzeigen
+        self._map_container.content = build_map_loading_indicator()
+        self.page.update()
+
+        try:
+            # Posts holen (gefiltert)
+            posts = self._all_loaded_posts if self._all_loaded_posts else []
+
+            if not posts:
+                # Keine Posts vorhanden
+                self._map_container.content = build_map_empty_state()
+                self.page.update()
+                return
+
+            # Posts mit Koordinaten filtern
+            posts_with_coords = [
+                p for p in posts 
+                if p.get("location_lat") is not None and p.get("location_lon") is not None
+            ]
+
+            if not posts_with_coords:
+                # Keine Posts mit Koordinaten
+                self._map_container.content = build_map_empty_state()
+                self.page.update()
+                return
+
+            # Mittelpunkt berechnen
+            center = self._map_data_service.get_center_point(posts_with_coords)
+
+            # Verfügbare Resthöhe für Karte berechnen
+            page_height = self.page.height if self.page and self.page.height else 900
+            map_height = max(float(page_height) - 255.0, 360.0)
+
+            # Marker-Click-Handler
+            def on_marker_click(post_id: str):
+                handle_map_marker_click(
+                    post_id=post_id,
+                    posts=posts,  # ALLE Posts übergeben (nicht nur mit Koordinaten)
+                    page=self.page,
+                    show_detail_dialog=self._show_detail_dialog,
+                )
+
+            # Karte rendern (mit Clustering bei >10 Posts)
+            map_widget = build_map_container(
+                posts=posts_with_coords,
+                page=self.page,
+                on_marker_click=on_marker_click,
+                on_favorite_click=self._toggle_favorite_from_map,
+                center_lat=center[0],
+                center_lon=center[1],
+                zoom_level=5,
+                use_clustering=len(posts_with_coords) > 10,
+                map_height=map_height,
+            )
+
+            self._map_container.content = map_widget
+            self._map_container.height = map_height
+            self._map_loaded = True
+            logger.info(f"Karte gerendert mit {len(posts_with_coords)} Meldungen")
+            self.page.update()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Rendern der Karte: {e}", exc_info=True)
+            self._map_container.content = build_map_error(str(e))
+            self.page.update()
+
+    # ─────────────────────────────────────────────────────────────
     # Build
     # ─────────────────────────────────────────────────────────────
 
@@ -790,27 +1098,34 @@ class DiscoverView:
             content=self._list_view,
         )
 
-        map_placeholder = ft.Column(
-            [
-                ft.Container(height=50),
-                ft.Icon(ft.Icons.MAP_OUTLINED, size=64, color=ft.Colors.GREY_400),
-                ft.Text("Kartenansicht", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.GREY_600),
-                ft.Text("Kommt bald!", color=ft.Colors.GREY_500),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            alignment=ft.MainAxisAlignment.CENTER,
+        # Map-Container (wird lazy geladen)
+        self._map_container = ft.Container(
+            content=build_map_loading_indicator(),
+            expand=True,
+            bgcolor=ft.Colors.SURFACE,
         )
 
         # Tab-Inhalte: Index 0 = Meldungen, Index 1 = Karte
-        tab_contents = [content_container, map_placeholder]
-        tab_body = ft.Container(content=tab_contents[0])
+        tab_contents = [content_container, self._map_container]
+        tab_body = ft.Container(content=tab_contents[0], expand=True)
 
         def switch_tab(index: int):
+            """Wechselt zwischen List- und Map-Tab."""
+            self._current_tab_index = index
             tab_body.content = tab_contents[index]
+            
+            # Button-Styling aktualisieren
             for i, btn in enumerate(tab_buttons):
                 btn.style = ft.ButtonStyle(
                     color=ft.Colors.PRIMARY if i == index else ft.Colors.GREY_500,
                 )
+            
+            # Bei Wechsel zur Karte: Lazy-Loading
+            if index == 1:
+                # Karte neu rendern wenn Filter geändert oder noch nicht geladen
+                if not self._map_loaded:
+                    self.page.run_task(self._load_and_render_map)
+            
             self.page.update()
 
         tab_buttons = [
@@ -859,4 +1174,4 @@ class DiscoverView:
 
         self.page.run_task(self.load_posts)
 
-        return ft.Column([tab_bar, ft.Divider(height=1), tab_body], spacing=0)
+        return ft.Column([tab_bar, ft.Divider(height=1), tab_body], spacing=0, expand=True)
