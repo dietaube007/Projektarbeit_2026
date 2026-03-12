@@ -6,16 +6,18 @@ repo_name: dietaube007/Projektarbeit_2026
 theme:
   name: material
   language: de
+  favicon: assets/petbuddy_logo.png
+  logo: assets/petbuddy_logo.png
   palette:
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: deep purple
+      accent: light blue
       toggle:
         icon: material/brightness-7
         name: Dunkelmodus
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: deep purple
+      accent: light blue
       toggle:
         icon: material/brightness-4
         name: Hellmodus
@@ -36,7 +38,11 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - tables
@@ -46,3 +52,5 @@ markdown_extensions:
 nav:
   - Home: index.html
   - Installation & Quickstart: installation-quickstart.md
+  - Technische Dokumentation: technische-dokumentation.md
+  - Nutzungshandbuch: nutzungshandbuch.md

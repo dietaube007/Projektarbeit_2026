@@ -169,6 +169,7 @@ h1 {
   background: linear-gradient(135deg, var(--blue), var(--purple));
   padding: 1.6rem 3.5rem;
   display: flex; align-items: center; justify-content: center; gap: 3rem;
+  scroll-margin-top: 64px;
 }
 .slogan-word { color: white; font-family: 'Lora',serif; font-size: 1.45rem; font-style: italic; }
 .slogan-dot  { color: rgba(255,255,255,.45); font-size: 1.4rem; }
@@ -210,9 +211,9 @@ h1 {
 .fi-pink   { background: #fdedf0; }
 .fi-teal   { background: #e6f5f5; }
 .fi-orange { background: #fff3e0; }
-.feat-card h3 { font-size: .92rem; font-weight: 800; margin-bottom: .4rem; }
-.feat-card p  { font-size: .8rem; line-height: 1.7; color: var(--text-soft); }
-.feat-tech { display: inline-block; margin-top: .8rem; font-size: .68rem; font-weight: 700; color: var(--purple); opacity: .75; }
+.feat-card h3 { font-size: .92rem; font-weight: 800; margin-bottom: 1rem; }
+.feat-card p  { font-size: .9rem; line-height: 1.8; color: var(--text-soft); }
+.feat-tech { display: inline-block; margin-top: .8rem; font-size: .8rem; font-weight: 700; color: var(--purple); opacity: .75; }
 
 /* ── TEAM ── */
 .team {
