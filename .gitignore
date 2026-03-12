@@ -50,3 +50,5 @@ htmlcov/
 
 # Supabase 
 .supabase/
+# MkDocs build output
+documentation/site/

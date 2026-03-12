@@ -19,3 +19,8 @@ numpy>=1.24.0
 # Karten-Integration (kostenlos mit OpenStreetMap)
 folium>=0.14.0
 branca>=0.6.0
+
+# Dokumentation (optional, nur für Entwicklung)
+# Installiere mit: pip install -r requirements.txt
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0

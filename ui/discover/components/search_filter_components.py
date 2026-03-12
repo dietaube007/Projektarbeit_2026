@@ -158,7 +158,7 @@ def create_sort_dropdown(
     dropdown = ft.Dropdown(
         label=None,
         hint_text="Sortieren",
-        prefix_icon=ft.Icons.SORT,
+        leading_icon=ft.Icons.SORT,
         options=[
             ft.dropdown.Option("created_at_desc", "Erstelldatum (neueste)"),
             ft.dropdown.Option("created_at_asc", "Erstelldatum (älteste)"),

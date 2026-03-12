@@ -1,66 +1,19 @@
 # PetBuddy
 
-Eine moderne Web-Anwendung zur Vermittlung von vermissten und gefundenen Tieren.
-
-![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
-![Flet](https://img.shields.io/badge/Flet-0.28.3-green.svg)
-![Supabase](https://img.shields.io/badge/Supabase-Backend-orange.svg)
-
----
+PetBuddy ist eine Webanwendung fuer vermisste und gefundene Haustiere.
 
 ## Schnellstart
 
-```bash
-# 1. Dependencies installieren
-pip install -r requirements.txt
+Die vollstaendige Anleitung steht in MkDocs:
 
-# 2. .env Datei erstellen
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-FLET_SECRET_KEY=...
-MAPBOX_TOKEN=...
-
-# 3. Anwendung starten
-python main.py
-```
-
-Die Anwendung öffnet sich automatisch im Browser unter `http://localhost:8550`
-
----
+- Installation & Quickstart: https://dietaube007.github.io/Projektarbeit_2026/installation-quickstart/
 
 ## Dokumentation
 
-**Vollständige Dokumentation:** [https://dietaube007.github.io/Projektarbeit_2026/](https://dietaube007.github.io/Projektarbeit_2026/)
+- Live: https://dietaube007.github.io/Projektarbeit_2026/
+- Lokal: `uv run mkdocs serve -f documentation/mkdocs.yml`
 
-Lokal starten:
+## Support
 
-```bash
-cd documentation
-mkdocs serve
-```
+- Issues: https://github.com/dietaube007/Projektarbeit_2026/issues
 
----
-
-## Technologie-Stack
-
-- **Flet** - Python UI-Framework
-- **Supabase** - Backend (PostgreSQL, Auth, Storage)
-- **Python 3.13+** - Programmiersprache
-- **Material Design 3** - Design-System
-
----
-
-## Projektstruktur
-
-```
-├── app/              # Hauptanwendungslogik
-├── services/         # Business Logic & Datenbankzugriff
-├── ui/              # UI-Komponenten
-├── utils/           # Utility-Module
-├── documentation/   # MkDocs Dokumentation
-└── main.py          # Einstiegspunkt
-```
-
----
-
-**Projektarbeit 2026**
