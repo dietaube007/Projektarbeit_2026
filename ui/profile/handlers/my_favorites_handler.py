@@ -104,6 +104,7 @@ async def load_favorites(
     page: ft.Page,
     sb,
     on_favorites_changed: Optional[Callable] = None,
+    on_count_updated: Optional[Callable[[List[dict]], None]] = None,
 ) -> List[dict]:
     """Lädt alle favorisierten Meldungen des aktuellen Benutzers.
     
@@ -113,6 +114,7 @@ async def load_favorites(
         page: Flet Page-Instanz
         sb: Supabase Client
         on_favorites_changed: Optionaler Callback wenn Favoriten geändert wurden
+        on_count_updated: Optionaler Callback zum Aktualisieren des Counter-Texts
     
     Returns:
         Liste der geladenen Favoriten
@@ -138,12 +140,15 @@ async def load_favorites(
                     sb=sb,
                     profile_service=profile_service,
                     on_favorites_changed=on_favorites_changed,
+                    on_count_updated=on_count_updated,
                 ),
                 page=page,
                 sb=sb,
                 profile_service=profile_service,
                 not_logged_in=True,
             )
+            if on_count_updated:
+                on_count_updated(favorites_items)
             page.update()
             return favorites_items
 
@@ -163,11 +168,14 @@ async def load_favorites(
                 sb=sb,
                 profile_service=profile_service,
                 on_favorites_changed=on_favorites_changed,
+                on_count_updated=on_count_updated,
             ),
             page=page,
             sb=sb,
             profile_service=profile_service,
         )
+        if on_count_updated:
+            on_count_updated(favorites_items)
         page.update()
         return favorites_items
 
@@ -185,11 +193,14 @@ async def load_favorites(
                 sb=sb,
                 profile_service=profile_service,
                 on_favorites_changed=on_favorites_changed,
+                on_count_updated=on_count_updated,
             ),
             page=page,
             sb=sb,
             profile_service=profile_service,
         )
+        if on_count_updated:
+            on_count_updated(favorites_items)
         page.update()
         return favorites_items
 
@@ -202,6 +213,7 @@ def remove_favorite(
     sb,
     profile_service=None,
     on_favorites_changed: Optional[Callable] = None,
+    on_count_updated: Optional[Callable[[List[dict]], None]] = None,
 ) -> None:
     """Entfernt einen Post aus den Favoriten.
     
@@ -212,6 +224,7 @@ def remove_favorite(
         page: Flet Page-Instanz
         sb: Supabase Client
         on_favorites_changed: Optionaler Callback wenn Favoriten geändert wurden
+        on_count_updated: Optionaler Callback zum Aktualisieren des Counter-Texts
     """
     def on_confirm() -> None:
         try:
@@ -221,8 +234,9 @@ def remove_favorite(
             # Aus Datenbank löschen
             if favorites_service.remove_favorite(str(post_id)):
                 # Lokal entfernen
+                target_id = str(post_id)
                 favorites_items[:] = [
-                    p for p in favorites_items if p.get("id") != post_id
+                    p for p in favorites_items if str(p.get("id")) != target_id
                 ]
                 current_profile_service = profile_service
                 if current_profile_service is None:
@@ -240,11 +254,14 @@ def remove_favorite(
                         sb=sb,
                         profile_service=current_profile_service,
                         on_favorites_changed=on_favorites_changed,
+                        on_count_updated=on_count_updated,
                     ),
                     page=page,
                     sb=sb,
                     profile_service=current_profile_service,
                 )
+                if on_count_updated:
+                    on_count_updated(favorites_items)
                 page.update()
 
                 # Startseite informieren

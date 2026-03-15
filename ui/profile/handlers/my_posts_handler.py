@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable, List, Optional
 from pathlib import Path
 from urllib.parse import urlparse
+from datetime import date
 import time
 import uuid
 import flet as ft
@@ -78,7 +79,19 @@ def handle_mark_reunited(
             return
 
         post_service = PostService(sb)
-        post_service.update(str(post.get("id")), {"post_status_id": reunited["id"]})
+        post_service.update(
+            str(post.get("id")),
+            {
+                "post_status_id": reunited["id"],
+                "event_date": date.today().isoformat(),
+            },
+        )
+        
+        # Schließe Detail-Dialog wenn offen, damit aktualisierte Daten geladen werden
+        if hasattr(page, '_detail_dialog_instance') and page._detail_dialog_instance:
+            page.close(page._detail_dialog_instance)
+            page._detail_dialog_instance = None
+        
         show_success_dialog(page, "Aktualisiert", "Meldung wurde auf 'Wiedervereint' gesetzt.")
         if on_posts_changed:
             on_posts_changed()

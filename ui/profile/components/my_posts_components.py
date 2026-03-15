@@ -242,6 +242,7 @@ def create_my_posts_view(
     my_posts_list: ft.ResponsiveRow,
     my_posts_items: List[dict],
     page: Optional[ft.Page] = None,
+    count_text_control: Optional[ft.Text] = None,
 ) -> list[ft.Control]:
     """Erstellt die Meine Posts-Ansicht.
 
@@ -249,6 +250,7 @@ def create_my_posts_view(
         my_posts_list: ResponsiveRow-Container für die Posts-Grid
         my_posts_items: Liste der Post-Dictionaries
         page: Flet Page-Instanz (für Dark-Mode)
+        count_text_control: Optionales, wiederverwendbares Text-Control für den Counter
     Returns:
         Liste von Controls für My Posts-View
     """
@@ -256,11 +258,15 @@ def create_my_posts_view(
     c_secondary = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_600
     count_text = f"{len(my_posts_items)} Meldung(en)" if my_posts_items else ""
 
+    counter_text = count_text_control or ft.Text("", size=12)
+    counter_text.value = count_text
+    counter_text.color = c_secondary
+
     header = ft.Container(
         content=ft.Row([
             ft.Text("Meine Meldungen", size=18, weight=ft.FontWeight.W_600),
             ft.Container(expand=True),
-            ft.Text(count_text, size=12, color=c_secondary),
+            counter_text,
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         padding=ft.padding.symmetric(horizontal=16, vertical=8),
     )

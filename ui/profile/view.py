@@ -137,6 +137,15 @@ class ProfileView:
 
         self.display_name = ft.Text("Lädt...", size=24, weight=ft.FontWeight.W_600)
         self.email_text = ft.Text("", size=14, color=ft.Colors.GREY_600)
+        self.favorites_count_text = ft.Text("", size=12)
+        self.my_posts_count_text = ft.Text("", size=12)
+
+    def _update_favorites_counter(self, favorites_items: List[dict]) -> None:
+        """Aktualisiert den Favoriten-Counter im Header."""
+        self.favorites_count_text.value = f"{len(favorites_items)} Meldung(en)" if favorites_items else ""
+        self.favorites_count_text.color = (
+            ft.Colors.GREY_400 if self.page.theme_mode == ft.ThemeMode.DARK else ft.Colors.GREY_600
+        )
 
     # ─────────────────────────────────────────────────────────────
     # DATEN LADEN
@@ -307,7 +316,10 @@ class ProfileView:
             page=self.page,
             sb=self.sb,
             on_favorites_changed=self.on_favorites_changed,
+            on_count_updated=self._update_favorites_counter,
         )
+        self._update_favorites_counter(self.favorites_items)
+        self.page.update()
 
     def _remove_favorite(self, post_id: str):
         """Entfernt einen Post aus den Favoriten."""
@@ -318,6 +330,7 @@ class ProfileView:
             page=self.page,
             sb=self.sb,
             on_favorites_changed=self.on_favorites_changed,
+            on_count_updated=self._update_favorites_counter,
         )
 
     async def _load_my_posts(self):
@@ -333,6 +346,12 @@ class ProfileView:
             on_mark_reunited=self._mark_reunited,
             on_export_pdf=self._export_post_pdf,
         )
+        count_text = f"{len(self.my_posts_items)} Meldung(en)" if self.my_posts_items else ""
+        self.my_posts_count_text.value = count_text
+        self.my_posts_count_text.color = (
+            ft.Colors.GREY_400 if self.page.theme_mode == ft.ThemeMode.DARK else ft.Colors.GREY_600
+        )
+        self.page.update()
 
     def _edit_post(self, post: dict):
         """Bearbeitet einen Post."""
@@ -372,6 +391,12 @@ class ProfileView:
             on_mark_reunited=self._mark_reunited,
             profile_service=self.profile_service,
         )
+        count_text = f"{len(self.my_posts_items)} Meldung(en)" if self.my_posts_items else ""
+        self.my_posts_count_text.value = count_text
+        self.my_posts_count_text.color = (
+            ft.Colors.GREY_400 if self.page.theme_mode == ft.ThemeMode.DARK else ft.Colors.GREY_600
+        )
+        self.page.update()
 
     def _mark_reunited(self, post: dict):
         """Setzt eine Meldung auf 'Wiedervereint'."""
@@ -507,6 +532,7 @@ class ProfileView:
             favorites_list=self.favorites_list,
             favorites_items=self.favorites_items,
             page=self.page,
+            count_text_control=self.favorites_count_text,
         )
 
     def _build_my_posts(self) -> list:
@@ -515,6 +541,7 @@ class ProfileView:
             my_posts_list=self.my_posts_list,
             my_posts_items=self.my_posts_items,
             page=self.page,
+            count_text_control=self.my_posts_count_text,
         )
 
     def _build_saved_searches(self) -> list:

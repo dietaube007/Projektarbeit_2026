@@ -4,7 +4,7 @@ My Favorites Components: UI-Komponenten für Favoriten-Anzeige.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, Optional
 
 import flet as ft
 
@@ -156,6 +156,7 @@ def create_favorites_view(
     favorites_list: ft.ResponsiveRow,
     favorites_items: list[dict],
     page: Optional[ft.Page] = None,
+    count_text_control: Optional[ft.Text] = None,
 ) -> list[ft.Control]:
     """Erstellt die Favoriten-Ansicht.
     
@@ -163,6 +164,7 @@ def create_favorites_view(
         favorites_list: ResponsiveRow-Container für die Favoriten-Liste
         favorites_items: Liste der Favoriten-Posts
         page: Flet Page-Instanz (für Dark-Mode)
+        count_text_control: Optionales, wiederverwendbares Text-Control für den Counter
     Returns:
         Liste von Controls für Favoriten-View
     """
@@ -170,11 +172,15 @@ def create_favorites_view(
     c_secondary = ft.Colors.GREY_400 if is_dark else ft.Colors.GREY_600
     count_text = f"{len(favorites_items)} Meldung(en)" if favorites_items else ""
 
+    counter_text = count_text_control or ft.Text("", size=12)
+    counter_text.value = count_text
+    counter_text.color = c_secondary
+
     header = ft.Container(
         content=ft.Row([
             ft.Text("Favorisierte Meldungen", size=18, weight=ft.FontWeight.W_600),
             ft.Container(expand=True),
-            ft.Text(count_text, size=12, color=c_secondary),
+            counter_text,
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         padding=ft.padding.symmetric(horizontal=16, vertical=8),
     )
