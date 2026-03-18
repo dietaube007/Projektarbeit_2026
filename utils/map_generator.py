@@ -226,11 +226,15 @@ def generate_map_html(
     Returns:
         HTML-String der Karte
     """
-    # Karte initialisieren mit 100% Größe
+    # Karte initialisieren mit 100% Größe.
+    # Hinweis: Die Karte wird in einer WebView per data:-URL gerendert.
+    # Direkte OSM-Tiles erfordern einen Referer-Header und liefern sonst 403.
+    # CartoDB Voyager ist optisch naeher am klassischen OSM-Design,
+    # bleibt in dieser Einbettung aber robuster als direkte OSM-Tiles.
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom_level,
-        tiles="OpenStreetMap",
+        tiles="CartoDB Voyager",
         prefer_canvas=True,  # Performance-Optimierung
         control_scale=True,
         width="100%",
@@ -239,6 +243,9 @@ def generate_map_html(
 
     # UTF-8 + Layout für volle Flächennutzung im WebView
     m.get_root().header.add_child(folium.Element('<meta charset="utf-8">'))
+    m.get_root().header.add_child(
+        folium.Element('<meta name="referrer" content="strict-origin-when-cross-origin">')
+    )
     map_name = m.get_name()
     m.get_root().header.add_child(
         folium.Element(
